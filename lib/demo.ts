@@ -1,0 +1,152 @@
+import type { State, Brand, Content } from './types';
+const pillars = [
+  { name: 'Produtos', percent: 30 },
+  { name: 'Institucional', percent: 20 },
+  { name: 'Educacional', percent: 20 },
+  { name: 'Cases', percent: 15 },
+  { name: 'Comercial', percent: 10 },
+  { name: 'Datas comemorativas', percent: 5 },
+];
+const brand = (
+  id: string,
+  name: string,
+  segment: string,
+  description: string,
+  colors: string,
+): Brand => ({
+  id,
+  name,
+  segment,
+  description,
+  colors,
+  website: '',
+  social: '',
+  voice: 'Próximo, confiante e claro.',
+  keywords: 'qualidade, cuidado, inovação',
+  forbidden: '',
+  direction: 'Composições simples, produto em destaque, bastante espaço.',
+  notes: 'Marca fictícia para demonstração.',
+  fonts: 'Saira',
+  products: 'Linha principal de produtos',
+  services: 'Atendimento consultivo',
+  monthlyGoal: 12,
+  weeklyGoal: 3,
+  pillars,
+});
+const brands = [
+  brand(
+    'b1',
+    'Forma',
+    'Arquitetura',
+    'Espaços que conectam pessoas e ideias.',
+    '#c5bcb0, #262626',
+  ),
+  brand(
+    'b2',
+    'Nativa',
+    'Saúde',
+    'Bem-estar em cada escolha.',
+    '#b6c3a5, #26332d',
+  ),
+  brand(
+    'b3',
+    'Órbita',
+    'Tecnologia',
+    'Tecnologia para negócios em movimento.',
+    '#a995c4, #292334',
+  ),
+];
+const names = [
+  'Um novo olhar para o essencial',
+  'O cuidado começa nas pequenas escolhas',
+  'Ideias que movem o seu negócio',
+  'Detalhes que transformam espaços',
+  'Sua rotina pode ser mais leve',
+  'Por trás de cada conexão',
+  'Feito para durar',
+  'Conheça nossa forma de cuidar',
+  'Uma nova perspectiva',
+  'O futuro começa agora',
+  'Histórias que inspiram',
+  'Mais perto do que importa',
+];
+const states: Content['status'][] = [
+  'ALTERAÇÃO',
+  'APROVAÇÃO',
+  'REVISÃO',
+  'EM CRIAÇÃO',
+  'APROVADO',
+  'PUBLICADO',
+  'APROVAÇÃO',
+  'PLANEJADO',
+  'EM CRIAÇÃO',
+  'PUBLICADO',
+  'IDEIA',
+  'APROVADO',
+];
+export function demoState(month = '2026-09'): State {
+  const contents: Content[] = names.map((title, i) => ({
+    id: 'c' + (i + 1),
+    brandId: brands[i % 3].id,
+    title,
+    brief: 'Apresentar a proposta da marca com clareza e uma abordagem humana.',
+    objective: i % 2 ? 'Engajamento' : 'Reconhecimento de marca',
+    pillar: pillars[i % pillars.length].name,
+    date: month + '-' + String(8 + i).padStart(2, '0'),
+    format: 'Feed + Story',
+    status: states[i],
+    createdAt: month + '-01T12:00:00Z',
+  }));
+  return {
+    brands,
+    contents,
+    versions: contents.map((c) => ({
+      id: 'v' + c.id,
+      contentId: c.id,
+      number: 1,
+      headline: c.title,
+      copy: 'Uma ideia. Novas possibilidades.',
+      caption:
+        'São os detalhes que fazem a diferença. Descubra novas possibilidades com a gente e conte: o que inspira você hoje?',
+      hashtags: [
+        '#Inspiração',
+        '#NovasIdeias',
+        '#Criatividade',
+        '#Conexão',
+        '#Propósito',
+      ],
+      feedUrl: '',
+      storyUrl: '',
+      change: 'Primeira versão demonstrativa',
+      createdAt: month + '-08T12:00:00Z',
+      locked: ['APROVADO', 'PUBLICADO'].includes(c.status) ? 1 : 0,
+    })),
+    assets: [],
+    comments: [
+      {
+        id: 'comment1',
+        contentId: 'c1',
+        text: 'Dar mais destaque à mensagem principal e simplificar o texto de apoio.',
+        createdAt: month + '-09T14:00:00Z',
+        user: 'Aprovador demo',
+      },
+    ],
+    dates: [
+      {
+        id: 'd1',
+        name: 'Dia do Cliente',
+        date: month + '-15',
+        segments: 'Comercial,Varejo,Tecnologia,Arquitetura,Saúde',
+        relevance: 'Alta',
+      },
+      {
+        id: 'd2',
+        name: 'Início da campanha de primavera',
+        date: month + '-22',
+        segments: 'Institucional',
+        relevance: 'Média',
+      },
+    ],
+    plans: [],
+  };
+}

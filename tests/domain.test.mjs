@@ -1,0 +1,111 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  validatePillars,
+  validateHashtags,
+  validateDate,
+  validateMonth,
+  assertTransition,
+  planProposal,
+  similarTopics,
+} from '../lib/domain.ts';
+const brand = {
+  id: 'b',
+  name: 'Teste',
+  voice: 'Claro',
+  pillars: [
+    { name: 'Produtos', percent: 30 },
+    { name: 'Educação', percent: 70 },
+  ],
+};
+const plan = {
+  month: '2026-09',
+  monthlyGoal: 12,
+  weeklyGoal: 3,
+  days: [2, 4, 6],
+  selectedDates: ['special'],
+  campaign: '',
+};
+test('pilares exigem total de 100 e não aceitam negativos', () => {
+  validatePillars(brand.pillars);
+  assert.throws(() => validatePillars([{ name: 'Teste', percent: 90 }]));
+  assert.throws(() =>
+    validatePillars([
+      { name: 'A', percent: -10 },
+      { name: 'B', percent: 110 },
+    ]),
+  );
+});
+test('cinco hashtags únicas com acentos', () => {
+  validateHashtags(['#Marca', '#Inspiração', '#Arte', '#Design', '#Futuro']);
+  assert.throws(() => validateHashtags(['#A', '#B', '#C', '#D']));
+  assert.throws(() => validateHashtags(['#A', '#a', '#C', '#D', '#E']));
+  assert.throws(() =>
+    validateHashtags(['#A', '#B', '#C', '#D', '#Com espaço']),
+  );
+});
+test('datas rejeitam dias inexistentes', () => {
+  validateDate('2024-02-29');
+  assert.throws(() => validateDate('2026-02-29'));
+  assert.throws(() => validateMonth('2026-13'));
+});
+test('aprovação não pode pular revisão e publicação protege estado', () => {
+  assertTransition('REVISÃO', 'APROVAÇÃO');
+  assertTransition('APROVADO', 'PUBLICADO');
+  assert.throws(() => assertTransition('IDEIA', 'APROVADO'));
+  assert.throws(() => assertTransition('PUBLICADO', 'EM CRIAÇÃO'));
+});
+test('planejamento preserva quantidade, mês, dias e distribuição', () => {
+  const result = planProposal(
+    brand,
+    plan,
+    [{ id: 'special', name: 'Data própria', date: '2026-09-14' }],
+    [],
+  );
+  assert.equal(result.length, 12);
+  assert.equal(result.filter((c) => c.pillar === 'Produtos').length, 4);
+  assert.equal(result.filter((c) => c.pillar === 'Educação').length, 8);
+  assert.ok(result.some((c) => c.date === '2026-09-14'));
+  assert.ok(result.every((c) => c.date.startsWith('2026-09')));
+  assert.ok(
+    result
+      .filter((c) => c.title !== 'Data própria')
+      .every((c) =>
+        plan.days.includes(new Date(c.date + 'T12:00:00').getDay()),
+      ),
+  );
+});
+test('planejamento rejeita frequência vazia e limites inválidos', () => {
+  assert.throws(() => planProposal(brand, { ...plan, days: [] }, [], []));
+  assert.throws(() =>
+    planProposal(brand, { ...plan, monthlyGoal: 101 }, [], []),
+  );
+});
+test('alerta identifica tema semelhante sem bloquear', () => {
+  assert.equal(
+    similarTopics('Inovação para novos negócios', [
+      { title: 'Inovação para novos negócios' },
+    ]).length,
+    1,
+  );
+  assert.equal(
+    similarTopics('Paisagismo residencial', [
+      { title: 'Transformação digital' },
+    ]).length,
+    0,
+  );
+});
+
+test('planejamento completa a meta sem duplicar conteúdos existentes', () => {
+  const existing = Array.from({ length: 4 }, (_, i) => ({
+    id: String(i),
+    brandId: 'b',
+    date: '2026-09-08',
+    pillar: 'Produtos',
+    title: 'Pauta antiga',
+  }));
+  const result = planProposal(brand, plan, [], existing);
+  assert.equal(result.length, 8);
+  assert.equal(result.filter((c) => c.pillar === 'Produtos').length, 0);
+  assert.ok(result.every((c) => c.date !== '2026-09-08'));
+});
