@@ -5,45 +5,43 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Field, FormModal } from './forms';
-import { BrandMark, ContentRow } from './shared';
+import { BrandOnboarding } from './brand-onboarding';
+import { LibraryView } from './library';
+import { Planning } from './planning';
+import { Contents } from './contents';
+import { identityCompleteness } from '@/lib/brand-memory';
+import { BrandMark } from './shared';
 import type { State, Brand, Content, Action } from '@/lib/types';
-const emptyBrand: Brand = {
-  id: '',
-  name: '',
-  segment: '',
-  description: '',
-  website: '',
-  social: '',
-  voice: '',
-  keywords: '',
-  forbidden: '',
-  direction: '',
-  notes: '',
-  colors: '',
-  fonts: '',
-  products: '',
-  services: '',
-  monthlyGoal: 12,
-  weeklyGoal: 3,
-  pillars: [
-    { name: 'Institucional', percent: 50 },
-    { name: 'Produtos', percent: 50 },
-  ],
-};
 export function Brands({
   state,
   act,
   open,
-  library,
+  reload,
+  month,
+  create,
 }: {
   state: State;
   act: Action;
   open: (c: Content) => void;
-  library: (id: string) => void;
+  reload: () => Promise<void>;
+  month: string;
+  create: (date?: string, brandId?: string) => void;
 }) {
+  const [onboarding, setOnboarding] = useState(false);
+  const [brandTab, setBrandTab] = useState('overview');
   const [selected, setSelected] = useState('');
   const [editing, setEditing] = useState<Brand | null>(null);
   const b = state.brands.find((b) => b.id === selected);
+  const completeness = b ? identityCompleteness(b, state.assets) : null;
+  const scoped = b
+    ? {
+        ...state,
+        brands: [b],
+        contents: state.contents.filter((c) => c.brandId === b.id),
+        assets: state.assets.filter((a) => a.brandId === b.id),
+        plans: state.plans.filter((p) => p.brandId === b.id),
+      }
+    : state;
   return (
     <>
       <div className="page-heading">
@@ -58,7 +56,7 @@ export function Brands({
         </div>
         <button
           className="create-btn"
-          onClick={() => setEditing(b || emptyBrand)}
+          onClick={() => (b ? setEditing(b) : setOnboarding(true))}
         >
           <Plus size={17} />
           {b ? 'Editar marca' : 'Adicionar marca'}
@@ -69,11 +67,13 @@ export function Brands({
           <button className="text-btn back" onClick={() => setSelected('')}>
             ← Todas as marcas
           </button>
-          <Tabs defaultValue="overview">
+          <Tabs value={brandTab} onValueChange={(v) => setBrandTab(String(v))}>
             <TabsList variant="line">
               <TabsTrigger value="overview">Visão geral</TabsTrigger>
-              <TabsTrigger value="identity">Identidade e regras</TabsTrigger>
-              <TabsTrigger value="history">Conteúdos anteriores</TabsTrigger>
+              <TabsTrigger value="planning">Planejamento</TabsTrigger>
+              <TabsTrigger value="contents">Conteúdos</TabsTrigger>
+              <TabsTrigger value="library">Biblioteca</TabsTrigger>
+              <TabsTrigger value="settings">Configurações</TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
               <div className="brand-overview">
@@ -91,7 +91,11 @@ export function Brands({
                   </div>
                   <div className="detail-line">
                     <span>Redes sociais</span>
-                    <strong>{b.social || 'Não informado'}</strong>
+                    <strong>
+                      {[b.instagram, b.linkedin, b.social]
+                        .filter(Boolean)
+                        .join(' · ') || 'Não informado'}
+                    </strong>
                   </div>
                   <div className="detail-line">
                     <span>Meta mensal</span>
@@ -116,10 +120,30 @@ export function Brands({
                     {state.assets.filter((a) => a.brandId === b.id).length}
                     <small> arquivos na biblioteca</small>
                   </div>
-                  <button className="outline-btn" onClick={() => library(b.id)}>
+                  <button
+                    className="outline-btn"
+                    onClick={() => setBrandTab('library')}
+                  >
                     <BookOpen size={16} /> Abrir biblioteca{' '}
                     <ArrowUpRight size={15} />
                   </button>
+                  <h2 className="section-space">
+                    Identidade da marca · {completeness?.percent}%
+                  </h2>
+                  <p className="form-hint">
+                    Complete quando quiser. Estes itens ajudam a orientar a
+                    criação.
+                  </p>
+                  <div className="identity-checks">
+                    {completeness?.checks.map((c) => (
+                      <span
+                        key={c.label}
+                        className={c.complete ? 'complete' : ''}
+                      >
+                        {c.complete ? '✓' : '○'} {c.label}
+                      </span>
+                    ))}
+                  </div>
                   <h2 className="section-space">Pilares de conteúdo</h2>
                   {b.pillars.map((p) => (
                     <div className="detail-line" key={p.name}>
@@ -130,7 +154,7 @@ export function Brands({
                 </section>
               </div>
             </TabsContent>
-            <TabsContent value="identity">
+            <TabsContent value="settings">
               <section className="panel identity-grid">
                 {[
                   ['Tom de voz', b.voice],
@@ -139,7 +163,10 @@ export function Brands({
                   ['Direção visual', b.direction],
                   ['Cores', b.colors],
                   ['Fontes', b.fonts],
-                  ['Regras da IA e observações', b.notes],
+                  ['Estilo de comunicação', b.communicationStyle],
+                  ['Regras específicas', b.rules],
+                  ['Orientações para criação', b.creationNotes],
+                  ['Observações do cliente', b.notes],
                 ].map(([label, value]) => (
                   <div key={label}>
                     <h3>{label}</h3>
@@ -148,17 +175,35 @@ export function Brands({
                 ))}
               </section>
             </TabsContent>
-            <TabsContent value="history">
-              {state.contents
-                .filter((c) => c.brandId === b.id)
-                .map((c) => (
-                  <ContentRow
-                    key={c.id}
-                    item={c}
-                    brand={b}
-                    onOpen={() => open(c)}
-                  />
-                ))}
+            <TabsContent value="planning" className="brand-module">
+              <Planning
+                key={b.id + month}
+                state={scoped}
+                month={month}
+                act={act}
+                open={open}
+                create={create}
+                fixedBrandId={b.id}
+              />
+            </TabsContent>
+            <TabsContent value="contents" className="brand-module">
+              <Contents
+                key={b.id}
+                state={scoped}
+                month={month}
+                open={open}
+                create={create}
+                fixedBrandId={b.id}
+              />
+            </TabsContent>
+            <TabsContent value="library" className="brand-module">
+              <LibraryView
+                key={b.id}
+                state={scoped}
+                brandId={b.id}
+                act={act}
+                reload={reload}
+              />
             </TabsContent>
           </Tabs>
         </>
@@ -168,7 +213,10 @@ export function Brands({
             <button
               key={b.id}
               className="brand-card"
-              onClick={() => setSelected(b.id)}
+              onClick={() => {
+                setSelected(b.id);
+                setBrandTab('overview');
+              }}
             >
               <div className="brand-card-top">
                 <BrandMark brand={b} />
@@ -195,6 +243,17 @@ export function Brands({
             </button>
           ))}
         </div>
+      )}
+      {onboarding && (
+        <BrandOnboarding
+          close={() => setOnboarding(false)}
+          created={async (id) => {
+            await reload();
+            setSelected(id);
+            setBrandTab('overview');
+            setOnboarding(false);
+          }}
+        />
       )}
       {editing && (
         <BrandEditor brand={editing} act={act} close={() => setEditing(null)} />
@@ -250,7 +309,9 @@ function BrandEditor({
               ['name', 'Nome'],
               ['segment', 'Segmento'],
               ['website', 'Site'],
-              ['social', 'Redes sociais'],
+              ['instagram', 'Instagram'],
+              ['linkedin', 'LinkedIn'],
+              ['social', 'Outras redes'],
             ].map(([k, l]) => (
               <Field key={k} label={l}>
                 <Input
@@ -270,6 +331,7 @@ function BrandEditor({
               ['description', 'Descrição'],
               ['products', 'Produtos'],
               ['services', 'Serviços'],
+              ['notes', 'Observações do cliente'],
             ].map(([k, l]) => (
               <Field key={k} label={l}>
                 <Textarea
@@ -294,7 +356,9 @@ function BrandEditor({
               ['keywords', 'Palavras importantes'],
               ['forbidden', 'Palavras proibidas'],
               ['direction', 'Direção visual'],
-              ['notes', 'Regras da IA e observações'],
+              ['communicationStyle', 'Estilo de comunicação'],
+              ['rules', 'Regras específicas'],
+              ['creationNotes', 'Orientações para criação'],
             ].map(([k, l]) => (
               <Field key={k} label={l}>
                 <Textarea

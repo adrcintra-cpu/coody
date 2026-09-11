@@ -1,27 +1,7 @@
-import type { Brand, Asset, Content, Version } from './types';
-export type BrandContext = {
-  brand: Brand;
-  references: Asset[];
-  history: Content[];
-  brief: string;
-};
-export function buildBrandContext(
-  brand: Brand,
-  assets: Asset[],
-  history: Content[],
-  brief: string,
-): BrandContext {
-  return {
-    brand,
-    references: assets
-      .filter((a) => a.brandId === brand.id)
-      .sort(
-        (a, b) => b.approved * 2 + b.priority - (a.approved * 2 + a.priority),
-      ),
-    history: history.filter((c) => c.brandId === brand.id),
-    brief,
-  };
-}
+import type { Content, Version } from './types';
+import type { BrandContext } from './brand-memory';
+export { buildBrandContext } from './brand-memory';
+export type { BrandContext } from './brand-memory';
 export interface OpenAIService {
   generateText(
     context: BrandContext,

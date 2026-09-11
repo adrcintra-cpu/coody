@@ -1901,3 +1901,27 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
   font-weight: 300;
   font-synthesis: none;
 }
+
+/* Brand onboarding and scoped library extend the existing workspace. */
+.onboarding-steps { width:100%; height:auto; flex-wrap:wrap; justify-content:flex-start; gap:4px; margin-bottom:22px; }
+.onboarding-steps button { gap:6px; white-space:normal; font-size:14px; }
+.onboarding-fields { min-width:0; border:0; padding:0; margin:0; }
+.pending-asset { margin:18px 0; padding:18px; border:1px solid var(--border); border-radius:12px; }
+.pending-asset h3 { display:flex; gap:8px; align-items:center; overflow-wrap:anywhere; }
+.onboarding-summary .detail-line { gap:20px; overflow-wrap:anywhere; }
+.library-context { margin-bottom:20px; }
+.selected-brand-context { display:flex; gap:8px; align-items:center; font-size:14px; }
+.category-summary { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 24px; }
+.category-summary button { border:1px solid var(--border); border-radius:8px; padding:9px 12px; font-size:14px; }
+.category-summary button.active { background:var(--accent); color:var(--accent-foreground); }
+.asset-title { display:flex; align-items:start; justify-content:space-between; gap:8px; }
+.asset-title h3,.asset-description,.asset-ai-notes { overflow-wrap:anywhere; }
+.asset-brand { font-size:14px; margin:8px 0; }
+.asset-description,.asset-ai-notes { font-size:14px; line-height:1.6; margin:10px 0; }
+.asset-ai-notes { padding:10px; border-left:2px solid var(--border); }
+.asset-flags,.identity-checks { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.asset-flags span,.identity-checks span { font-size:13px; border:1px solid var(--border); border-radius:6px; padding:4px 8px; }
+.identity-checks .complete { color:var(--primary); }
+.brand-module { padding-top:20px; }
+.brand-module .page-heading h1 { font-size:24px; }
+@media(max-width:640px) { .onboarding-steps button { flex:1 1 40%; } .pending-asset { padding:12px; } .onboarding-summary .detail-line { flex-wrap:wrap; } }

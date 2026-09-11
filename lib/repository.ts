@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { canonicalCategory } from './brand-memory';
 import { demoState } from './demo';
 import type {
   State,
@@ -21,6 +22,7 @@ export function bucket() {
 const allowed = new Set([
   'users',
   'brands',
+  'brand_guidelines',
   'content_items',
   'content_versions',
   'brand_assets',
@@ -96,7 +98,13 @@ export async function readState(): Promise<State> {
         hashtags: string;
       })[]
     ).map((v) => ({ ...v, hashtags: JSON.parse(v.hashtags) })),
-    assets: results[3].results as unknown as Asset[],
+    assets: (results[3].results as unknown as Asset[]).map((a) => ({
+      ...a,
+      category: canonicalCategory(a.category, a.approved),
+      description: a.description || '',
+      aiNotes: a.aiNotes || '',
+      updatedAt: a.updatedAt || a.createdAt,
+    })),
     comments: results[4].results as unknown as Comment[],
     dates: results[5].results as unknown as SpecialDate[],
     plans: (
@@ -110,4 +118,20 @@ export async function readState(): Promise<State> {
       selectedDates: JSON.parse(p.selectedDates),
     })),
   };
+}
+
+export function saveGuidelines(brandId: string, rules: string, now: string) {
+  const db = database();
+  return [
+    db
+      .prepare(
+        'UPDATE brand_guidelines SET rules=?, updatedAt=? WHERE brandId=?',
+      )
+      .bind(rules, now, brandId),
+    db
+      .prepare(
+        'INSERT INTO brand_guidelines (id,brandId,rules,updatedAt) SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM brand_guidelines WHERE brandId=?)',
+      )
+      .bind('guidelines:' + brandId, brandId, rules, now, brandId),
+  ];
 }

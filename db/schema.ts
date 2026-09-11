@@ -17,6 +17,11 @@ export const brands = sqliteTable('brands', {
   description: text().notNull(),
   website: text().notNull(),
   social: text().notNull(),
+  instagram: text().notNull().default(''),
+  linkedin: text().notNull().default(''),
+  communicationStyle: text().notNull().default(''),
+  rules: text().notNull().default(''),
+  creationNotes: text().notNull().default(''),
   voice: text().notNull(),
   keywords: text().notNull(),
   forbidden: text().notNull(),
@@ -33,6 +38,9 @@ export const brands = sqliteTable('brands', {
 export const brandAssets = sqliteTable(
   'brand_assets',
   {
+    description: text().notNull().default(''),
+    aiNotes: text().notNull().default(''),
+    updatedAt: text().notNull().default(''),
     id: text().primaryKey(),
     brandId: text()
       .notNull()

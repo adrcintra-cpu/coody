@@ -121,20 +121,28 @@ export function ContentForm({
       >
         <div className="form-grid">
           <Field label="Marca">
-            <Picker
-              label="Marca"
-              value={brand}
-              onChange={(v) => {
-                setBrand(v);
-                setPillar(
-                  state.brands.find((b) => b.id === v)?.pillars[0]?.name || '',
-                );
-              }}
-              options={state.brands.map((b) => ({
-                value: b.id,
-                label: b.name,
-              }))}
-            />
+            {initial || brandId ? (
+              <Input
+                readOnly
+                value={state.brands.find((b) => b.id === brand)?.name || ''}
+              />
+            ) : (
+              <Picker
+                label="Marca"
+                value={brand}
+                onChange={(v) => {
+                  setBrand(v);
+                  setPillar(
+                    state.brands.find((b) => b.id === v)?.pillars[0]?.name ||
+                      '',
+                  );
+                }}
+                options={state.brands.map((b) => ({
+                  value: b.id,
+                  label: b.name,
+                }))}
+              />
+            )}
           </Field>
           <Field label="Publicação prevista">
             <Input

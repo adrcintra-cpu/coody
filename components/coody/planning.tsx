@@ -14,14 +14,18 @@ export function Planning({
   act,
   open,
   create,
+  fixedBrandId,
 }: {
+  fixedBrandId?: string;
   state: State;
   month: string;
   act: Action;
   open: (c: Content) => void;
   create: (date?: string, brandId?: string) => void;
 }) {
-  const [brandId, setBrandId] = useState(state.brands[0]?.id || '');
+  const [brandId, setBrandId] = useState(
+    fixedBrandId || state.brands[0]?.id || '',
+  );
   const b = state.brands.find((b) => b.id === brandId);
   const [monthly, setMonthly] = useState(b?.monthlyGoal || 12);
   const [weekly, setWeekly] = useState(b?.weeklyGoal || 3);
@@ -91,19 +95,25 @@ export function Planning({
         </button>
       </div>
       <div className="toolbar">
-        <Picker
-          value={brandId}
-          label="Marca"
-          onChange={(v) => {
-            setBrandId(v);
-            const brand = state.brands.find((b) => b.id === v);
-            setMonthly(brand?.monthlyGoal || 12);
-            setWeekly(brand?.weeklyGoal || 3);
-            setProposal([]);
-            setSelected([]);
-          }}
-          options={state.brands.map((b) => ({ value: b.id, label: b.name }))}
-        />
+        {fixedBrandId ? (
+          <span className="selected-brand-context">
+            Marca: <strong>{b?.name}</strong>
+          </span>
+        ) : (
+          <Picker
+            value={brandId}
+            label="Marca"
+            onChange={(v) => {
+              setBrandId(v);
+              const brand = state.brands.find((b) => b.id === v);
+              setMonthly(brand?.monthlyGoal || 12);
+              setWeekly(brand?.weeklyGoal || 3);
+              setProposal([]);
+              setSelected([]);
+            }}
+            options={state.brands.map((b) => ({ value: b.id, label: b.name }))}
+          />
+        )}
         <span className="muted">
           {items.length} pautas ·{' '}
           {

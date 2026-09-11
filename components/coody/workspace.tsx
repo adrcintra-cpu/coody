@@ -287,7 +287,14 @@ export default function Workspace() {
               navigate={navigate}
             />
           ) : view === 'Marcas' ? (
-            <Brands state={state} act={act} open={open} library={library} />
+            <Brands
+              state={state}
+              act={act}
+              open={open}
+              reload={reload}
+              month={month}
+              create={create}
+            />
           ) : view === 'Biblioteca' ? (
             <LibraryView
               state={state}

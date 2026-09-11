@@ -1,143 +1,152 @@
 'use client';
-import { useRef, useState } from 'react';
-import { Upload, FileText, Star, Check, ArrowUpRight } from 'lucide-react';
+import { useState } from 'react';
+import {
+  Upload,
+  FileText,
+  Star,
+  Check,
+  ArrowUpRight,
+  Pencil,
+} from 'lucide-react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Picker, NoData } from './shared';
-import type { State, Action } from '@/lib/types';
-export const categories = [
-  'Brandbook',
-  'Logos',
-  'Produtos',
-  'Fotografias',
-  'Campanhas',
-  'Referências visuais',
-  'Posts anteriores',
-  'Artes aprovadas',
-  'Materiais institucionais',
-  'Outros',
-];
+import { Field, FormModal } from './forms';
+import {
+  AssetFields,
+  emptyAssetFields,
+  type AssetFieldsValue,
+} from './asset-fields';
+import {
+  assetCategories,
+  canonicalCategory,
+  categoryInfo,
+} from '@/lib/brand-memory';
+import type { State, Action, Asset } from '@/lib/types';
+export const categories = assetCategories.map((c) => c.label);
 export function LibraryView({
   state,
   act,
   reload,
   initialBrand,
+  brandId,
 }: {
   state: State;
   act: Action;
   reload: () => Promise<void>;
   initialBrand?: string;
+  brandId?: string;
 }) {
-  const [brand, setBrand] = useState(initialBrand || state.brands[0]?.id || '');
-  const [category, setCategory] = useState('Todos');
-  const [uploadCategory, setUploadCategory] = useState('Referências visuais');
+  const [selection, setSelection] = useState(initialBrand || '');
+  const brand = brandId || selection;
+  const selectedBrand = state.brands.find((b) => b.id === brand);
+  const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const input = useRef<HTMLInputElement>(null);
+  const [editor, setEditor] = useState<Asset | 'new' | null>(null);
   const items = state.assets
     .filter(
       (a) =>
-        a.brandId === brand &&
-        (category === 'Todos' || a.category === category) &&
-        a.name.toLowerCase().includes(query.toLowerCase()),
+        (brand === 'all' || a.brandId === brand) &&
+        (category === 'all' ||
+          canonicalCategory(a.category, a.approved) === category) &&
+        [
+          a.name,
+          a.description,
+          a.aiNotes,
+          state.brands.find((b) => b.id === a.brandId)?.name,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(query.toLowerCase()),
     )
     .sort(
-      (a, b) => b.approved * 2 + b.priority - (a.approved * 2 + a.priority),
+      (a, b) =>
+        b.priority - a.priority ||
+        b.approved - a.approved ||
+        b.createdAt.localeCompare(a.createdAt),
     );
-  const toggle = async (id: string, priority: number, approved: number) => {
-    try {
-      await act('assetFlags', { id, priority, approved });
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
   return (
     <>
       <div className="page-heading">
         <div>
           <p className="eyebrow">MEMÓRIA VISUAL</p>
           <h1>Biblioteca</h1>
-          <p>Boas referências. Criações cada vez mais consistentes.</p>
+          <p>
+            {selectedBrand
+              ? `Memória visual e identidade da ${selectedBrand.name}.`
+              : brand === 'all'
+                ? 'Localize e gerencie arquivos de todas as marcas.'
+                : 'Selecione uma marca para abrir sua memória visual.'}
+          </p>
         </div>
         <button
-          disabled={busy || !brand}
           className="create-btn"
-          onClick={() => input.current?.click()}
+          disabled={!state.brands.length}
+          onClick={() => setEditor('new')}
         >
           <Upload size={17} />
-          {busy ? 'Enviando…' : 'Adicionar arquivo'}
+          Adicionar arquivo
         </button>
       </div>
-      <div className="toolbar">
-        <Picker
-          label="Marca"
-          value={brand}
-          onChange={setBrand}
-          options={state.brands.map((b) => ({ value: b.id, label: b.name }))}
-        />
-        <Picker
-          label="Categoria"
-          value={category}
-          onChange={setCategory}
-          options={['Todos', ...categories].map((c) => ({
-            value: c,
-            label: c,
-          }))}
-        />
+      <div className="toolbar library-context">
+        {brandId ? (
+          <div className="selected-brand-context">
+            <span>MARCA</span>
+            <strong>{selectedBrand?.name}</strong>
+          </div>
+        ) : (
+          <Field label="Marca">
+            <Picker
+              label="Selecionar marca"
+              value={selection}
+              onChange={setSelection}
+              options={[
+                { value: '', label: 'Selecionar marca' },
+                { value: 'all', label: 'Todas as marcas' },
+                ...state.brands.map((b) => ({ value: b.id, label: b.name })),
+              ]}
+            />
+          </Field>
+        )}
         <Input
           aria-label="Buscar arquivo"
-          placeholder="Buscar arquivo…"
+          placeholder="Buscar por nome, descrição ou marca…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-      </div>
-      <div className="upload-bar">
-        <span>Salvar novos arquivos em</span>
         <Picker
-          label="Categoria do upload"
-          value={uploadCategory}
-          onChange={setUploadCategory}
-          options={categories.map((c) => ({ value: c, label: c }))}
+          label="Filtrar categoria"
+          value={category}
+          onChange={setCategory}
+          options={[{ value: 'all', label: 'Todos' }, ...assetCategories]}
         />
-        <small>PDF, SVG, PNG, JPG e WEBP · até 20 MB</small>
       </div>
-      <input
-        ref={input}
-        type="file"
-        hidden
-        accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setBusy(true);
-          setError('');
-          try {
-            const data = new FormData();
-            data.set('file', file);
-            data.set('brandId', brand);
-            data.set('category', uploadCategory);
-            const response = await fetch('/api/assets', {
-              method: 'POST',
-              body: data,
-            });
-            const result = (await response.json()) as { error?: string };
-            if (!response.ok) throw new Error(result.error);
-            await reload();
-          } catch (e) {
-            setError((e as Error).message);
-          } finally {
-            setBusy(false);
-            if (input.current) input.current.value = '';
-          }
-        }}
-      />
-      {error && (
-        <p role="alert" className="error">
-          {error}
+      {brand === 'all' && (
+        <p className="notice">
+          Visão de gestão e localização. A criação e o contexto de IA sempre
+          usam uma única marca.
         </p>
       )}
+      <div className="category-summary">
+        {assetCategories.map((c) => (
+          <button
+            key={c.value}
+            className={category === c.value ? 'active' : ''}
+            onClick={() => setCategory(category === c.value ? 'all' : c.value)}
+          >
+            {c.label}
+            <span>
+              {
+                state.assets.filter(
+                  (a) =>
+                    (brand === 'all' || a.brandId === brand) &&
+                    canonicalCategory(a.category, a.approved) === c.value,
+                ).length
+              }
+            </span>
+          </button>
+        ))}
+      </div>
       {items.length ? (
         <div className="asset-grid">
           {items.map((a) => (
@@ -162,38 +171,221 @@ export function LibraryView({
                 <ArrowUpRight className="asset-open" size={17} />
               </a>
               <div className="asset-info">
-                <h3>{a.name}</h3>
-                <p>{a.category}</p>
-                <label htmlFor={a.id + '-priority'} className="check-label">
-                  <Checkbox
-                    id={a.id + '-priority'}
-                    checked={!!a.priority}
-                    onCheckedChange={(v) =>
-                      void toggle(a.id, v ? 1 : 0, a.approved)
-                    }
-                  />
-                  <Star size={13} /> Referência prioritária
-                </label>
-                <label htmlFor={a.id + '-approved'} className="check-label">
-                  <Checkbox
-                    id={a.id + '-approved'}
-                    checked={!!a.approved}
-                    onCheckedChange={(v) =>
-                      void toggle(a.id, a.priority, v ? 1 : 0)
-                    }
-                  />
-                  <Check size={13} /> Arte aprovada
-                </label>
+                <div className="asset-title">
+                  <h3>{a.name}</h3>
+                  <button
+                    className="text-btn"
+                    aria-label={'Editar ' + a.name}
+                    onClick={() => setEditor(a)}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </div>
+                <p>
+                  {categoryInfo(a.category, a.approved).label} ·{' '}
+                  {a.mime.split('/').pop()?.toUpperCase()}
+                </p>
+                <p className="asset-brand">
+                  {state.brands.find((b) => b.id === a.brandId)?.name} ·{' '}
+                  {new Date(a.createdAt).toLocaleDateString('pt-BR')}
+                </p>
+                <p className="asset-description">
+                  {a.description || 'Sem descrição.'}
+                </p>
+                <div className="asset-ai-notes">
+                  <span>Observação para IA</span>
+                  <p>{a.aiNotes || 'Nenhuma orientação adicionada.'}</p>
+                </div>
+                <div className="asset-flags">
+                  {!!a.priority && (
+                    <span>
+                      <Star size={13} />
+                      Prioritária
+                    </span>
+                  )}
+                  {(a.approved === 1 || a.category === 'approved_art') && (
+                    <span>
+                      <Check size={13} />
+                      Arte aprovada
+                    </span>
+                  )}
+                </div>
               </div>
             </article>
           ))}
         </div>
       ) : (
         <NoData
-          title="A memória desta marca começa aqui"
-          description="Adicione brandbooks, logos e referências. Artes aprovadas terão prioridade no contexto de criação."
+          title={
+            !brand
+              ? 'Escolha uma marca para começar'
+              : 'Nenhum arquivo nesta seleção'
+          }
+          description={
+            !brand
+              ? 'A biblioteca de cada cliente tem seu próprio espaço.'
+              : 'Adicione identidade, referências e materiais ou ajuste os filtros.'
+          }
+        />
+      )}
+      {editor && (
+        <AssetEditor
+          state={state}
+          asset={editor === 'new' ? undefined : editor}
+          brandId={editor === 'new' ? selectedBrand?.id || '' : editor.brandId}
+          fixedBrand={!!selectedBrand || !!brandId || editor !== 'new'}
+          close={() => setEditor(null)}
+          saved={async (id) => {
+            await reload();
+            if (!brandId && !brand) setSelection(id);
+            setEditor(null);
+          }}
+          act={act}
         />
       )}
     </>
+  );
+}
+function AssetEditor({
+  state,
+  asset,
+  brandId,
+  fixedBrand,
+  close,
+  saved,
+  act,
+}: {
+  state: State;
+  asset?: Asset;
+  brandId: string;
+  fixedBrand: boolean;
+  close: () => void;
+  saved: (brandId: string) => Promise<void>;
+  act: Action;
+}) {
+  const [brand, setBrand] = useState(brandId);
+  const [file, setFile] = useState<File | null>(null);
+  const [value, setValue] = useState<AssetFieldsValue>(
+    asset
+      ? {
+          name: asset.name,
+          category: canonicalCategory(asset.category, asset.approved),
+          description: asset.description,
+          aiNotes: asset.aiNotes,
+          priority: !!asset.priority,
+        }
+      : { ...emptyAssetFields },
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  return (
+    <FormModal
+      open
+      onClose={() => {
+        if (!busy) close();
+      }}
+      title={asset ? 'Detalhes do arquivo' : 'Adicionar arquivo'}
+      description="O arquivo pertence a uma única marca. As orientações ajudam a compor seu contexto criativo."
+    >
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError('');
+          try {
+            if (!brand || brand === 'all')
+              throw new Error('Selecione uma marca específica.');
+            if (asset) {
+              await act('saveAsset', {
+                id: asset.id,
+                brandId: brand,
+                ...value,
+              });
+            } else {
+              if (!file) throw new Error('Selecione o arquivo.');
+              const form = new FormData();
+              form.set('file', file);
+              form.set('brandId', brand);
+              Object.entries(value).forEach(([k, v]) => form.set(k, String(v)));
+              const response = await fetch('/api/assets', {
+                method: 'POST',
+                body: form,
+              });
+              const result = (await response.json()) as { error?: string };
+              if (!response.ok) throw new Error(result.error);
+            }
+            await saved(brand);
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <fieldset disabled={busy}>
+          <Field label="Marca">
+            {fixedBrand ? (
+              <Input
+                readOnly
+                value={state.brands.find((b) => b.id === brand)?.name || ''}
+              />
+            ) : (
+              <Picker
+                label="Marca do arquivo"
+                value={brand}
+                onChange={setBrand}
+                options={[
+                  { value: '', label: 'Selecionar marca' },
+                  ...state.brands.map((b) => ({ value: b.id, label: b.name })),
+                ]}
+              />
+            )}
+          </Field>
+          {!asset && (
+            <Field label="Arquivo">
+              <Input
+                type="file"
+                required
+                accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  setFile(f || null);
+                  if (f && !value.name) setValue({ ...value, name: f.name });
+                }}
+              />
+              <small className="muted">
+                PDF, SVG, PNG, JPG e WEBP · até 20 MB
+              </small>
+            </Field>
+          )}
+          <AssetFields value={value} onChange={setValue} />
+          <p className="form-hint">
+            Papel no contexto: {categoryInfo(value.category).role}.
+          </p>
+        </fieldset>
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+        <div className="form-actions">
+          <button
+            disabled={busy}
+            type="button"
+            className="outline-btn"
+            onClick={close}
+          >
+            Cancelar
+          </button>
+          <button disabled={busy} className="create-btn">
+            {busy
+              ? 'Salvando…'
+              : asset
+                ? 'Salvar detalhes'
+                : 'Adicionar à biblioteca'}
+          </button>
+        </div>
+      </form>
+    </FormModal>
   );
 }

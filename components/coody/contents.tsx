@@ -17,14 +17,16 @@ export function Contents({
   open,
   create,
   approvals = false,
+  fixedBrandId,
 }: {
+  fixedBrandId?: string;
   state: State;
   month: string;
   open: (c: Content) => void;
   create: (date?: string, brandId?: string) => void;
   approvals?: boolean;
 }) {
-  const [brand, setBrand] = useState('all');
+  const [brand, setBrand] = useState(fixedBrandId || 'all');
   const [status, setStatus] = useState('all');
   const [query, setQuery] = useState('');
   const items = state.contents.filter(
@@ -51,21 +53,38 @@ export function Contents({
           </p>
         </div>
         {!approvals && (
-          <button className="create-btn" onClick={() => create(month + '-15')}>
+          <button
+            className="create-btn"
+            onClick={() =>
+              create(
+                month + '-15',
+                fixedBrandId || (brand === 'all' ? undefined : brand),
+              )
+            }
+          >
             <Plus size={17} /> Criar conteúdo
           </button>
         )}
       </div>
       <div className="toolbar">
-        <Picker
-          label="Marca"
-          value={brand}
-          onChange={setBrand}
-          options={[
-            { value: 'all', label: 'Todas as marcas' },
-            ...state.brands.map((b) => ({ value: b.id, label: b.name })),
-          ]}
-        />
+        {fixedBrandId ? (
+          <span className="selected-brand-context">
+            Marca:{' '}
+            <strong>
+              {state.brands.find((b) => b.id === fixedBrandId)?.name}
+            </strong>
+          </span>
+        ) : (
+          <Picker
+            label="Marca"
+            value={brand}
+            onChange={setBrand}
+            options={[
+              { value: 'all', label: 'Todas as marcas' },
+              ...state.brands.map((b) => ({ value: b.id, label: b.name })),
+            ]}
+          />
+        )}
         <Picker
           label="Status"
           value={status}

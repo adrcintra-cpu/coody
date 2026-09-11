@@ -4,7 +4,7 @@ Workspace criativo de agência. Etapa 1 funcional com dados fictícios, persist�
 
 ## Implementação por etapas
 
-1. **Base e experiência (implementada):** arquitetura TypeScript modular, design system dark com logo oficial, Krona One e Saira locais, Dashboard, Brand Spaces, Biblioteca, Planejamento, Calendário, Conteúdos, Studio, Aprovações e telas de preparação das integrações.
+1. **Base e experiência (implementada):** arquitetura TypeScript modular, design system dark com logo oficial, Oxanium Light 300 nos títulos e Saira Light 300 no corpo, servidas localmente, Dashboard, Brand Spaces, Biblioteca, Planejamento, Calendário, Conteúdos, Studio, Aprovações e telas de preparação das integrações.
 2. **IA:** conectar adaptador OpenAI somente no servidor; geração de texto e imagem separadas, validação de 5 hashtags, contexto completo da marca, recuperação de referências e recomposição independente de Feed e Story.
 3. **Trello:** configuração de workspace/board/listas, cards com anexos, webhooks assinados, sincronização idempotente, comentários e fila de tentativas.
 4. **Equipes:** identidade por usuário, autorização real por papel e agência, convites, aprovação externa por link, auditoria e limites de upload/geração.
@@ -18,8 +18,9 @@ Workspace criativo de agência. Etapa 1 funcional com dados fictícios, persist�
 - `lib/types.ts`: entidades e status.
 - `lib/domain.ts`: distribuição editorial, datas, semelhança e regras de aprovação.
 - `lib/repository.ts`: acesso D1/R2 e seed demonstrativo idempotente.
-- `lib/services.ts`: interfaces OpenAIService, TrelloService, StorageService e construtor de Brand Context.
-- `db/schema.ts` e `drizzle/`: modelo relacional e migração inicial.
+- `lib/services.ts`: interfaces OpenAIService, TrelloService, StorageService e reexportação do Brand Context.
+- `lib/brand-memory.ts`: categorias semânticas, completude e contexto isolado por marca.
+- `db/schema.ts` e `drizzle/`: modelo relacional e migrações aditivas.
 - `tests/domain.test.mjs`: regras editoriais e fluxo de status.
 - `public/`: arquivos oficiais do logo copiados sem alteração e fontes locais.
 
@@ -39,11 +40,11 @@ A `FERRAMENTAS/landingbase` foi lida e preservada. É um starter Astro estático
 
 17 tabelas cobrem users, brands, brand_assets, brand_guidelines, products, services, content_pillars, special_dates, monthly_plans, content_items, content_versions, generated_assets, approvals, trello_integrations, trello_cards, comments e activity_logs. Chaves estrangeiras relacionam entidades e índices atendem marca/data, ativos e versão única.
 
-Nesta etapa, a ficha editável da marca é a fonte de verdade para pilares, produtos, serviços e regras; as tabelas dedicadas ficam reservadas à normalização nas próximas etapas. Isso evita duas fontes editáveis divergentes. O usuário demonstrativo é único; os papéis são contratos preparados, ainda não autorização multiusuário. O site deve permanecer privado ao proprietário até a etapa de identidade e permissões.
+Nesta etapa, a ficha editável da marca é a fonte de verdade para pilares, produtos, serviços e regras; as tabelas de produtos, serviços e pilares ficam reservadas à normalização nas próximas etapas. `brand_guidelines` recebe as regras sincronizadas na mesma transação do cadastro/edição. Isso evita duas fontes editáveis divergentes. O usuário demonstrativo é único; os papéis são contratos preparados, ainda não autorização multiusuário. O site deve permanecer privado ao proprietário até a etapa de identidade e permissões.
 
 ## Desenvolvimento
 
-Requer Node >=22.13 e pnpm. `pnpm install`, `pnpm dev`, `pnpm exec tsc --noEmit`, `node --experimental-strip-types --test tests/domain.test.mjs`, `pnpm build`. Gere mudanças de schema com `pnpm db:generate`. A migração inicial deve ser aplicada à instância D1 local antes do primeiro uso. Sites aplica as migrações na publicação. O seed fictício é inserido uma única vez após a estrutura existir.
+Requer Node >=22.13 e pnpm. `pnpm install`, `pnpm dev`, `pnpm exec tsc --noEmit`, `pnpm test`, `pnpm build`. Gere mudanças de schema com `pnpm db:generate`. A migração inicial deve ser aplicada à instância D1 local antes do primeiro uso. Sites aplica as migrações na publicação. O seed fictício é inserido uma única vez após a estrutura existir.
 
 As fontes são servidas localmente. As licenças OFL estão em `public/fonts/`.
 

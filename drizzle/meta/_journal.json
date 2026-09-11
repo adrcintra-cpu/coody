@@ -8,6 +8,13 @@
       "when": 1789053750240,
       "tag": "0000_optimal_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789135227728,
+      "tag": "0001_solid_bushwacker",
+      "breakpoints": true
     }
   ]
 }

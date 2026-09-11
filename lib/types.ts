@@ -26,6 +26,11 @@ export type Brand = {
   description: string;
   website: string;
   social: string;
+  instagram: string;
+  linkedin: string;
+  communicationStyle: string;
+  rules: string;
+  creationNotes: string;
   voice: string;
   keywords: string;
   forbidden: string;
@@ -66,6 +71,9 @@ export type Version = {
   locked: number;
 };
 export type Asset = {
+  description: string;
+  aiNotes: string;
+  updatedAt: string;
   id: string;
   brandId: string;
   name: string;

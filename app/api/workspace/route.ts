@@ -1,6 +1,7 @@
-import { database, insert, readState } from '@/lib/repository';
+import { parseBrand, guidelineRules } from '@/lib/brand-validation';
+import { assetCategories, canonicalCategory } from '@/lib/brand-memory';
+import { database, insert, readState, saveGuidelines } from '@/lib/repository';
 import {
-  validatePillars,
   validateDate,
   validateHashtags,
   assertTransition,
@@ -44,38 +45,7 @@ export async function POST(request: Request) {
     const item = state.contents.find((c) => c.id === data.id);
     if (action === 'saveBrand') {
       const existing = state.brands.find((b) => b.id === data.id);
-      const row: Brand = {
-        id: existing?.id || entityId,
-        name: str(data.name, 100),
-        segment: str(data.segment, 100),
-        description: str(data.description),
-        website: str(data.website, 500),
-        social: str(data.social, 500),
-        voice: str(data.voice),
-        keywords: str(data.keywords),
-        forbidden: str(data.forbidden),
-        direction: str(data.direction),
-        notes: str(data.notes),
-        colors: str(data.colors, 500),
-        fonts: str(data.fonts, 500),
-        products: str(data.products),
-        services: str(data.services),
-        monthlyGoal: Number(data.monthlyGoal),
-        weeklyGoal: Number(data.weeklyGoal),
-        pillars: data.pillars as Brand['pillars'],
-      };
-      if (!row.name || !row.segment)
-        throw new Error('Preencha nome e segmento.');
-      if (
-        !Number.isInteger(row.monthlyGoal) ||
-        row.monthlyGoal < 1 ||
-        row.monthlyGoal > 100 ||
-        !Number.isInteger(row.weeklyGoal) ||
-        row.weeklyGoal < 1 ||
-        row.weeklyGoal > 30
-      )
-        throw new Error('Revise as metas mensal e semanal.');
-      validatePillars(row.pillars);
+      const row = parseBrand(data, existing?.id || entityId, existing);
       if (existing) {
         const keys = Object.keys(row).filter(
           (k) => k !== 'id',
@@ -93,6 +63,7 @@ export async function POST(request: Request) {
             ),
         );
       } else statements.push(insert('brands', row));
+      statements.push(...saveGuidelines(row.id, guidelineRules(row), now));
     } else if (action === 'createContent' || action === 'editContent') {
       if (!brand) throw new Error('Selecione uma marca válida.');
       const title = str(data.title, 200);
@@ -106,6 +77,8 @@ export async function POST(request: Request) {
         throw new Error('Selecione um pilar válido.');
       if (action === 'editContent') {
         if (!item) throw new Error('Conteúdo não encontrado.');
+        if (item.brandId !== brand.id)
+          throw new Error('A pauta pertence a outra marca.');
         if (['APROVADO', 'PUBLICADO', 'APROVAÇÃO'].includes(item.status))
           throw new Error(
             'Esta versão está protegida. Solicite uma alteração antes de editar.',
@@ -235,9 +208,9 @@ export async function POST(request: Request) {
             statements.push(
               db
                 .prepare(
-                  'UPDATE brand_assets SET approved=1, priority=1 WHERE brandId=? AND url=?',
+                  "UPDATE brand_assets SET approved=1, priority=1, category='approved_art', updatedAt=? WHERE brandId=? AND url=?",
                 )
-                .bind(item.brandId, url),
+                .bind(now, item.brandId, url),
             );
         }
       }
@@ -336,13 +309,39 @@ export async function POST(request: Request) {
       statements.push(
         db.prepare('DELETE FROM content_items WHERE id=?').bind(item.id),
       );
-    } else if (action === 'assetFlags') {
-      const asset = state.assets.find((a) => a.id === data.id);
-      if (!asset) throw new Error('Arquivo não encontrado.');
+    } else if (action === 'assetFlags' || action === 'saveAsset') {
+      const asset = state.assets.find(
+        (a) => a.id === data.id && a.brandId === data.brandId,
+      );
+      if (!asset) throw new Error('Arquivo não encontrado nesta marca.');
+      const category =
+        action === 'saveAsset'
+          ? str(data.category)
+          : data.approved
+            ? 'approved_art'
+            : asset.category === 'approved_art'
+              ? 'visual_reference'
+              : canonicalCategory(asset.category);
+      if (!assetCategories.some((c) => c.value === category))
+        throw new Error('Categoria inválida.');
+      const name = action === 'saveAsset' ? str(data.name, 200) : asset.name;
+      if (!name) throw new Error('Informe o nome do arquivo.');
       statements.push(
         db
-          .prepare('UPDATE brand_assets SET priority=?, approved=? WHERE id=?')
-          .bind(data.priority ? 1 : 0, data.approved ? 1 : 0, asset.id),
+          .prepare(
+            'UPDATE brand_assets SET name=?,category=?,description=?,aiNotes=?,priority=?,approved=?,updatedAt=? WHERE id=? AND brandId=?',
+          )
+          .bind(
+            name,
+            category,
+            action === 'saveAsset' ? str(data.description) : asset.description,
+            action === 'saveAsset' ? str(data.aiNotes) : asset.aiNotes,
+            data.priority ? 1 : 0,
+            category === 'approved_art' ? 1 : 0,
+            now,
+            asset.id,
+            asset.brandId,
+          ),
       );
     } else if (action === 'createDate') {
       const name = str(data.name, 150),
