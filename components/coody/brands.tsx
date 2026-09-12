@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, ArrowUpRight, Palette, BookOpen, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,8 +28,42 @@ export function Brands({
   create: (date?: string, brandId?: string) => void;
 }) {
   const [onboarding, setOnboarding] = useState(false);
-  const [brandTab, setBrandTab] = useState('overview');
-  const [selected, setSelected] = useState('');
+  const route = () =>
+    new URLSearchParams(
+      typeof window === 'undefined'
+        ? ''
+        : window.location.hash.split('?')[1] || '',
+    );
+  const [brandTab, setBrandTab] = useState(
+    () => route().get('tab') || 'overview',
+  );
+  const [selected, setSelected] = useState(() => route().get('brand') || '');
+  const choose = (id: string, tab = 'overview') => {
+    setSelected(id);
+    setBrandTab(tab);
+    const params = route();
+    if (id) {
+      params.set('brand', id);
+      params.set('tab', tab);
+    } else {
+      params.delete('brand');
+      params.delete('tab');
+    }
+    window.history.pushState(null, '', '#Marcas?' + params.toString());
+  };
+  useEffect(() => {
+    const restore = () => {
+      const p = new URLSearchParams(window.location.hash.split('?')[1] || '');
+      setSelected(p.get('brand') || '');
+      setBrandTab(p.get('tab') || 'overview');
+    };
+    window.addEventListener('popstate', restore);
+    window.addEventListener('hashchange', restore);
+    return () => {
+      window.removeEventListener('popstate', restore);
+      window.removeEventListener('hashchange', restore);
+    };
+  }, []);
   const [editing, setEditing] = useState<Brand | null>(null);
   const b = state.brands.find((b) => b.id === selected);
   const completeness = b ? identityCompleteness(b, state.assets) : null;
@@ -64,11 +98,14 @@ export function Brands({
       </div>
       {b ? (
         <>
-          <button className="text-btn back" onClick={() => setSelected('')}>
+          <button className="text-btn back" onClick={() => choose('')}>
             ← Todas as marcas
           </button>
-          <Tabs value={brandTab} onValueChange={(v) => setBrandTab(String(v))}>
-            <TabsList variant="line">
+          <Tabs
+            value={brandTab}
+            onValueChange={(v) => choose(selected, String(v))}
+          >
+            <TabsList className="brand-tabs" variant="line">
               <TabsTrigger value="overview">Visão geral</TabsTrigger>
               <TabsTrigger value="planning">Planejamento</TabsTrigger>
               <TabsTrigger value="contents">Conteúdos</TabsTrigger>
@@ -122,7 +159,7 @@ export function Brands({
                   </div>
                   <button
                     className="outline-btn"
-                    onClick={() => setBrandTab('library')}
+                    onClick={() => choose(selected, 'library')}
                   >
                     <BookOpen size={16} /> Abrir biblioteca{' '}
                     <ArrowUpRight size={15} />
@@ -214,8 +251,7 @@ export function Brands({
               key={b.id}
               className="brand-card"
               onClick={() => {
-                setSelected(b.id);
-                setBrandTab('overview');
+                choose(b.id);
               }}
             >
               <div className="brand-card-top">
@@ -249,8 +285,7 @@ export function Brands({
           close={() => setOnboarding(false)}
           created={async (id) => {
             await reload();
-            setSelected(id);
-            setBrandTab('overview');
+            choose(id);
             setOnboarding(false);
           }}
         />

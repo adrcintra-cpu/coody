@@ -70,6 +70,9 @@ export function similarTopics(title: string, history: Content[]) {
     );
   });
 }
+export function dateAvailableToBrand(date: SpecialDate, brandId: string) {
+  return date.isGlobal === 1 || date.brandId === brandId;
+}
 export function planProposal(
   brand: Brand,
   plan: Plan,
@@ -110,6 +113,18 @@ export function planProposal(
       candidates.push(date);
   }
   if (!candidates.length) throw new Error('Nenhuma data disponível.');
+  if (
+    plan.selectedDates.some(
+      (id) =>
+        !dates.some(
+          (d) =>
+            d.id === id &&
+            dateAvailableToBrand(d, brand.id) &&
+            d.date.startsWith(plan.month),
+        ),
+    )
+  )
+    throw new Error('Uma data selecionada não pertence a esta marca ou mês.');
   const chosen = dates.filter(
     (d) =>
       plan.selectedDates.includes(d.id) &&

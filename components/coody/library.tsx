@@ -22,6 +22,7 @@ import {
   canonicalCategory,
   categoryInfo,
 } from '@/lib/brand-memory';
+import { checkImageFile } from '@/lib/client-upload';
 import type { State, Action, Asset } from '@/lib/types';
 export const categories = assetCategories.map((c) => c.label);
 export function LibraryView({
@@ -99,7 +100,19 @@ export function LibraryView({
             <Picker
               label="Selecionar marca"
               value={selection}
-              onChange={setSelection}
+              onChange={(value) => {
+                setSelection(value);
+                const params = new URLSearchParams(
+                  window.location.hash.split('?')[1] || '',
+                );
+                if (value) params.set('brand', value);
+                else params.delete('brand');
+                window.history.replaceState(
+                  null,
+                  '',
+                  '#Biblioteca?' + params.toString(),
+                );
+              }}
               options={[
                 { value: '', label: 'Selecionar marca' },
                 { value: 'all', label: 'Todas as marcas' },
@@ -303,6 +316,7 @@ function AssetEditor({
               });
             } else {
               if (!file) throw new Error('Selecione o arquivo.');
+              await checkImageFile(file);
               const form = new FormData();
               form.set('file', file);
               form.set('brandId', brand);

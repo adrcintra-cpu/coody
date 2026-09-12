@@ -37,6 +37,7 @@ import { Contents, Calendar } from './contents';
 import { Studio } from './studio';
 import { Integrations, Settings } from './settings';
 import { ContentForm } from './forms';
+import { today } from '@/lib/types';
 import type { View, State, Content, Action } from '@/lib/types';
 const nav = [
   ['Dashboard', LayoutDashboard],
@@ -51,7 +52,7 @@ const nav = [
 ] as const;
 export default function Workspace() {
   const [view, setView] = useState<View>('Dashboard');
-  const [month, setMonth] = useState('2026-09');
+  const [month, setMonth] = useState(() => today().slice(0, 7));
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -85,18 +86,43 @@ export default function Workspace() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
-  const navigate = useCallback((v: View) => {
-    setView(v);
-    window.history.pushState(null, '', '#' + encodeURIComponent(v));
-  }, []);
+  const navigate = useCallback(
+    (v: View, details: Record<string, string> = {}) => {
+      setView(v);
+      if (v === 'Biblioteca') setLibraryBrand(details.brand || '');
+      const params = new URLSearchParams({ month, ...details });
+      window.history.pushState(
+        null,
+        '',
+        '#' + encodeURIComponent(v) + '?' + params.toString(),
+      );
+    },
+    [month],
+  );
   useEffect(() => {
     const restore = () => {
-      const name = decodeURIComponent(window.location.hash.slice(1));
-      if (nav.some(([v]) => v === name)) setView(name as View);
+      try {
+        const [raw, query] = window.location.hash.slice(1).split('?');
+        const name = decodeURIComponent(raw),
+          params = new URLSearchParams(query || '');
+        if (nav.some(([v]) => v === name) || name === 'Studio')
+          setView(name as View);
+        setSelected(params.get('id') || '');
+        setLibraryBrand(params.get('brand') || '');
+        const restoredMonth = params.get('month');
+        if (restoredMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(restoredMonth))
+          setMonth(restoredMonth);
+      } catch {
+        setView('Dashboard');
+      }
     };
     restore();
     window.addEventListener('popstate', restore);
-    return () => window.removeEventListener('popstate', restore);
+    window.addEventListener('hashchange', restore);
+    return () => {
+      window.removeEventListener('popstate', restore);
+      window.removeEventListener('hashchange', restore);
+    };
   }, []);
   useEffect(() => {
     if (!message) return;
@@ -107,10 +133,29 @@ export default function Workspace() {
     const response = await fetch('/api/workspace', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, data }),
+      body: JSON.stringify({
+        action,
+        data: {
+          ...data,
+          ...([
+            'editContent',
+            'saveVersion',
+            'status',
+            'deleteContent',
+          ].includes(action)
+            ? {
+                expectedRevision:
+                  state?.contents.find((c) => c.id === data.id)?.revision ?? 0,
+              }
+            : {}),
+        },
+      }),
     });
     const result = (await response.json()) as { error?: string };
-    if (!response.ok) throw new Error(result.error);
+    if (!response.ok) {
+      if (response.status === 409) await reload();
+      throw new Error(result.error);
+    }
     await reload();
     setMessage(
       action === 'saveVersion'
@@ -165,13 +210,13 @@ export default function Workspace() {
   }, []);
   const open = (c: Content) => {
     setSelected(c.id);
-    navigate('Studio');
+    navigate('Studio', { id: c.id });
   };
   const create = (date?: string, brandId?: string) =>
     setForm({ date, brandId });
   const library = (id: string) => {
     setLibraryBrand(id);
-    navigate('Biblioteca');
+    navigate('Biblioteca', { brand: id });
   };
   const item = state?.contents.find((c) => c.id === selected);
   return (
@@ -259,6 +304,14 @@ export default function Workspace() {
               onChange={(e) => {
                 if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value))
                   setMonth(e.target.value);
+                const [path, query] = window.location.hash.split('?');
+                const params = new URLSearchParams(query || '');
+                params.set('month', e.target.value);
+                window.history.replaceState(
+                  null,
+                  '',
+                  (path || '#Dashboard') + '?' + params.toString(),
+                );
               }}
             />
             <span className="avatar small">AC</span>
@@ -338,7 +391,9 @@ export default function Workspace() {
               state={state}
               item={item}
               act={act}
-              back={() => navigate('Conteúdos')}
+              back={() =>
+                navigate('Marcas', { brand: item.brandId, tab: 'contents' })
+              }
               edit={(c) => setForm({ initial: c })}
               library={library}
             />

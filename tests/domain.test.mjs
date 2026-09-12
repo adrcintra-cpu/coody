@@ -23,7 +23,7 @@ const plan = {
   monthlyGoal: 12,
   weeklyGoal: 3,
   days: [2, 4, 6],
-  selectedDates: ['special'],
+  selectedDates: [],
   campaign: '',
 };
 test('pilares exigem total de 100 e não aceitam negativos', () => {
@@ -58,8 +58,8 @@ test('aprovação não pode pular revisão e publicação protege estado', () =>
 test('planejamento preserva quantidade, mês, dias e distribuição', () => {
   const result = planProposal(
     brand,
-    plan,
-    [{ id: 'special', name: 'Data própria', date: '2026-09-14' }],
+    { ...plan, selectedDates: ['special'] },
+    [{ brandId: 'b', id: 'special', name: 'Data própria', date: '2026-09-14' }],
     [],
   );
   assert.equal(result.length, 12);
@@ -108,4 +108,36 @@ test('planejamento completa a meta sem duplicar conteúdos existentes', () => {
   assert.equal(result.length, 8);
   assert.equal(result.filter((c) => c.pillar === 'Produtos').length, 0);
   assert.ok(result.every((c) => c.date !== '2026-09-08'));
+});
+
+test('datas privadas não entram no planejamento de outra marca', () => {
+  const own = { id: 'own', brandId: 'b', name: 'Privada', date: '2026-09-14' };
+  const foreign = {
+    id: 'foreign',
+    brandId: 'other',
+    name: 'Outro cliente',
+    date: '2026-09-14',
+  };
+  const global = {
+    id: 'global',
+    isGlobal: 1,
+    name: 'Global',
+    date: '2026-09-14',
+  };
+  assert.throws(() =>
+    planProposal(brand, { ...plan, selectedDates: ['foreign'] }, [foreign], []),
+  );
+  assert.equal(
+    planProposal(brand, { ...plan, selectedDates: ['own'] }, [own], [])[0]
+      .brandId,
+    'b',
+  );
+  assert.ok(
+    planProposal(
+      brand,
+      { ...plan, selectedDates: ['global'] },
+      [global],
+      [],
+    ).some((c) => c.title === 'Global'),
+  );
 });

@@ -139,6 +139,7 @@ export function demoState(month = '2026-09'): State {
     dates: [
       {
         id: 'd1',
+        isGlobal: 1,
         name: 'Dia do Cliente',
         date: month + '-15',
         segments: 'Comercial,Varejo,Tecnologia,Arquitetura,Saúde',
@@ -146,6 +147,7 @@ export function demoState(month = '2026-09'): State {
       },
       {
         id: 'd2',
+        isGlobal: 1,
         name: 'Início da campanha de primavera',
         date: month + '-22',
         segments: 'Institucional',

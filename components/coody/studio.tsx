@@ -86,7 +86,7 @@ export function Studio({
   const context = buildBrandContext(
     brand,
     state.assets,
-    state.contents,
+    state.contents.filter((c) => c.id !== item.id),
     item.brief,
   );
   const dirty =

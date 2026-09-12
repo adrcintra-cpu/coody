@@ -46,6 +46,7 @@ export type Brand = {
 };
 export type Content = {
   id: string;
+  revision?: number;
   brandId: string;
   title: string;
   brief: string;
@@ -93,6 +94,8 @@ export type Comment = {
 };
 export type SpecialDate = {
   id: string;
+  brandId?: string | null;
+  isGlobal?: number;
   name: string;
   date: string;
   segments: string;

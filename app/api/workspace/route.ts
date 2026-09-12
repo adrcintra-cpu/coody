@@ -6,6 +6,8 @@ import {
   validateHashtags,
   assertTransition,
   planProposal,
+  dateAvailableToBrand,
+  validateMonth,
 } from '@/lib/domain';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET() {
@@ -24,6 +26,9 @@ export async function GET() {
 const str = (v: unknown, max = 6000) =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
 const id = () => crypto.randomUUID();
+const conflictMessage =
+  'Esta pauta mudou em outra aba. Atualize os dados e revise antes de tentar novamente.';
+class ConflictError extends Error {}
 export async function POST(request: Request) {
   if (
     request.headers.get('origin') &&
@@ -43,6 +48,15 @@ export async function POST(request: Request) {
     const entityId = str(data.id) || id();
     const brand = state.brands.find((b) => b.id === data.brandId);
     const item = state.contents.find((c) => c.id === data.id);
+    if (
+      item &&
+      ['editContent', 'saveVersion', 'status', 'deleteContent'].includes(
+        action,
+      ) &&
+      data.expectedRevision !== undefined &&
+      data.expectedRevision !== (item.revision ?? 0)
+    )
+      throw new ConflictError(conflictMessage);
     if (action === 'saveBrand') {
       const existing = state.brands.find((b) => b.id === data.id);
       const row = parseBrand(data, existing?.id || entityId, existing);
@@ -246,7 +260,7 @@ export async function POST(request: Request) {
           user: 'Agência criativa',
         }),
       );
-    } else if (action === 'savePlan') {
+    } else if (action === 'savePlan' || action === 'updatePlan') {
       if (!brand) throw new Error('Selecione uma marca.');
       const plan: Plan = {
         id: entityId,
@@ -265,41 +279,83 @@ export async function POST(request: Request) {
         !Array.isArray(plan.selectedDates)
       )
         throw new Error('Revise as configurações.');
-      const proposal = planProposal(
-        brand,
-        plan,
-        state.dates,
-        state.contents.filter((c) => c.brandId === brand.id),
-      );
+      if (
+        plan.selectedDates.some(
+          (id) =>
+            !state.dates.some(
+              (d) =>
+                d.id === id &&
+                dateAvailableToBrand(d, brand.id) &&
+                d.date.startsWith(plan.month),
+            ),
+        )
+      )
+        throw new Error('Selecione apenas datas desta marca e mês.');
+      validateMonth(plan.month);
+      if (
+        !Number.isInteger(plan.monthlyGoal) ||
+        plan.monthlyGoal < 1 ||
+        plan.monthlyGoal > 100 ||
+        !Array.isArray(plan.days) ||
+        !plan.days.length ||
+        plan.days.some((d) => !Number.isInteger(d) || d < 0 || d > 6)
+      )
+        throw new Error('Revise as metas e os dias de publicação.');
       const existing = state.plans.find(
         (p) => p.brandId === brand.id && p.month === plan.month,
       );
-      if (existing)
-        throw new Error(
-          'Este mês já foi planejado. Edite as pautas existentes ou crie novas pautas.',
-        );
-      statements.push(insert('monthly_plans', plan));
-      for (const p of proposal) {
-        const contentId = id();
+      if (action === 'updatePlan') {
+        if (!existing || existing.id !== data.id)
+          throw new Error('Planejamento não encontrado nesta marca.');
         statements.push(
-          insert('content_items', { ...p, id: contentId, createdAt: now }),
+          db
+            .prepare(
+              'UPDATE monthly_plans SET monthlyGoal=?,weeklyGoal=?,days=?,campaign=?,selectedDates=? WHERE id=? AND brandId=?',
+            )
+            .bind(
+              plan.monthlyGoal,
+              plan.weeklyGoal,
+              JSON.stringify(plan.days),
+              plan.campaign,
+              JSON.stringify(plan.selectedDates),
+              existing.id,
+              brand.id,
+            ),
         );
-        statements.push(
-          insert('content_versions', {
-            id: id(),
-            contentId,
-            number: 1,
-            headline: p.title,
-            copy: '',
-            caption: '',
-            hashtags: [],
-            feedUrl: '',
-            storyUrl: '',
-            change: 'Pauta do planejamento',
-            createdAt: now,
-            locked: 0,
-          }),
+      } else {
+        const proposal = planProposal(
+          brand,
+          plan,
+          state.dates,
+          state.contents.filter((c) => c.brandId === brand.id),
         );
+        if (existing)
+          throw new Error(
+            'Este mês já foi planejado. Edite as pautas existentes ou crie novas pautas.',
+          );
+        statements.push(insert('monthly_plans', plan));
+        for (const p of proposal) {
+          const contentId = id();
+          statements.push(
+            insert('content_items', { ...p, id: contentId, createdAt: now }),
+          );
+          statements.push(
+            insert('content_versions', {
+              id: id(),
+              contentId,
+              number: 1,
+              headline: p.title,
+              copy: '',
+              caption: '',
+              hashtags: [],
+              feedUrl: '',
+              storyUrl: '',
+              change: 'Pauta do planejamento',
+              createdAt: now,
+              locked: 0,
+            }),
+          );
+        }
       }
     } else if (action === 'deleteContent') {
       if (!item || !['IDEIA', 'PLANEJADO'].includes(item.status))
@@ -343,7 +399,21 @@ export async function POST(request: Request) {
             asset.brandId,
           ),
       );
+    } else if (action === 'assignDate') {
+      if (!brand) throw new Error('Selecione uma marca válida.');
+      const date = state.dates.find(
+        (d) => d.id === data.id && !d.brandId && !d.isGlobal,
+      );
+      if (!date) throw new Error('Data não disponível para vinculação.');
+      statements.push(
+        db
+          .prepare(
+            'UPDATE special_dates SET brandId=? WHERE id=? AND brandId IS NULL AND isGlobal=0',
+          )
+          .bind(brand.id, date.id),
+      );
     } else if (action === 'createDate') {
+      if (!brand) throw new Error('Selecione a marca da data.');
       const name = str(data.name, 150),
         date = str(data.date);
       if (!name) throw new Error('Informe o nome da data.');
@@ -351,6 +421,8 @@ export async function POST(request: Request) {
       statements.push(
         insert('special_dates', {
           id: entityId,
+          brandId: brand.id,
+          isGlobal: 0,
           name,
           date,
           segments: str(data.segments) || 'Institucional',
@@ -358,6 +430,22 @@ export async function POST(request: Request) {
         }),
       );
     } else throw new Error('Ação não disponível.');
+    if (
+      item &&
+      ['editContent', 'saveVersion', 'status', 'deleteContent'].includes(action)
+    ) {
+      const expected = data.expectedRevision ?? item.revision ?? 0;
+      if (expected !== (item.revision ?? 0))
+        throw new ConflictError(conflictMessage);
+      // A failed compare must abort the entire D1 batch, including its side effects.
+      statements.unshift(
+        db
+          .prepare(
+            'UPDATE content_items SET revision=CASE WHEN revision=? THEN revision+1 ELSE NULL END WHERE id=?',
+          )
+          .bind(expected as number, item.id),
+      );
+    }
     statements.push(
       insert('activity_logs', {
         id: id(),
@@ -373,13 +461,18 @@ export async function POST(request: Request) {
     const message =
       error instanceof Error ? error.message : 'Não foi possível salvar.';
     console.error('workspace action', error);
+    const conflict =
+      error instanceof ConflictError ||
+      message.includes('content_items.revision');
     return Response.json(
       {
-        error: message.includes('SQLITE')
-          ? 'Os dados mudaram durante a edição. Atualize e tente novamente.'
-          : message,
+        error: conflict
+          ? conflictMessage
+          : message.includes('SQLITE')
+            ? 'Os dados mudaram durante a edição. Atualize e tente novamente.'
+            : message,
       },
-      { status: 400 },
+      { status: conflict ? 409 : 400 },
     );
   }
 }

@@ -106,7 +106,10 @@ export async function readState(): Promise<State> {
       updatedAt: a.updatedAt || a.createdAt,
     })),
     comments: results[4].results as unknown as Comment[],
-    dates: results[5].results as unknown as SpecialDate[],
+    dates: (results[5].results as unknown as SpecialDate[]).map((d) => ({
+      ...d,
+      isGlobal: d.isGlobal === 1 || ['d1', 'd2'].includes(d.id) ? 1 : 0,
+    })),
     plans: (
       results[6].results as unknown as (Omit<Plan, 'days' | 'selectedDates'> & {
         days: string;

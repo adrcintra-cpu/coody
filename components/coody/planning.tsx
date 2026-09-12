@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Picker, ContentRow, NoData, Meter } from './shared';
 import { Field, FormModal } from './forms';
-import { planProposal } from '@/lib/domain';
+import { planProposal, dateAvailableToBrand } from '@/lib/domain';
 import type { State, Action, Content, Plan } from '@/lib/types';
 export function Planning({
   state,
@@ -36,10 +36,14 @@ export function Planning({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [addDate, setAddDate] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(false);
+  const [legacyDate, setLegacyDate] = useState('');
   const items = state.contents.filter(
     (c) => c.brandId === brandId && c.date.startsWith(month),
   );
-  const relevant = state.dates.filter((d) => d.date.startsWith(month));
+  const relevant = state.dates.filter(
+    (d) => d.date.startsWith(month) && dateAvailableToBrand(d, brandId),
+  );
   const plan: Plan = {
     id: '',
     brandId,
@@ -53,6 +57,8 @@ export function Planning({
   const saved = state.plans.find(
     (p) => p.brandId === brandId && p.month === month,
   );
+  const activeSaved = editingPlan ? undefined : saved;
+  const legacyDates = state.dates.filter((d) => !d.brandId && !d.isGlobal);
   const concentrated =
     b?.pillars.filter(
       (p) =>
@@ -62,10 +68,10 @@ export function Planning({
     ) || [];
   const missingDates = relevant.filter(
     (d) =>
-      (saved?.selectedDates || selected).includes(d.id) &&
+      (activeSaved?.selectedDates || selected).includes(d.id) &&
       !items.some((c) => c.date === d.date),
   );
-  const weekGoal = saved?.weeklyGoal || weekly;
+  const weekGoal = activeSaved?.weeklyGoal || weekly;
   const weeklyCounts = Array.from(
     {
       length: Math.ceil(
@@ -158,22 +164,81 @@ export function Planning({
           {missingDates.map((d) => d.name).join(', ')}.
         </p>
       )}
+      {!fixedBrandId && legacyDates.length > 0 && (
+        <section className="panel">
+          <h2>Datas antigas sem marca</h2>
+          <p className="form-hint">
+            Vincule cada data ao cliente correto antes de usá-la no
+            planejamento. As informações existentes foram preservadas.
+          </p>
+          <div className="toolbar">
+            <Picker
+              label="Data para vincular"
+              value={legacyDate}
+              onChange={setLegacyDate}
+              options={[
+                { value: '', label: 'Selecionar data' },
+                ...legacyDates.map((d) => ({
+                  value: d.id,
+                  label: d.name + ' · ' + d.date,
+                })),
+              ]}
+            />
+            <button
+              className="outline-btn"
+              disabled={!legacyDate || !b || busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await act('assignDate', { id: legacyDate, brandId });
+                  setLegacyDate('');
+                } catch (e) {
+                  setError((e as Error).message);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Vincular a {b?.name || 'uma marca'}
+            </button>
+          </div>
+        </section>
+      )}
       <div className="planning-layout">
         <section className="panel">
           <h2>Direção do mês</h2>
           <p className="muted">
             {saved
-              ? 'Planejamento salvo. Ajuste as pautas ao lado.'
+              ? 'Planejamento salvo. As revisões da configuração preservam todas as pautas existentes.'
               : 'Defina o ritmo e organize uma proposta inicial.'}
           </p>
+          {saved && !editingPlan && (
+            <button
+              className="outline-btn"
+              onClick={() => {
+                setMonthly(saved.monthlyGoal);
+                setWeekly(saved.weeklyGoal);
+                setDays(saved.days);
+                setCampaign(saved.campaign);
+                setSelected(
+                  saved.selectedDates.filter((id) =>
+                    relevant.some((d) => d.id === id),
+                  ),
+                );
+                setEditingPlan(true);
+              }}
+            >
+              Revisar planejamento
+            </button>
+          )}
           <div className="form-grid">
             <Field label="Posts no mês">
               <Input
-                disabled={!!saved}
+                disabled={!!saved && !editingPlan}
                 type="number"
                 min={1}
                 max={100}
-                value={saved?.monthlyGoal ?? monthly}
+                value={activeSaved?.monthlyGoal ?? monthly}
                 onChange={(e) => {
                   setMonthly(Number(e.target.value));
                   setProposal([]);
@@ -182,11 +247,11 @@ export function Planning({
             </Field>
             <Field label="Posts por semana">
               <Input
-                disabled={!!saved}
+                disabled={!!saved && !editingPlan}
                 type="number"
                 min={1}
                 max={30}
-                value={saved?.weeklyGoal ?? weekly}
+                value={activeSaved?.weeklyGoal ?? weekly}
                 onChange={(e) => setWeekly(Number(e.target.value))}
               />
             </Field>
@@ -197,12 +262,12 @@ export function Planning({
                 <label
                   key={d}
                   className={
-                    (saved?.days || days).includes(i) ? 'selected' : ''
+                    (activeSaved?.days || days).includes(i) ? 'selected' : ''
                   }
                 >
                   <Checkbox
-                    disabled={!!saved}
-                    checked={(saved?.days || days).includes(i)}
+                    disabled={!!saved && !editingPlan}
+                    checked={(activeSaved?.days || days).includes(i)}
                     onCheckedChange={(v) => {
                       setDays(v ? [...days, i] : days.filter((d) => d !== i));
                       setProposal([]);
@@ -215,8 +280,8 @@ export function Planning({
           </Field>
           <Field label="Campanhas e prioridades">
             <Textarea
-              disabled={!!saved}
-              value={saved?.campaign ?? campaign}
+              disabled={!!saved && !editingPlan}
+              value={activeSaved?.campaign ?? campaign}
               onChange={(e) => {
                 setCampaign(e.target.value);
                 setProposal([]);
@@ -239,8 +304,10 @@ export function Planning({
           {relevant.map((d) => (
             <label className="special-date" key={d.id}>
               <Checkbox
-                disabled={!!saved}
-                checked={(saved?.selectedDates || selected).includes(d.id)}
+                disabled={!!saved && !editingPlan}
+                checked={(activeSaved?.selectedDates || selected).includes(
+                  d.id,
+                )}
                 onCheckedChange={(v) => {
                   setSelected(
                     v
@@ -268,6 +335,41 @@ export function Planning({
             <p className="error" role="alert">
               {error}
             </p>
+          )}
+          {saved && editingPlan && (
+            <>
+              <p className="notice">
+                Esta revisão atualiza metas, dias, campanha e datas. Nenhuma
+                pauta será excluída, movida ou criada automaticamente.
+              </p>
+              <div className="form-actions">
+                <button
+                  className="outline-btn"
+                  disabled={busy}
+                  onClick={() => setEditingPlan(false)}
+                >
+                  Cancelar revisão
+                </button>
+                <button
+                  className="create-btn"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError('');
+                    try {
+                      await act('updatePlan', { ...plan, id: saved.id });
+                      setEditingPlan(false);
+                    } catch (e) {
+                      setError((e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  {busy ? 'Salvando…' : 'Salvar revisão'}
+                </button>
+              </div>
+            </>
           )}
           {!saved && (
             <>
@@ -386,17 +488,24 @@ export function Planning({
         </section>
       </div>
       {addDate && (
-        <DateForm month={month} act={act} close={() => setAddDate(false)} />
+        <DateForm
+          month={month}
+          brandId={brandId}
+          act={act}
+          close={() => setAddDate(false)}
+        />
       )}
     </>
   );
 }
 function DateForm({
   month,
+  brandId,
   act,
   close,
 }: {
   month: string;
+  brandId: string;
   act: Action;
   close: () => void;
 }) {
@@ -415,7 +524,7 @@ function DateForm({
           const data = new FormData(e.currentTarget);
           setBusy(true);
           try {
-            await act('createDate', Object.fromEntries(data));
+            await act('createDate', { ...Object.fromEntries(data), brandId });
             close();
           } catch (e) {
             setError((e as Error).message);

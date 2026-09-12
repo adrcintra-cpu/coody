@@ -1,0 +1,92 @@
+{
+  "brandId": "96230026-0635-4483-adbf-30d1e2a00e33",
+  "dateId": "10d6fbd1-4710-4701-9c42-f713331fe5f2",
+  "results": [
+    {
+      "check": "Cadastro navegador persistido",
+      "passed": true,
+      "brandId": "96230026-0635-4483-adbf-30d1e2a00e33"
+    },
+    {
+      "check": "Arquivo de outra marca rejeitado",
+      "result": {
+        "status": 400,
+        "body": {
+          "error": "Arquivo não encontrado nesta marca."
+        }
+      }
+    },
+    {
+      "check": "PNG truncado de quatro bytes",
+      "result": {
+        "status": 200,
+        "body": {
+          "ok": true,
+          "id": "cdebfc56-3603-4153-b070-0baf9ae06998"
+        }
+      }
+    },
+    {
+      "check": "Data própria possui vínculo com marca",
+      "record": {
+        "id": "10d6fbd1-4710-4701-9c42-f713331fe5f2",
+        "name": "QA aniversário privado",
+        "date": "2031-01-14",
+        "segments": "Teste de aceitação",
+        "relevance": "Alta"
+      }
+    },
+    {
+      "check": "Revisar plano salvo",
+      "result": {
+        "status": 400,
+        "body": {
+          "error": "Este mês já foi planejado. Edite as pautas existentes ou crie novas pautas."
+        }
+      }
+    },
+    {
+      "check": "Decisões concorrentes aprovação e alteração",
+      "responses": [
+        {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "id": "fd21fb18-b675-4a6f-9adf-926bced2d7ae"
+          }
+        },
+        {
+          "status": 200,
+          "body": {
+            "ok": true,
+            "id": "fd21fb18-b675-4a6f-9adf-926bced2d7ae"
+          }
+        }
+      ],
+      "finalStatus": "ALTERAÇÃO",
+      "lockedVersions": 1,
+      "comments": [
+        "QA decisão concorrente"
+      ]
+    },
+    {
+      "check": "Origem externa rejeitada",
+      "status": 403
+    }
+  ],
+  "extraDateId": "2bf1df46-9841-4e87-b459-223cc0f41742",
+  "approvalRecords": [
+    {
+      "decision": "APROVAÇÃO",
+      "versionId": "adfdcfd9-6a04-4ad5-a90c-099337aae4c0"
+    },
+    {
+      "decision": "ALTERAÇÃO",
+      "versionId": "adfdcfd9-6a04-4ad5-a90c-099337aae4c0"
+    },
+    {
+      "decision": "APROVADO",
+      "versionId": "adfdcfd9-6a04-4ad5-a90c-099337aae4c0"
+    }
+  ]
+}

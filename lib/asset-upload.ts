@@ -1,3 +1,4 @@
+import { validateFileStructure } from './upload-structure';
 import type { Asset } from './types';
 import { canonicalCategory, assetCategories } from './brand-memory';
 import { textValue } from './brand-validation';
@@ -43,6 +44,7 @@ export async function validateUpload(file: unknown) {
       );
   }
 
+  validateFileStructure(bytes, file.type);
   return { file, bytes };
 }
 export function assetRecord(

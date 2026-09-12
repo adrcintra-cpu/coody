@@ -89,6 +89,8 @@ export const contentPillars = sqliteTable('content_pillars', {
 });
 export const specialDates = sqliteTable('special_dates', {
   id: text().primaryKey(),
+  brandId: text().references(() => brands.id),
+  isGlobal: integer().notNull().default(0),
   name: text().notNull(),
   date: text().notNull(),
   segments: text().notNull(),
@@ -114,6 +116,7 @@ export const contentItems = sqliteTable(
   'content_items',
   {
     id: text().primaryKey(),
+    revision: integer().notNull().default(0),
     brandId: text()
       .notNull()
       .references(() => brands.id),

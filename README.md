@@ -4,7 +4,7 @@ Workspace criativo de agência. Etapa 1 funcional com dados fictícios, persist�
 
 ## Implementação por etapas
 
-1. **Base e experiência (implementada):** arquitetura TypeScript modular, design system dark com logo oficial, Oxanium Light 300 nos títulos e Saira Light 300 no corpo, servidas localmente, Dashboard, Brand Spaces, Biblioteca, Planejamento, Calendário, Conteúdos, Studio, Aprovações e telas de preparação das integrações.
+1. **Base e experiência (implementada):** arquitetura TypeScript modular, design system dark com logo oficial, Krona One Regular 400 nos títulos (arquivo fornecido, sem variante Light) e Saira Light 300 no corpo, servidas localmente, Dashboard, Brand Spaces, Biblioteca, Planejamento, Calendário, Conteúdos, Studio, Aprovações e telas de preparação das integrações.
 2. **IA:** conectar adaptador OpenAI somente no servidor; geração de texto e imagem separadas, validação de 5 hashtags, contexto completo da marca, recuperação de referências e recomposição independente de Feed e Story.
 3. **Trello:** configuração de workspace/board/listas, cards com anexos, webhooks assinados, sincronização idempotente, comentários e fila de tentativas.
 4. **Equipes:** identidade por usuário, autorização real por papel e agência, convites, aprovação externa por link, auditoria e limites de upload/geração.
@@ -50,4 +50,4 @@ As fontes são servidas localmente. As licenças OFL estão em `public/fonts/`.
 
 ## Limites intencionais
 
-OpenAI/Trello sem credenciais ou chamadas reais. Arquivos são anexados manualmente e não há editor gráfico ou renderização automática de artes. A integração WebMCP opcional apenas abre o formulário; não foi validada em um contexto WebMCP compatível. Não houve teste visual automatizado de navegador. API, regras de domínio, tipos e build são validados separadamente.
+OpenAI/Trello sem credenciais ou chamadas reais. Arquivos são anexados manualmente e não há editor gráfico ou renderização automática de artes. A integração WebMCP opcional apenas abre o formulário; não foi validada em um contexto WebMCP compatível. Os fluxos de cadastro, restauração de navegação e responsividade a 390 px foram verificados no navegador. API, regras de domínio, tipos e build são validados separadamente.

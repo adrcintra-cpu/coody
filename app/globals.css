@@ -1895,10 +1895,10 @@ small {
   src: url(/fonts/oxanium-light.ttf) format('truetype');
 }
 
-/* User-selected true Light face for interface headings. */
+/* Supplied Krona One has a single Regular face; disable synthetic bold. */
 h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [data-slot='dialog-title'], [data-slot='dialog-title'], [data-slot='alert-dialog-title'] {
-  font-family: 'Oxanium', sans-serif;
-  font-weight: 300;
+  font-family: 'Krona One', sans-serif;
+  font-weight: 400;
   font-synthesis: none;
 }
 
@@ -1925,3 +1925,8 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
 .brand-module { padding-top:20px; }
 .brand-module .page-heading h1 { font-size:24px; }
 @media(max-width:640px) { .onboarding-steps button { flex:1 1 40%; } .pending-asset { padding:12px; } .onboarding-summary .detail-line { flex-wrap:wrap; } }
+
+.brand-tabs { display:flex; flex-wrap:wrap; width:100%; height:auto; justify-content:flex-start; gap:4px; }
+.brand-tabs [role=tab] { flex:0 1 auto; white-space:normal; min-width:0; }
+.category-summary button { display:inline-flex; align-items:center; gap:8px; }
+@media(max-width:640px) { .brand-tabs [role=tab] { padding:10px 8px; font-size:14px; } .page-heading h1 { overflow-wrap:anywhere; } }
