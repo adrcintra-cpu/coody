@@ -1,7 +1,8 @@
 'use client';
 import { useState } from 'react';
 import type { State } from '@/lib/types';
-export function Integrations() {
+import { TrelloIntegration } from './trello';
+export function Integrations({ state }: { state: State }) {
   return (
     <>
       <div className="page-heading">
@@ -20,14 +21,7 @@ export function Integrations() {
             permite editar textos e selecionar artes da biblioteca.
           </p>
         </section>
-        <section className="panel">
-          <h2>Trello</h2>
-          <p className="stage-label">Não integrado</p>
-          <p>
-            Sincronização externa indisponível. Revisões, comentários e
-            aprovações são registrados no COODY.
-          </p>
-        </section>
+        <TrelloIntegration state={state} />
       </div>
     </>
   );

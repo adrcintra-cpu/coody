@@ -213,3 +213,31 @@ export const maintenanceBackups = sqliteTable('maintenance_backups', {
   payload: text().notNull(),
   createdAt: text().notNull(),
 });
+
+export const trelloConnection = sqliteTable('trello_connection', {
+  id: text().primaryKey(),
+  credentials: text().notNull(),
+  memberId: text().notNull(),
+  memberName: text().notNull(),
+  boardId: text().notNull().default(''),
+  boardName: text().notNull().default(''),
+  approvalList: text().notNull().default(''),
+  changesList: text().notNull().default(''),
+  approvedList: text().notNull().default(''),
+  updatedAt: text().notNull(),
+});
+export const trelloExports = sqliteTable('trello_exports', {
+  id: text().primaryKey(),
+  contentId: text()
+    .notNull()
+    .references(() => contentItems.id),
+  versionId: text()
+    .notNull()
+    .references(() => contentVersions.id),
+  boardId: text().notNull(),
+  cardId: text().notNull().default(''),
+  cardUrl: text().notNull().default(''),
+  state: text().notNull(),
+  leaseUntil: integer().notNull().default(0),
+  updatedAt: text().notNull(),
+});

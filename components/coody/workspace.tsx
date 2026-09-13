@@ -425,7 +425,7 @@ export default function Workspace() {
               library={library}
             />
           ) : view === 'Integrações' ? (
-            <Integrations />
+            <Integrations state={state} />
           ) : view === 'Configurações' ? (
             <Settings state={state} reload={reload} />
           ) : (
