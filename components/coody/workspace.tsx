@@ -410,6 +410,7 @@ export default function Workspace() {
             />
           ) : view === 'Studio' && item ? (
             <Studio
+              reload={reload}
               key={
                 item.id +
                 '-' +

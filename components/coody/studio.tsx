@@ -1,4 +1,5 @@
 'use client';
+import { ImageGenerator } from './openai';
 import { useState } from 'react';
 import {
   ArrowLeft,
@@ -44,7 +45,9 @@ export function Studio({
   back,
   edit,
   library,
+  reload,
 }: {
+  reload: () => Promise<void>;
   state: State;
   item: Content;
   act: Action;
@@ -253,6 +256,12 @@ export function Studio({
             Feed e Story usam arquivos independentes. A adaptação preserva o
             conceito e exige uma composição própria para cada formato.
           </p>
+          <ImageGenerator
+            contentId={item.id}
+            format={format}
+            disabled={disabled}
+            reload={reload}
+          />
           <section className="panel section-space">
             <h2>Contexto da marca</h2>
             <p className="muted">

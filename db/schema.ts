@@ -241,3 +241,11 @@ export const trelloExports = sqliteTable('trello_exports', {
   leaseUntil: integer().notNull().default(0),
   updatedAt: text().notNull(),
 });
+
+export const imageRequests = sqliteTable('image_requests', {
+  id: text().primaryKey(),
+  contentId: text().notNull(),
+  status: text().notNull(),
+  assetId: text().notNull().default(''),
+  createdAt: text().notNull(),
+});

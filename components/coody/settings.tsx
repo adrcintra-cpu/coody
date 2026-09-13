@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { State } from '@/lib/types';
+import { OpenAIIntegration } from './openai';
 import { TrelloIntegration } from './trello';
 export function Integrations({ state }: { state: State }) {
   return (
@@ -13,14 +14,7 @@ export function Integrations({ state }: { state: State }) {
         </div>
       </div>
       <div className="integration-grid">
-        <section className="panel">
-          <h2>OpenAI</h2>
-          <p className="stage-label">Não integrada</p>
-          <p>
-            Geração automática de textos e imagens indisponível. O Studio
-            permite editar textos e selecionar artes da biblioteca.
-          </p>
-        </section>
+        <OpenAIIntegration />
         <TrelloIntegration state={state} />
       </div>
     </>
