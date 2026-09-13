@@ -35,7 +35,7 @@ test('Trello authorization stays in header and requests are not blindly retried'
     assert.equal(url, 'https://api.trello.com/1/members/me');
     assert.ok(!url.includes(creds.token));
     assert.match(opts.headers.get('Authorization'), /oauth_token/);
-    assert.equal(opts.redirect, 'error');
+    assert.equal(opts.redirect, 'manual');
     return Response.json({ id: 'member' });
   });
   assert.equal(result.id, 'member');
@@ -58,4 +58,10 @@ test('provider errors do not leak credentials or raw response', async () => {
 });
 test('arbitrary remote URLs rejected', async () => {
   await assert.rejects(trello(creds, 'https://example.com'), /inválido/);
+});
+
+test('redirect response is rejected without following or retrying', async () => {
+ let calls=0;
+ await assert.rejects(trello(creds,'/members/me',{},async()=>{calls++;return new Response('',{status:302,headers:{Location:'https://example.com'}});}),/não concluiu/);
+ assert.equal(calls,1);
 });

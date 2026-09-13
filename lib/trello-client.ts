@@ -25,14 +25,17 @@ export async function trello<T>(
     response = await transport('https://api.trello.com/1' + path, {
       ...init,
       headers,
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(20000),
     });
-  } catch {
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Unknown transport failure';
+    console.error('trello transport', detail.replaceAll(credentials.key, '[redacted]').replaceAll(credentials.token, '[redacted]').slice(0, 500));
     throw new Error(
       'Trello não respondeu. Confira a conexão antes de repetir o envio.',
     );
   }
+  // Never follow redirects: authorization must remain on api.trello.com.
   if (!response.ok)
     throw new Error(
       response.status === 401 || response.status === 403
