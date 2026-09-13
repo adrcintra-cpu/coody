@@ -7,7 +7,6 @@ import {
   Check,
   Lock,
   ImagePlus,
-  Sparkles,
   GitCompareArrows,
   MessageSquare,
   ArrowUpRight,
@@ -216,7 +215,7 @@ export function Studio({
                   <span>
                     Selecione uma arte da biblioteca.
                     <br />
-                    Geração com IA na próxima etapa.
+                    Selecione uma arte da biblioteca para este formato.
                   </span>
                 </div>
               )}
@@ -248,14 +247,6 @@ export function Studio({
               onClick={() => library(item.brandId)}
             >
               <ImagePlus size={15} /> Adicionar referência ou imagem
-            </button>
-            <button
-              className="outline-btn"
-              disabled
-              title="Requer integração OpenAI"
-            >
-              <Sparkles size={15} />{' '}
-              {format === 'feed' ? 'Regenerar arte' : 'Regenerar Story'}
             </button>
           </div>
           <p className="form-hint">
@@ -330,22 +321,6 @@ export function Studio({
               V{current.number} ·{' '}
               {new Date(current.createdAt).toLocaleDateString('pt-BR')}
             </span>
-          </div>
-          <div className="toolbar-inline">
-            <button
-              className="text-btn"
-              disabled
-              title="Requer integração OpenAI"
-            >
-              <Sparkles size={13} /> Regenerar headline
-            </button>
-            <button
-              className="text-btn"
-              disabled
-              title="Requer integração OpenAI"
-            >
-              <Sparkles size={13} /> Regenerar legenda
-            </button>
           </div>
           <button
             disabled={disabled}

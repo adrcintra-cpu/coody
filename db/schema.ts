@@ -207,3 +207,9 @@ export const activityLogs = sqliteTable('activity_logs', {
   entityId: text().notNull(),
   createdAt: text().notNull(),
 });
+
+export const maintenanceBackups = sqliteTable('maintenance_backups', {
+  id: text().primaryKey(),
+  payload: text().notNull(),
+  createdAt: text().notNull(),
+});

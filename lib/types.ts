@@ -112,6 +112,7 @@ export type Plan = {
   selectedDates: string[];
 };
 export type State = {
+  user?: import('./identity').CurrentUser;
   brands: Brand[];
   contents: Content[];
   versions: Version[];

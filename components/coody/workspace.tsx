@@ -199,6 +199,10 @@ export default function Workspace() {
               Object.keys(input).length
             )
               throw new Error('Envie um objeto vazio.');
+            if (!state?.brands.length) {
+              navigate('Marcas');
+              return { opened: true, saved: false };
+            }
             setForm({});
             return { opened: true, saved: false };
           },
@@ -207,13 +211,18 @@ export default function Workspace() {
       ),
     ).catch(() => {});
     return () => lifecycle.abort();
-  }, []);
+  }, [state?.brands.length, navigate]);
   const open = (c: Content) => {
     setSelected(c.id);
     navigate('Studio', { id: c.id });
   };
-  const create = (date?: string, brandId?: string) =>
+  const create = (date?: string, brandId?: string) => {
+    if (!state?.brands.length) {
+      navigate('Marcas');
+      return;
+    }
     setForm({ date, brandId });
+  };
   const library = (id: string) => {
     setLibraryBrand(id);
     navigate('Biblioteca', { brand: id });
@@ -234,7 +243,7 @@ export default function Workspace() {
           <div className="workspace-name">
             <span className="workspace-icon">W</span>
             <span>
-              Workspace da agência<small>Plano criativo · demonstração</small>
+              Meu workspace<small>Planejamento e criação</small>
             </span>
             <ChevronDown size={14} />
           </div>
@@ -276,12 +285,15 @@ export default function Workspace() {
         </SidebarContent>
         <SidebarFooter>
           <div className="demo-note">
-            <span className="live-dot" /> Ambiente demonstrativo
+            <span className="live-dot" /> Workspace privado
           </div>
           <button className="profile" onClick={() => navigate('Configurações')}>
-            <span className="avatar">AC</span>
+            <span className="avatar">
+              {state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'}
+            </span>
             <span>
-              Agência criativa<small>Administrador</small>
+              {state?.user?.name || 'Minha conta'}
+              <small>Administrador</small>
             </span>
             <ChevronDown size={15} />
           </button>
@@ -314,7 +326,9 @@ export default function Workspace() {
                 );
               }}
             />
-            <span className="avatar small">AC</span>
+            <span className="avatar small">
+              {state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'}
+            </span>
           </div>
         </header>
         <main className="workspace-main">
@@ -332,6 +346,19 @@ export default function Workspace() {
             <output className="loading-state">
               <LoaderCircle className="animate-spin" /> Abrindo seu workspace…
             </output>
+          ) : !state.brands.length &&
+            !['Marcas', 'Configurações', 'Integrações'].includes(view) ? (
+            <section className="panel">
+              <p className="eyebrow">COMECE AQUI</p>
+              <h1>Seu workspace está pronto para a primeira marca</h1>
+              <p className="muted">
+                Cadastre a identidade, os pilares e os arquivos da marca para
+                começar o planejamento e a criação.
+              </p>
+              <button className="create-btn" onClick={() => navigate('Marcas')}>
+                Cadastrar primeira marca
+              </button>
+            </section>
           ) : view === 'Dashboard' ? (
             <Dashboard
               state={state}
@@ -400,7 +427,7 @@ export default function Workspace() {
           ) : view === 'Integrações' ? (
             <Integrations />
           ) : view === 'Configurações' ? (
-            <Settings />
+            <Settings state={state} reload={reload} />
           ) : (
             <Contents state={state} month={month} open={open} create={create} />
           )}

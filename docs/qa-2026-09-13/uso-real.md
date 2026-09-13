@@ -1,0 +1,9 @@
+# COODY — uso individual privado, 13/09/2026
+
+Carga automática demonstrativa removida. Conta e autoria vêm dos cabeçalhos autenticados do Sites, com e-mail do proprietário autorizado exclusivamente no servidor. APIs de leitura, arquivos, exportação e mutações recusam visitantes sem identidade. Acesso de equipe/cliente não implementado.
+
+A remoção operacional dos exemplos compara todas as células e quantidades de registros originais, recusa dados adicionais/alterados e verifica novamente dentro da transação. Antes de excluir, preserva o snapshot em maintenance_backups, chave original-examples-v1. Essa cópia permite recuperação administrativa por inserção transacional na ordem brands, special_dates, content_items, content_versions, comments; não restaurar sobre dados existentes. Nenhum arquivo R2 é removido pela operação. A referência histórica em lib/maintenance existe somente para reconhecer os registros a remover, nunca para inseri-los.
+
+Validação local: 19 testes unitários; 24 verificações do fluxo de conteúdo; cadastro com arquivo e repetição sem duplicação; falha sem cadastro parcial; metadados e isolamento por marca; rejeição de arquivo truncado; datas privadas; revisão de plano sem perder pautas; três disputas simultâneas de aprovação com uma decisão válida e um conflito sem efeitos colaterais. APIs anônimas retornaram 401. Limpeza bloqueada com registros adicionais, limpeza original concluída, repetição idempotente, duas leituras sem recriar exemplos e exportação JSON verificadas.
+
+Não confundir status PUBLICADO com postagem em rede social: é um registro interno. OpenAI e Trello não estão integrados; botões inoperantes de geração foram retirados. Planejamento usa regras e o Studio edição manual. O arquivo de fonte fornecido é Krona One Regular, aplicado sem negrito sintético; não há variante Light fornecida.

@@ -1,4 +1,4 @@
-import type { State, Brand, Content } from './types';
+import type { State, Brand, Content } from '../lib/types';
 const pillars = [
   { name: 'Produtos', percent: 30 },
   { name: 'Institucional', percent: 20 },

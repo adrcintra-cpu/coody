@@ -385,7 +385,7 @@ export function Planning({
                   }
                 }}
               >
-                <CalendarRange size={17} /> Montar proposta demonstrativa
+                <CalendarRange size={17} /> Montar planejamento
               </button>
               <p className="form-hint">
                 <Sparkles size={12} /> Planejar mês com IA estará disponível

@@ -1,8 +1,11 @@
+import { authorize } from '@/lib/auth';
 import { bucket, database, insert, saveGuidelines } from '@/lib/repository';
 import { parseBrand, guidelineRules } from '@/lib/brand-validation';
 import { assetRecord, validateUpload, limitedForm } from '@/lib/asset-upload';
 import type { Asset } from '@/lib/types';
 export async function POST(request: Request) {
+  const user = authorize(request);
+  if (user instanceof Response) return user;
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin

@@ -1,159 +1,127 @@
 'use client';
 import { useState } from 'react';
-import {
-  Sparkles,
-  Columns3,
-  Lock,
-  ArrowUpRight,
-  ShieldCheck,
-  UserRound,
-} from 'lucide-react';
-import { FormModal } from './forms';
+import type { State } from '@/lib/types';
 export function Integrations() {
-  const [details, setDetails] = useState('');
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">SEU ECOSSISTEMA CRIATIVO</p>
+          <p className="eyebrow">SERVIÇOS EXTERNOS</p>
           <h1>Integrações</h1>
-          <p>Conecte inteligência, produção e colaboração.</p>
+          <p>Status dos recursos conectados ao COODY.</p>
         </div>
-        <span className="stage-label">Próxima etapa</span>
       </div>
       <div className="integration-grid">
-        {[
-          {
-            name: 'OpenAI',
-            Icon: Sparkles,
-            description:
-              'Planejamento contextual, legendas e criação de artes para cada marca.',
-            features: [
-              'Geração de texto com 5 hashtags',
-              'Feed e Story com composições próprias',
-              'Brand Context e histórico editorial',
-            ],
-          },
-          {
-            name: 'Trello',
-            Icon: Columns3,
-            description:
-              'Aprovações e alterações conectadas ao fluxo da sua equipe.',
-            features: [
-              'Cards com texto, Feed e Story',
-              'Listas de aprovação, alteração e aprovado',
-              'Sincronização de status e comentários',
-            ],
-          },
-        ].map(({ name, Icon, description, features }) => (
-          <section className="integration-card" key={name}>
-            <div className="integration-icon">
-              <Icon size={28} strokeWidth={1.3} />
-            </div>
-            <div className="section-head">
-              <h2>{name}</h2>
-              <span className="stage-label">Não conectado</span>
-            </div>
-            <p className="muted">{description}</p>
-            <ul>
-              {features.map((f) => (
-                <li key={f}>
-                  <span /> {f}
-                </li>
-              ))}
-            </ul>
-            <button
-              className="outline-btn full"
-              onClick={() => setDetails(name)}
-            >
-              Ver preparação <ArrowUpRight size={15} />
-            </button>
-          </section>
-        ))}
+        <section className="panel">
+          <h2>OpenAI</h2>
+          <p className="stage-label">Não integrada</p>
+          <p>
+            Geração automática de textos e imagens indisponível. O Studio
+            permite editar textos e selecionar artes da biblioteca.
+          </p>
+        </section>
+        <section className="panel">
+          <h2>Trello</h2>
+          <p className="stage-label">Não integrado</p>
+          <p>
+            Sincronização externa indisponível. Revisões, comentários e
+            aprovações são registrados no COODY.
+          </p>
+        </section>
       </div>
-      <p className="security-note">
-        <Lock size={15} /> As credenciais serão configuradas no servidor.
-        Nenhuma chave é solicitada nesta etapa.
-      </p>
-      {details && (
-        <FormModal
-          open
-          onClose={() => setDetails('')}
-          title={details + ' · preparação'}
-          description="A arquitetura está separada da interface e pronta para receber o adaptador real."
-        >
-          <p className="muted">
-            {details === 'OpenAI'
-              ? 'A próxima etapa conectará a API oficial para geração de texto e imagem, usando o contexto da marca. O Story será recomposto para 9:16.'
-              : 'A próxima etapa permitirá selecionar Workspace, Board e listas, criar cards com anexos e sincronizar alterações por webhook.'}
-          </p>
-          <p className="notice">
-            Nesta versão, o fluxo de criação e aprovação é interno. Nenhuma
-            chamada externa é realizada.
-          </p>
-          <button className="outline-btn" onClick={() => setDetails('')}>
-            Entendido
-          </button>
-        </FormModal>
-      )}
     </>
   );
 }
-export function Settings() {
+export function Settings({
+  state,
+  reload,
+}: {
+  state: State;
+  reload: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const hasExamples = state.brands.some((b) =>
+    ['b1', 'b2', 'b3'].includes(b.id),
+  );
+  async function removeExamples() {
+    setBusy(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/maintenance/examples', {
+        method: 'POST',
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error);
+      await reload();
+      setMessage('Exemplos removidos. Uma cópia de segurança foi preservada.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível remover os exemplos.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <div className="page-heading">
         <div>
           <p className="eyebrow">SEU ESPAÇO DE TRABALHO</p>
           <h1>Configurações</h1>
-          <p>Uma base organizada para a sua equipe crescer.</p>
+          <p>Acesso e dados do workspace.</p>
         </div>
       </div>
       <div className="settings-layout">
         <section className="panel">
-          <UserRound size={24} />
-          <h2>Agência criativa</h2>
-          <p className="muted">Perfil demonstrativo · Administrador</p>
+          <h2>{state.user?.name || 'Minha conta'}</h2>
+          <p>{state.user?.email}</p>
+          <div className="detail-line">
+            <span>Acesso</span>
+            <strong>Administrador · proprietário</strong>
+          </div>
           <div className="detail-line">
             <span>Workspace</span>
-            <strong>COODY</strong>
-          </div>
-          <div className="detail-line">
-            <span>Idioma</span>
-            <strong>Português (Brasil)</strong>
-          </div>
-          <div className="detail-line">
-            <span>Interface</span>
-            <strong>Dark</strong>
+            <strong>COODY privado</strong>
           </div>
           <p className="notice">
-            Dados fictícios para validar o fluxo. Alterações e arquivos são
-            salvos neste workspace demonstrativo.
+            Acesso individual pela conta proprietária. Os cadastros, conteúdos e
+            arquivos são salvos no workspace.
           </p>
         </section>
         <section className="panel">
-          <ShieldCheck size={24} />
-          <h2>Papéis preparados</h2>
-          <p className="muted">
-            Contas individuais e aplicação de permissões serão ativadas em uma
-            próxima etapa.
+          <h2>Seus dados</h2>
+          <p>
+            Exporte os cadastros, textos, histórico e metadados dos arquivos
+            para guardar uma cópia. As imagens e documentos devem ser baixados
+            pela biblioteca.
           </p>
-          {[
-            ['Administrador', 'Acesso completo ao workspace.'],
-            [
-              'Criativo',
-              'Planejamento, criação, edição, Studio e envio para aprovação.',
-            ],
-            [
-              'Aprovador',
-              'Visualização, comentários, aprovação e solicitação de alteração.',
-            ],
-          ].map(([role, desc]) => (
-            <div className="role-row" key={role}>
-              <h3>{role}</h3>
-              <p className="muted">{desc}</p>
-            </div>
-          ))}
+          <a className="outline-btn" href="/api/backup" download>
+            Exportar dados
+          </a>
+          <p className="notice">
+            Acessos separados para equipe e clientes ainda não estão
+            disponíveis.
+          </p>
+          {hasExamples && (
+            <>
+              <h3>Remover exemplos iniciais</h3>
+              <p>
+                Apenas a demonstração original sem alterações pode ser removida.
+                Uma cópia de segurança será preservada.
+              </p>
+              <button
+                className="outline-btn"
+                disabled={busy}
+                onClick={removeExamples}
+              >
+                {busy ? 'Removendo…' : 'Remover exemplos'}
+              </button>
+            </>
+          )}
+          {message && <output>{message}</output>}
         </section>
       </div>
     </>

@@ -1,3 +1,5 @@
+import { fetch, ensureTestBrand } from './local-client.mjs';
+await ensureTestBrand();
 // Local-only regression; returns the ID of its QA brand for cleanup.
 import assert from 'node:assert/strict';
 const origin = 'http://localhost:3000';

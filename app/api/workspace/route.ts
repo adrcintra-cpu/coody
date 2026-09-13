@@ -1,3 +1,4 @@
+import { authorize, registerUser } from '@/lib/auth';
 import { parseBrand, guidelineRules } from '@/lib/brand-validation';
 import { assetCategories, canonicalCategory } from '@/lib/brand-memory';
 import { database, insert, readState, saveGuidelines } from '@/lib/repository';
@@ -10,9 +11,11 @@ import {
   validateMonth,
 } from '@/lib/domain';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
-export async function GET() {
+export async function GET(request: Request) {
+  const user = authorize(request);
+  if (user instanceof Response) return user;
   try {
-    return Response.json(await readState(), {
+    return Response.json({ ...(await readState()), user }, {
       headers: { 'Cache-Control': 'no-store' },
     });
   } catch (error) {
@@ -30,6 +33,8 @@ const conflictMessage =
   'Esta pauta mudou em outra aba. Atualize os dados e revise antes de tentar novamente.';
 class ConflictError extends Error {}
 export async function POST(request: Request) {
+  const user = authorize(request);
+  if (user instanceof Response) return user;
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin
@@ -41,6 +46,7 @@ export async function POST(request: Request) {
       data: Record<string, unknown>;
     };
     if (!data || typeof data !== 'object') throw new Error('Dados inválidos.');
+    await registerUser(user);
     const db = database();
     const state = await readState();
     const now = new Date().toISOString();
@@ -236,7 +242,7 @@ export async function POST(request: Request) {
             versionId: version.id,
             decision: target,
             createdAt: now,
-            userId: 'demo-admin',
+            userId: user.id,
           }),
         );
       if (str(data.comment))
@@ -246,7 +252,7 @@ export async function POST(request: Request) {
             contentId: item.id,
             text: str(data.comment),
             createdAt: now,
-            user: 'Agência criativa',
+            user: user.name,
           }),
         );
     } else if (action === 'comment') {
@@ -257,7 +263,7 @@ export async function POST(request: Request) {
           contentId: item.id,
           text: str(data.text),
           createdAt: now,
-          user: 'Agência criativa',
+          user: user.name,
         }),
       );
     } else if (action === 'savePlan' || action === 'updatePlan') {
@@ -449,7 +455,7 @@ export async function POST(request: Request) {
     statements.push(
       insert('activity_logs', {
         id: id(),
-        userId: 'demo-admin',
+        userId: user.id,
         action,
         entityId,
         createdAt: now,

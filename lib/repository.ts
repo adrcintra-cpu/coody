@@ -1,6 +1,5 @@
 import { env } from 'cloudflare:workers';
 import { canonicalCategory } from './brand-memory';
-import { demoState } from './demo';
 import type {
   State,
   Brand,
@@ -56,25 +55,6 @@ export function insert(
 }
 export async function readState(): Promise<State> {
   const db = database();
-  const initialized = await db
-    .prepare('SELECT id FROM users WHERE id = ?')
-    .bind('demo-admin')
-    .first();
-  if (!initialized) {
-    const seed = demoState();
-    await db.batch([
-      insert(
-        'users',
-        { id: 'demo-admin', name: 'Agência criativa', role: 'ADMINISTRADOR' },
-        true,
-      ),
-      ...seed.brands.map((b) => insert('brands', b, true)),
-      ...seed.contents.map((c) => insert('content_items', c, true)),
-      ...seed.versions.map((v) => insert('content_versions', v, true)),
-      ...seed.dates.map((d) => insert('special_dates', d, true)),
-      ...seed.comments.map((c) => insert('comments', c, true)),
-    ]);
-  }
   const results = await db.batch(
     [
       'brands',
@@ -108,7 +88,7 @@ export async function readState(): Promise<State> {
     comments: results[4].results as unknown as Comment[],
     dates: (results[5].results as unknown as SpecialDate[]).map((d) => ({
       ...d,
-      isGlobal: d.isGlobal === 1 || ['d1', 'd2'].includes(d.id) ? 1 : 0,
+      isGlobal: d.isGlobal === 1 ? 1 : 0,
     })),
     plans: (
       results[6].results as unknown as (Omit<Plan, 'days' | 'selectedDates'> & {

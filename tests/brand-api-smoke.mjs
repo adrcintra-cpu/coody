@@ -1,3 +1,5 @@
+import { fetch, ensureTestBrand } from './local-client.mjs';
+await ensureTestBrand();
 import assert from 'node:assert/strict';
 const origin = 'http://localhost:3000';
 const snapshot = async () => {

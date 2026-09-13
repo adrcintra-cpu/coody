@@ -1,8 +1,11 @@
+import { authorize } from '@/lib/auth';
 import { bucket, database } from '@/lib/repository';
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const user = authorize(request);
+  if (user instanceof Response) return user;
   const { id } = await params;
   const asset = await database()
     .prepare('SELECT * FROM brand_assets WHERE id=?')
