@@ -1,8 +1,8 @@
 export class OpenAIError extends Error {}
 export async function openaiRequest(
   key: string,
-  path: 'responses' | 'images/generations',
-  body: Record<string, unknown>,
+  path: 'responses' | 'images/generations' | 'images/edits',
+  body: Record<string, unknown> | FormData,
   transport: typeof fetch = fetch,
 ) {
   let response: Response;
@@ -13,9 +13,11 @@ export async function openaiRequest(
       signal: AbortSignal.timeout(180000),
       headers: {
         Authorization: 'Bearer ' + key,
-        'Content-Type': 'application/json',
+        ...(body instanceof FormData
+          ? {}
+          : { 'Content-Type': 'application/json' }),
       },
-      body: JSON.stringify(body),
+      body: body instanceof FormData ? body : JSON.stringify(body),
     });
   } catch {
     throw new OpenAIError(
@@ -24,21 +26,60 @@ export async function openaiRequest(
   }
   if (!response.ok) {
     const raw = await response.text();
-    let result: {error?:{code?:string;type?:string;message?:string}} = {};
-    try { result = JSON.parse(raw); } catch { /* Non-JSON gateway failures are not API quota confirmations. */ }
+    let result: { error?: { code?: string; type?: string; message?: string } } =
+      {};
+    try {
+      result = JSON.parse(raw);
+    } catch {
+      /* Non-JSON gateway failures are not API quota confirmations. */
+    }
     const code = result?.error?.code;
     const type = result?.error?.type;
     const retry = response.headers.get('retry-after');
-    const safe = (value: unknown) => typeof value === 'string' ? value.replaceAll(key, '[redacted]').replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]').slice(0,500) : '';
-    console.error('openai_failure', JSON.stringify({path,status:response.status,code:safe(code),type:safe(type),requestId:safe(response.headers.get('x-request-id')),retryAfter:safe(retry),contentType:safe(response.headers.get('content-type')),detail:safe(result?.error?.message || raw)}));
-    if ([code,type].some(v=>v==='insufficient_quota' || v==='billing_hard_limit_reached' || v==='billing_not_active'))
-      throw new OpenAIError('Créditos ou cota de faturamento da API OpenAI esgotados. Regularize o faturamento do projeto para gerar o criativo.');
+    const safe = (value: unknown) =>
+      typeof value === 'string'
+        ? value
+            .replaceAll(key, '[redacted]')
+            .replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]')
+            .slice(0, 500)
+        : '';
+    console.error(
+      'openai_failure',
+      JSON.stringify({
+        path,
+        status: response.status,
+        code: safe(code),
+        type: safe(type),
+        requestId: safe(response.headers.get('x-request-id')),
+        retryAfter: safe(retry),
+        contentType: safe(response.headers.get('content-type')),
+        detail: safe(result?.error?.message || raw),
+      }),
+    );
+    if (
+      [code, type].some(
+        (v) =>
+          v === 'insufficient_quota' ||
+          v === 'billing_hard_limit_reached' ||
+          v === 'billing_not_active',
+      )
+    )
+      throw new OpenAIError(
+        'Créditos ou cota de faturamento da API OpenAI esgotados. Regularize o faturamento do projeto para gerar o criativo.',
+      );
     if (response.status === 429) {
       if (code === 'rate_limit_exceeded' || type === 'rate_limit_exceeded') {
         const seconds = retry && /^\d+$/.test(retry) ? Number(retry) : null;
-        throw new OpenAIError('A OpenAI confirmou limite de requisições.' + (seconds ? ' Tente novamente em '+seconds+' segundos.' : ' O servidor não informou quando o limite será liberado.'));
+        throw new OpenAIError(
+          'A OpenAI confirmou limite de requisições.' +
+            (seconds
+              ? ' Tente novamente em ' + seconds + ' segundos.'
+              : ' O servidor não informou quando o limite será liberado.'),
+        );
       }
-      throw new OpenAIError('Pedido bloqueado (HTTP 429), sem confirmação de limite temporário ou falta de créditos. O servidor não informou um horário de liberação. O diagnóstico foi registrado para investigação.');
+      throw new OpenAIError(
+        'Pedido bloqueado (HTTP 429), sem confirmação de limite temporário ou falta de créditos. O servidor não informou um horário de liberação. O diagnóstico foi registrado para investigação.',
+      );
     }
     if (response.status === 401)
       throw new OpenAIError(

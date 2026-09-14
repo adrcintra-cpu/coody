@@ -80,8 +80,9 @@ export function ImageGenerator({
       <p className="form-hint">
         Gera textos e artes para {formats}, aplica as imagens automaticamente e
         salva uma nova versão em revisão. Revise a escrita nas artes antes de
-        aprovar. Usa as orientações textuais da marca; os arquivos da biblioteca
-        não são enviados. Cobrança pela API OpenAI.
+        aprovar. Usa os logotipos, referências e PDFs da biblioteca desta marca,
+        enviados à OpenAI para orientar a criação. Confira a fidelidade do logo
+        antes de aprovar. Cobrança pela API OpenAI.
       </p>
       <button
         className="create-btn"
