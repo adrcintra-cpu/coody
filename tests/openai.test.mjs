@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {openaiRequest,parseCreative} from '../lib/openai-client.ts';
 test('OpenAI quota and rate limit are distinct and secrets stay out of errors',async()=>{
- for(const [code,pattern] of [['insufficient_quota',/Créditos/],['rate_limit_exceeded',/temporariamente/]]) {
+ for(const [code,pattern] of [['insufficient_quota',/Créditos/],['rate_limit_exceeded',/limite de requisições/]]) {
   await assert.rejects(()=>openaiRequest('secret','responses',{},async()=>Response.json({error:{code,message:'secret'}},{status:429})),pattern);
  }
 });
@@ -24,4 +24,10 @@ test('Creative parsing accepts structured text and rejects refusals and invalid 
  assert.throws(()=>parseCreative({output:[{type:'message',content:[{type:'refusal'}]}]}));
  assert.throws(()=>parseCreative(wrap({...value,hashtags:['#Um','#um','#Três','#Quatro','#Cinco']})));
  assert.throws(()=>parseCreative(wrap({...value,caption:''})));
+});
+
+test('Unknown 429 is not presented as temporary and quota type is recognized', async()=>{
+ await assert.rejects(()=>openaiRequest('secret','responses',{},async()=>new Response('gateway blocked',{status:429})),/sem confirmação/);
+ await assert.rejects(()=>openaiRequest('secret','responses',{},async()=>Response.json({error:{type:'insufficient_quota'}},{status:429})),/Créditos/);
+ await assert.rejects(()=>openaiRequest('secret','responses',{},async()=>Response.json({error:{code:'rate_limit_exceeded'}},{status:429,headers:{'retry-after':'20'}})),/20 segundos/);
 });
