@@ -19,12 +19,12 @@ export function OpenAIIntegration() {
   }, []);
   return (
     <section className="panel">
-      <h2>OpenAI · imagens</h2>
-      <p role="status">{message}</p>
+      <h2>OpenAI · criativos</h2>
+      <output>{message}</output>
       <p>
-        Geração no Studio a partir do briefing, das orientações da marca e da
-        sua descrição. As imagens ficam na biblioteca para revisão. Cobrança
-        pela conta da API OpenAI.
+        Criação de headline, legenda, hashtags e artes a partir da pauta. A nova
+        versão aparece no Studio em revisão, antes da aprovação. Cobrança pela
+        conta da API OpenAI.
       </p>
       <button
         className="outline-btn"
@@ -49,12 +49,14 @@ export function OpenAIIntegration() {
 }
 export function ImageGenerator({
   contentId,
-  format,
+  formats,
+  onBusy,
   disabled,
   reload,
 }: {
   contentId: string;
-  format: string;
+  formats: string;
+  onBusy: (value: boolean) => void;
   disabled: boolean;
   reload: () => Promise<void>;
 }) {
@@ -63,8 +65,8 @@ export function ImageGenerator({
   const [message, setMessage] = useState('');
   return (
     <section className="panel section-space">
-      <h2>Gerar imagem com OpenAI</h2>
-      <label htmlFor="image-description">Descreva a imagem</label>
+      <h2>Criar criativo com IA</h2>
+      <label htmlFor="image-description">Orientação adicional (opcional)</label>
       <textarea
         id="image-description"
         className="full"
@@ -73,20 +75,23 @@ export function ImageGenerator({
         value={prompt}
         disabled={busy || disabled}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Cena, estilo, composição e elementos desejados"
+        placeholder="O briefing e as regras da marca já serão usados. Acrescente uma direção, se desejar."
       />
       <p className="form-hint">
-        {format === 'feed' ? 'Feed · 1024 × 1280' : 'Story · 1152 × 2048'} ·
-        qualidade econômica. Usa orientações textuais da marca; os arquivos da
-        biblioteca não são enviados à OpenAI. Cada geração pode gerar cobrança
-        na API.
+        Gera textos e artes para {formats}, aplica as imagens automaticamente e
+        salva uma nova versão em revisão. Revise a escrita nas artes antes de
+        aprovar. Usa as orientações textuais da marca; os arquivos da biblioteca
+        não são enviados. Cobrança pela API OpenAI.
       </p>
       <button
         className="create-btn"
-        disabled={disabled || busy || !prompt.trim()}
+        disabled={disabled || busy}
         onClick={async () => {
           setBusy(true);
-          setMessage('Gerando imagem. Isso pode levar alguns minutos…');
+          onBusy(true);
+          setMessage(
+            'Criando textos e artes. Aguarde a conclusão; isso pode levar alguns minutos…',
+          );
           try {
             const response = await fetch('/api/openai', {
               method: 'POST',
@@ -94,7 +99,7 @@ export function ImageGenerator({
               body: JSON.stringify({
                 id: crypto.randomUUID(),
                 contentId,
-                format,
+                mode: 'creative',
                 prompt,
               }),
             });
@@ -102,7 +107,7 @@ export function ImageGenerator({
             if (!response.ok)
               throw new Error(result.error || 'Falha na geração.');
             setMessage(
-              'Imagem salva na biblioteca. Selecione-a em Arte do Feed ou Arte do Story e salve uma nova versão após revisar.',
+              'Criativo salvo em uma nova versão. Revise os textos e as artes e envie para aprovação.',
             );
             await reload();
           } catch (error) {
@@ -113,14 +118,13 @@ export function ImageGenerator({
             );
           } finally {
             setBusy(false);
+            onBusy(false);
           }
         }}
       >
-        {busy
-          ? 'Gerando…'
-          : 'Gerar imagem · ' + (format === 'feed' ? 'Feed' : 'Story')}
+        {busy ? 'Gerando…' : 'Criar criativo completo · ' + formats}
       </button>
-      <p role="status">{message}</p>
+      <output>{message}</output>
     </section>
   );
 }

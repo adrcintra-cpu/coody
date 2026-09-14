@@ -128,7 +128,7 @@ export function Studio({
   return (
     <>
       <div className="studio-heading">
-        <button className="text-btn" onClick={back}>
+        <button className="text-btn" disabled={busy} onClick={back}>
           <ArrowLeft size={15} /> Conteúdos
         </button>
         <StatusBadge status={item.status} />
@@ -173,6 +173,7 @@ export function Studio({
             label="Versão"
             value={current.id}
             onChange={(id) => {
+              if (busy) return;
               const v = versions.find((v) => v.id === id);
               if (v) {
                 setVersionId(id);
@@ -256,10 +257,16 @@ export function Studio({
             Feed e Story usam arquivos independentes. A adaptação preserva o
             conceito e exige uma composição própria para cada formato.
           </p>
+          {dirty && (
+            <p className="notice">
+              Salve as alterações dos textos antes de criar outro criativo.
+            </p>
+          )}
           <ImageGenerator
             contentId={item.id}
-            format={format}
-            disabled={disabled}
+            formats={item.format}
+            disabled={disabled || dirty}
+            onBusy={setBusy}
             reload={reload}
           />
           <section className="panel section-space">
