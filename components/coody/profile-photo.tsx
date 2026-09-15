@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
 export function ProfilePhoto({
   url,
@@ -12,11 +12,12 @@ export function ProfilePhoto({
   brandId?: string;
   reload: () => Promise<void>;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   return (
-    <section className="panel profile-upload">
-      <h2>Foto de perfil {brandId ? 'do cliente' : 'do usuário'}</h2>
+    <section className="profile-upload" aria-label={brandId ? "Foto de perfil do cliente" : "Foto de perfil do usuário"}>
+      <div className="profile-upload-row">
       {url ? (
         <Image
           unoptimized
@@ -31,14 +32,18 @@ export function ProfilePhoto({
           {name.slice(0, 2).toUpperCase()}
         </span>
       )}
-      <p>
-        PNG, JPG ou WEBP de até 5 MB. A foto aparece no perfil e nas
-        identificações do workspace.
-      </p>
-      <label htmlFor={'profile-file-' + (brandId || 'user')}>
-        Alterar foto
-      </label>
+      <div className="profile-upload-identity">
+        <strong>{name}</strong>
+        <span>{brandId ? 'Perfil da marca' : 'Perfil do usuário'}</span>
+      </div>
+      <button className="profile-upload-button" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
+        {busy ? 'Enviando…' : 'Mudar foto'}
+      </button>
+      </div>
       <input
+        ref={inputRef}
+        style={{ display: 'none' }}
+        aria-label="Selecionar foto de perfil"
         id={'profile-file-' + (brandId || 'user')}
         type="file"
         accept="image/png,image/jpeg,image/webp"
@@ -76,7 +81,7 @@ export function ProfilePhoto({
           }
         }}
       />
-      <output>{message}</output>
+      {message && <output className="profile-upload-message" aria-live="polite">{message}</output>}
     </section>
   );
 }
