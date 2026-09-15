@@ -1,4 +1,5 @@
 'use client';
+import { ProfilePhoto } from './profile-photo';
 import { useEffect, useState } from 'react';
 import { Plus, ArrowUpRight, Palette, BookOpen, Layers } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -192,6 +193,12 @@ export function Brands({
               </div>
             </TabsContent>
             <TabsContent value="settings">
+              <ProfilePhoto
+                url={b.avatarUrl}
+                name={b.name}
+                brandId={b.id}
+                reload={reload}
+              />
               <section className="panel identity-grid">
                 {[
                   ['Tom de voz', b.voice],
@@ -225,6 +232,8 @@ export function Brands({
             </TabsContent>
             <TabsContent value="contents" className="brand-module">
               <Contents
+                act={act}
+                reload={reload}
                 key={b.id}
                 state={scoped}
                 month={month}

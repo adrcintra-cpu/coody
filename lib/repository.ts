@@ -64,7 +64,11 @@ export async function readState(): Promise<State> {
       'comments',
       'special_dates',
       'monthly_plans',
-    ].map((t) => db.prepare(`SELECT * FROM ${t}`)),
+    ].map((t) =>
+      db.prepare(
+        `SELECT * FROM ${t}${t === 'content_items' ? ' WHERE deletedAt IS NULL' : ''}`,
+      ),
+    ),
   );
   return {
     brands: (

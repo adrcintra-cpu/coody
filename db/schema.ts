@@ -6,11 +6,13 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 export const users = sqliteTable('users', {
+  avatarUrl: text().notNull().default(''),
   id: text().primaryKey(),
   name: text().notNull(),
   role: text().notNull(),
 });
 export const brands = sqliteTable('brands', {
+  avatarUrl: text().notNull().default(''),
   id: text().primaryKey(),
   name: text().notNull(),
   segment: text().notNull(),
@@ -115,6 +117,7 @@ export const monthlyPlans = sqliteTable(
 export const contentItems = sqliteTable(
   'content_items',
   {
+    deletedAt: text(),
     id: text().primaryKey(),
     revision: integer().notNull().default(0),
     brandId: text()

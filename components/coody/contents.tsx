@@ -1,6 +1,16 @@
 'use client';
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
+import { Plus, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentRow, Picker, NoData, StatusBadge } from './shared';
@@ -10,8 +20,11 @@ import {
   type State,
   type Content,
   type Status,
+  type Action,
 } from '@/lib/types';
 export function Contents({
+  act,
+  reload,
   state,
   month,
   open,
@@ -19,6 +32,8 @@ export function Contents({
   approvals = false,
   fixedBrandId,
 }: {
+  act: Action;
+  reload: () => Promise<void>;
   fixedBrandId?: string;
   state: State;
   month: string;
@@ -26,6 +41,28 @@ export function Contents({
   create: (date?: string, brandId?: string) => void;
   approvals?: boolean;
 }) {
+  const [removing, setRemoving] = useState<Content | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [trash, setTrash] = useState<
+    { id: string; title: string; brandId: string }[] | null
+  >(null);
+  async function loadTrash() {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await fetch('/api/trash');
+      if (!r.ok) throw new Error('Não foi possível abrir a lixeira.');
+      const d = (await r.json()) as {
+        items: { id: string; title: string; brandId: string }[];
+      };
+      setTrash(d.items);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha ao carregar.');
+    } finally {
+      setBusy(false);
+    }
+  }
   const [brand, setBrand] = useState(fixedBrandId || 'all');
   const [status, setStatus] = useState('all');
   const [query, setQuery] = useState('');
@@ -66,6 +103,63 @@ export function Contents({
           </button>
         )}
       </div>
+      <button
+        className="outline-btn"
+        disabled={busy}
+        onClick={() => (trash === null ? void loadTrash() : setTrash(null))}
+      >
+        <Trash2 size={16} />
+        {trash === null ? 'Lixeira' : 'Voltar aos conteúdos'}
+      </button>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+      {trash !== null && (
+        <section className="panel">
+          <h2>Lixeira de conteúdos</h2>
+          <p>
+            As versões e os arquivos são preservados. Restaurar devolve o
+            conteúdo ao status anterior.
+          </p>
+          {trash
+            .filter((c) => !fixedBrandId || c.brandId === fixedBrandId)
+            .map((c) => (
+              <div className="trash-row" key={c.id}>
+                <span>{c.title}</span>
+                <button
+                  className="outline-btn"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError('');
+                    try {
+                      const r = await fetch('/api/trash', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: c.id }),
+                      });
+                      if (!r.ok) throw new Error('Falha ao restaurar.');
+                      await reload();
+                      await loadTrash();
+                    } catch (e) {
+                      setError(
+                        e instanceof Error ? e.message : 'Falha ao restaurar.',
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Restaurar
+                </button>
+              </div>
+            ))}
+          {!trash.filter((c) => !fixedBrandId || c.brandId === fixedBrandId)
+            .length && <p>Lixeira vazia.</p>}
+        </section>
+      )}
       <div className="toolbar">
         {fixedBrandId ? (
           <span className="selected-brand-context">
@@ -114,21 +208,72 @@ export function Contents({
           </span>
         )}
       </div>
-      {items.length ? (
-        items.map((c) => (
-          <ContentRow
-            key={c.id}
-            item={c}
-            brand={state.brands.find((b) => b.id === c.brandId)}
-            onOpen={() => open(c)}
+      {trash === null &&
+        (items.length ? (
+          items.map((c) => (
+            <div className="content-manage-row" key={c.id}>
+              <ContentRow
+                item={c}
+                brand={state.brands.find((b) => b.id === c.brandId)}
+                onOpen={() => open(c)}
+              />
+              <button
+                className="text-btn danger"
+                aria-label={'Excluir ' + c.title}
+                onClick={() => setRemoving(c)}
+              >
+                <Trash2 size={17} />
+              </button>
+            </div>
+          ))
+        ) : (
+          <NoData
+            title="Nenhum conteúdo nesta seleção"
+            description="Mude os filtros ou adicione uma nova pauta."
           />
-        ))
-      ) : (
-        <NoData
-          title="Nenhum conteúdo nesta seleção"
-          description="Mude os filtros ou adicione uma nova pauta."
-        />
-      )}
+        ))}
+      <AlertDialog
+        open={!!removing}
+        onOpenChange={(v) => {
+          if (!busy && !v) setRemoving(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mover conteúdo para a lixeira?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removing?.title}. Ele sairá dos conteúdos e do calendário. Você
+              poderá restaurá-lo com todas as versões. Cartões já enviados ao
+              Trello permanecem lá.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && <p className="error">{error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!removing) return;
+                setBusy(true);
+                setError('');
+                try {
+                  await act('deleteContent', { id: removing.id });
+                  setRemoving(null);
+                } catch (e) {
+                  setError(
+                    e instanceof Error ? e.message : 'Falha ao excluir.',
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? 'Movendo…' : 'Mover para lixeira'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

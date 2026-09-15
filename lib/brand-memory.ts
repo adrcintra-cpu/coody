@@ -2,12 +2,12 @@ import type { Asset, Brand, Content } from './types';
 export const assetCategories = [
   {
     value: 'brandbook',
-    label: 'Brandbook',
+    label: 'Manual da marca',
     role: 'Regras oficiais da identidade',
   },
   {
     value: 'logo',
-    label: 'Logos',
+    label: 'Logotipos',
     role: 'Elementos oficiais que devem ser preservados',
   },
   {
@@ -22,7 +22,7 @@ export const assetCategories = [
   },
   {
     value: 'product_photo',
-    label: 'Produtos / Fotos',
+    label: 'Produtos',
     role: 'Material real para a criação',
   },
   {
@@ -78,7 +78,7 @@ export function identityCompleteness(brand: Brand, assets: Asset[]) {
       complete: has('visual_reference') || has('approved_art'),
     },
     { label: 'Tom de voz', complete: !!brand.voice.trim() },
-    { label: 'Brandbook', complete: has('brandbook') },
+    { label: 'Manual da marca', complete: has('brandbook') },
   ];
   return {
     checks,

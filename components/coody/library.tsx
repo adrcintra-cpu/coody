@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import {
   Upload,
+  Folder,
   FileText,
   Star,
   Check,
@@ -140,14 +141,15 @@ export function LibraryView({
           usam uma única marca.
         </p>
       )}
-      <div className="category-summary">
+      <div className="library-folders">
         {assetCategories.map((c) => (
           <button
             key={c.value}
             className={category === c.value ? 'active' : ''}
             onClick={() => setCategory(category === c.value ? 'all' : c.value)}
           >
-            {c.label}
+            <Folder size={25} />
+            <strong>{c.label}</strong>
             <span>
               {
                 state.assets.filter(
@@ -160,6 +162,17 @@ export function LibraryView({
           </button>
         ))}
       </div>
+      {category !== 'all' && (
+        <p className="notice">
+          Pasta: {assetCategories.find((c) => c.value === category)?.label}.{' '}
+          {category === 'product_photo'
+            ? 'Envie fotos reais dos produtos e descreva nome, modelo e características; o COODY usará esses arquivos na criação.'
+            : 'Novos arquivos serão adicionados nesta pasta.'}{' '}
+          <button className="text-btn" onClick={() => setCategory('all')}>
+            Ver todas as pastas
+          </button>
+        </p>
+      )}
       {items.length ? (
         <div className="asset-grid">
           {items.map((a) => (
@@ -243,6 +256,7 @@ export function LibraryView({
       )}
       {editor && (
         <AssetEditor
+          initialCategory={category === 'all' ? 'material' : category}
           state={state}
           asset={editor === 'new' ? undefined : editor}
           brandId={editor === 'new' ? selectedBrand?.id || '' : editor.brandId}
@@ -260,6 +274,7 @@ export function LibraryView({
   );
 }
 function AssetEditor({
+  initialCategory,
   state,
   asset,
   brandId,
@@ -269,6 +284,7 @@ function AssetEditor({
   act,
 }: {
   state: State;
+  initialCategory: string;
   asset?: Asset;
   brandId: string;
   fixedBrand: boolean;
@@ -287,7 +303,10 @@ function AssetEditor({
           aiNotes: asset.aiNotes,
           priority: !!asset.priority,
         }
-      : { ...emptyAssetFields },
+      : {
+          ...emptyAssetFields,
+          category: initialCategory as AssetFieldsValue['category'],
+        },
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

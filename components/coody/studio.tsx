@@ -454,12 +454,12 @@ export function Studio({
               Comentar
             </button>
           </section>
-          {['IDEIA', 'PLANEJADO'].includes(item.status) && (
+          {!busy && (
             <button
               className="text-btn danger section-space"
               onClick={() => setRemove(true)}
             >
-              <Trash2 size={14} /> Excluir pauta
+              <Trash2 size={14} /> Mover para lixeira
             </button>
           )}
         </section>
@@ -522,10 +522,12 @@ export function Studio({
       <AlertDialog open={remove} onOpenChange={setRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir esta pauta?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Mover esta pauta para a lixeira?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              A pauta e seu rascunho inicial serão removidos. Esta ação não pode
-              ser desfeita.
+              A pauta sairá das listas. Suas versões serão preservadas e você
+              poderá restaurá-la na lixeira de Conteúdos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -535,7 +537,7 @@ export function Studio({
                 if (await run('deleteContent', { id: item.id })) back();
               }}
             >
-              Excluir pauta
+              Mover para lixeira
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

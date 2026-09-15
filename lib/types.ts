@@ -20,6 +20,7 @@ export const statusLabels: Record<Status, string> = {
   PUBLICADO: 'Publicado',
 };
 export type Brand = {
+  avatarUrl?: string;
   id: string;
   name: string;
   segment: string;
@@ -45,6 +46,7 @@ export type Brand = {
   pillars: { name: string; percent: number }[];
 };
 export type Content = {
+  deletedAt?: string | null;
   id: string;
   revision?: number;
   brandId: string;

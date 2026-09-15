@@ -1,4 +1,5 @@
 'use client';
+import { ProfilePhoto } from './profile-photo';
 import { useState } from 'react';
 import type { State } from '@/lib/types';
 import { OpenAIIntegration } from './openai';
@@ -62,6 +63,11 @@ export function Settings({
           <p>Acesso e dados do workspace.</p>
         </div>
       </div>
+      <ProfilePhoto
+        url={state.user?.avatarUrl}
+        name={state.user?.name || 'Minha conta'}
+        reload={reload}
+      />
       <div className="settings-layout">
         <section className="panel">
           <h2>{state.user?.name || 'Minha conta'}</h2>

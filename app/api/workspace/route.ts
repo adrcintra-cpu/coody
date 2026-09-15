@@ -15,9 +15,19 @@ export async function GET(request: Request) {
   const user = authorize(request);
   if (user instanceof Response) return user;
   try {
-    return Response.json({ ...(await readState()), user }, {
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    const profile = await database()
+      .prepare('SELECT avatarUrl FROM users WHERE id=?')
+      .bind(user.id)
+      .first<{ avatarUrl: string }>();
+    return Response.json(
+      {
+        ...(await readState()),
+        user: { ...user, avatarUrl: profile?.avatarUrl || '' },
+      },
+      {
+        headers: { 'Cache-Control': 'no-store' },
+      },
+    );
   } catch (error) {
     console.error('workspace', error);
     return Response.json(
@@ -364,12 +374,11 @@ export async function POST(request: Request) {
         }
       }
     } else if (action === 'deleteContent') {
-      if (!item || !['IDEIA', 'PLANEJADO'].includes(item.status))
-        throw new Error(
-          'Somente ideias e pautas planejadas podem ser excluídas.',
-        );
+      if (!item) throw new Error('Conteúdo não encontrado.');
       statements.push(
-        db.prepare('DELETE FROM content_items WHERE id=?').bind(item.id),
+        db
+          .prepare('UPDATE content_items SET deletedAt=? WHERE id=?')
+          .bind(now, item.id),
       );
     } else if (action === 'assetFlags' || action === 'saveAsset') {
       const asset = state.assets.find(

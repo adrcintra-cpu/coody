@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import {
   Select,
   SelectTrigger,
@@ -60,7 +61,17 @@ export function StatusBadge({ status }: { status: Status }) {
 export function BrandMark({ brand }: { brand?: Brand }) {
   return (
     <span className="brand-mark" style={{ color: brand?.colors.split(',')[0] }}>
-      {brand?.name.slice(0, 1) || '?'}
+      {brand?.avatarUrl ? (
+        <Image
+          unoptimized
+          src={brand.avatarUrl}
+          width={40}
+          height={40}
+          alt={brand.name}
+        />
+      ) : (
+        brand?.name.slice(0, 1) || '?'
+      )}
     </span>
   );
 }

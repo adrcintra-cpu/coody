@@ -289,7 +289,17 @@ export default function Workspace() {
           </div>
           <button className="profile" onClick={() => navigate('Configurações')}>
             <span className="avatar">
-              {state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'}
+              {state?.user?.avatarUrl ? (
+                <Image
+                  unoptimized
+                  src={state.user.avatarUrl}
+                  width={36}
+                  height={36}
+                  alt={state.user.name}
+                />
+              ) : (
+                state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'
+              )}
             </span>
             <span>
               {state?.user?.name || 'Minha conta'}
@@ -327,7 +337,17 @@ export default function Workspace() {
               }}
             />
             <span className="avatar small">
-              {state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'}
+              {state?.user?.avatarUrl ? (
+                <Image
+                  unoptimized
+                  src={state.user.avatarUrl}
+                  width={36}
+                  height={36}
+                  alt={state.user.name}
+                />
+              ) : (
+                state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'
+              )}
             </span>
           </div>
         </header>
@@ -401,6 +421,8 @@ export default function Workspace() {
             />
           ) : view === 'Conteúdos' || view === 'Aprovações' ? (
             <Contents
+              act={act}
+              reload={reload}
               key={view}
               state={state}
               month={month}
@@ -430,7 +452,7 @@ export default function Workspace() {
           ) : view === 'Configurações' ? (
             <Settings state={state} reload={reload} />
           ) : (
-            <Contents state={state} month={month} open={open} create={create} />
+            <Contents state={state} month={month} open={open} create={create} act={act} reload={reload} />
           )}
         </main>
       </SidebarInset>

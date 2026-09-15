@@ -1,4 +1,5 @@
 export type CurrentUser = {
+  avatarUrl?: string;
   id: string;
   name: string;
   email: string;

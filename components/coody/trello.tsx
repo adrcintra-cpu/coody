@@ -46,12 +46,24 @@ export function TrelloIntegration({ state }: { state: State }) {
     }
   }
   useEffect(() => {
-    const controller=new AbortController();
-    fetch('/api/trello',{cache:'no-store',signal:controller.signal}).then(async response=>{
-      const data=await response.json() as Model & {error?:string};
-      if(!response.ok)throw new Error(data.error);return data;
-    }).then(data=>{setModel(data);setBoard(data.config?.boardId||'');setApproval(data.config?.approvalList||'');setChanges(data.config?.changesList||'');setApproved(data.config?.approvedList||'');}).catch(e=>{if(e.name!=='AbortError')setError(e.message);});
-    return ()=>controller.abort();
+    const controller = new AbortController();
+    fetch('/api/trello', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const data = (await response.json()) as Model & { error?: string };
+        if (!response.ok) throw new Error(data.error);
+        return data;
+      })
+      .then((data) => {
+        setModel(data);
+        setBoard(data.config?.boardId || '');
+        setApproval(data.config?.approvalList || '');
+        setChanges(data.config?.changesList || '');
+        setApproved(data.config?.approvedList || '');
+      })
+      .catch((e) => {
+        if (e.name !== 'AbortError') setError(e.message);
+      });
+    return () => controller.abort();
   }, []);
   async function action(data: Record<string, string>) {
     setBusy(true);
@@ -247,7 +259,8 @@ export function TrelloIntegration({ state }: { state: State }) {
           <label className="field" htmlFor="trello-api-key">
             <span>Chave de API</span>
             <Input
-              id="trello-api-key" autoComplete="off"
+              id="trello-api-key"
+              autoComplete="off"
               value={key}
               onChange={(e) => setKey(e.target.value.trim())}
             />
@@ -262,7 +275,8 @@ export function TrelloIntegration({ state }: { state: State }) {
           <label className="field" htmlFor="trello-token">
             <span>Token de autorização</span>
             <Input
-              id="trello-token" type="password"
+              id="trello-token"
+              type="password"
               autoComplete="new-password"
               value={token}
               onChange={(e) => setToken(e.target.value.trim())}
