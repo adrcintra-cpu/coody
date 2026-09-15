@@ -1,3 +1,4 @@
+import { apiAlert } from '@/lib/workspaces';
 import { creativeMaterials } from '@/lib/creative-materials';
 import { libraryInputs } from '@/lib/library-inputs';
 import { env } from 'cloudflare:workers';
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
       throw new Error(
         'Informe uma descrição de até 3.000 caracteres e um formato válido.',
       );
-    const state = await readState();
+    const state = await readState(request);
     const item = state.contents.find((c) => c.id === data.contentId);
     if (!item) throw new Error('Pauta não encontrada.');
     const previous = await database()
@@ -308,6 +309,7 @@ export async function POST(request: Request) {
       error.name !== 'SyntaxError'
         ? error.message
         : 'Não foi possível concluir o criativo. Confira a biblioteca antes de iniciar outro pedido.';
+    if (error instanceof OpenAIError) await apiAlert(request,'OpenAI',message).catch(()=>{});
     return Response.json(
       {
         error:

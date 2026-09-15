@@ -1,4 +1,5 @@
 'use client';
+import { MagnificIntegration } from './magnific';
 import { ProfilePhoto } from './profile-photo';
 import { useState } from 'react';
 import type { State } from '@/lib/types';
@@ -16,6 +17,7 @@ export function Integrations({ state }: { state: State }) {
       </div>
       <div className="integration-grid">
         <OpenAIIntegration />
+        <MagnificIntegration />
         <TrelloIntegration state={state} />
       </div>
     </>

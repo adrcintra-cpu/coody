@@ -1,4 +1,5 @@
 'use client';
+import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
 import { useState } from 'react';
 import {
@@ -262,6 +263,7 @@ export function Studio({
               Salve as alterações dos textos antes de criar outro criativo.
             </p>
           )}
+          <MagnificGenerator key={item.id} state={state} item={item} disabled={disabled || dirty} reload={reload}/>
           <ImageGenerator
             contentId={item.id}
             formats={item.format}

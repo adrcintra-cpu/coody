@@ -12,9 +12,9 @@ export async function GET(
   const url = '/api/avatars/' + id;
   const found = await database()
     .prepare(
-      'SELECT id FROM brands WHERE avatarUrl=? UNION ALL SELECT id FROM users WHERE avatarUrl=? AND id=?',
+      'SELECT id FROM brands WHERE avatarUrl=? UNION ALL SELECT id FROM users WHERE avatarUrl=? AND id=? UNION ALL SELECT id FROM workspaces WHERE avatarUrl=?',
     )
-    .bind(url, url, user.id)
+    .bind(url, url, user.id, url)
     .first();
   if (!found) return new Response('Não encontrado', { status: 404 });
   const object = await bucket().get('avatars/' + id);

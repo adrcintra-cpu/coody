@@ -7,7 +7,7 @@ export async function GET(request: Request) {
     {
       format: 'coody-export-v1',
       exportedAt: new Date().toISOString(),
-      workspace: await readState(),
+      workspace: await readState(request),
     },
     {
       headers: {

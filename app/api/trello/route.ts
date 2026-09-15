@@ -1,5 +1,6 @@
 import { authorize } from '@/lib/auth';
-import { database } from '@/lib/repository';
+import { activeWorkspace } from '@/lib/workspaces';
+import { database, readState } from '@/lib/repository';
 import { client, connection, secret, send } from '@/lib/trello';
 import type { Board, List } from '@/lib/trello';
 import { seal, trello, validCredentials } from '@/lib/trello-client';
@@ -30,9 +31,9 @@ export async function GET(request: Request) {
         : [];
     const exports = await database()
       .prepare(
-        'SELECT id,contentId,versionId,cardUrl,state,updatedAt FROM trello_exports ORDER BY updatedAt DESC LIMIT 100',
+        'SELECT e.id,e.contentId,e.versionId,e.cardUrl,e.state,e.updatedAt FROM trello_exports e JOIN content_items c ON e.contentId=c.id JOIN brands b ON c.brandId=b.id WHERE b.workspaceId=? ORDER BY e.updatedAt DESC LIMIT 100',
       )
-      .all();
+      .bind((await activeWorkspace(request)).id).all();
     return Response.json(
       {
         connected: true,
@@ -128,8 +129,10 @@ export async function POST(request: Request) {
         .run();
       return Response.json({ ok: true, message: 'Quadro e listas salvos.' });
     }
-    if (data.action === 'send')
+    if (data.action === 'send') {
+      if(!(await readState(request)).contents.some(c=>c.id===data.contentId))throw new Error('Conteúdo não encontrado neste workspace.');
       return Response.json(await send(data.contentId));
+    }
     throw new Error('Ação não disponível.');
   } catch (error) {
     return Response.json(

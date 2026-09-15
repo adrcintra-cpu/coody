@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       .first<{ avatarUrl: string }>();
     return Response.json(
       {
-        ...(await readState()),
+        ...(await readState(request)),
         user: { ...user, avatarUrl: profile?.avatarUrl || '' },
       },
       {
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     if (!data || typeof data !== 'object') throw new Error('Dados inválidos.');
     await registerUser(user);
     const db = database();
-    const state = await readState();
+    const state = await readState(request);
     const now = new Date().toISOString();
     const statements: D1PreparedStatement[] = [];
     const entityId = str(data.id) || id();
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
               row.id,
             ),
         );
-      } else statements.push(insert('brands', row));
+      } else statements.push(insert('brands', {...row,workspaceId:state.workspace!.id}));
       statements.push(...saveGuidelines(row.id, guidelineRules(row), now));
     } else if (action === 'createContent' || action === 'editContent') {
       if (!brand) throw new Error('Selecione uma marca válida.');

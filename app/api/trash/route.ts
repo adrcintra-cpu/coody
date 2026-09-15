@@ -1,3 +1,4 @@
+import { activeWorkspace } from '@/lib/workspaces';
 import { authorize } from '@/lib/auth';
 import { database } from '@/lib/repository';
 export async function GET(request: Request) {
@@ -5,9 +6,9 @@ export async function GET(request: Request) {
   if (user instanceof Response) return user;
   const rows = await database()
     .prepare(
-      'SELECT id,title,brandId,deletedAt FROM content_items WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC',
+      'SELECT c.id,c.title,c.brandId,c.deletedAt FROM content_items c JOIN brands b ON c.brandId=b.id WHERE c.deletedAt IS NOT NULL AND b.workspaceId=? ORDER BY c.deletedAt DESC',
     )
-    .all();
+    .bind((await activeWorkspace(request)).id).all();
   return Response.json(
     { items: rows.results },
     { headers: { 'Cache-Control': 'no-store' } },
@@ -26,9 +27,9 @@ export async function POST(request: Request) {
     if (typeof id !== 'string') throw new Error('Conteúdo inválido.');
     await database()
       .prepare(
-        'UPDATE content_items SET deletedAt=NULL,revision=revision+1 WHERE id=? AND deletedAt IS NOT NULL',
+        'UPDATE content_items SET deletedAt=NULL,revision=revision+1 WHERE id=? AND deletedAt IS NOT NULL AND brandId IN (SELECT id FROM brands WHERE workspaceId=?)',
       )
-      .bind(id)
+      .bind(id,(await activeWorkspace(request)).id)
       .run();
     return Response.json({ ok: true });
   } catch {

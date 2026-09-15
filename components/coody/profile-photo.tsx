@@ -5,11 +5,13 @@ export function ProfilePhoto({
   url,
   name,
   brandId,
+  workspaceId,
   reload,
 }: {
   url?: string;
   name: string;
   brandId?: string;
+  workspaceId?: string;
   reload: () => Promise<void>;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +36,7 @@ export function ProfilePhoto({
       )}
       <div className="profile-upload-identity">
         <strong>{name}</strong>
-        <span>{brandId ? 'Perfil da marca' : 'Perfil do usuário'}</span>
+        <span>{workspaceId ? 'Perfil do workspace' : brandId ? 'Perfil da marca' : 'Perfil do usuário'}</span>
       </div>
       <button className="profile-upload-button" type="button" disabled={busy} onClick={() => inputRef.current?.click()}>
         {busy ? 'Enviando…' : 'Mudar foto'}
@@ -44,7 +46,7 @@ export function ProfilePhoto({
         ref={inputRef}
         style={{ display: 'none' }}
         aria-label="Selecionar foto de perfil"
-        id={'profile-file-' + (brandId || 'user')}
+        id={'profile-file-' + (workspaceId || brandId || 'user')}
         type="file"
         accept="image/png,image/jpeg,image/webp"
         disabled={busy}
@@ -61,7 +63,7 @@ export function ProfilePhoto({
           try {
             const form = new FormData();
             form.set('file', file);
-            form.set('kind', brandId ? 'brand' : 'user');
+            form.set('kind', workspaceId ? 'workspace' : brandId ? 'brand' : 'user');
             if (brandId) form.set('brandId', brandId);
             const response = await fetch('/api/avatars', {
               method: 'POST',

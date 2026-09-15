@@ -1,4 +1,6 @@
 'use client';
+import { WorkspaceMenu } from './workspace-menu';
+import { Notifications } from './notifications';
 import { useCallback, useEffect, useState } from 'react';
 import {
   LayoutDashboard,
@@ -11,9 +13,9 @@ import {
   Plug,
   Settings as SettingsIcon,
   Plus,
-  ChevronDown,
   X,
   LoaderCircle,
+  ChevronDown,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -240,13 +242,7 @@ export default function Workspace() {
             src="/coody-logo.svg"
             alt="COODY"
           />
-          <div className="workspace-name">
-            <span className="workspace-icon">W</span>
-            <span>
-              Meu workspace<small>Planejamento e criação</small>
-            </span>
-            <ChevronDown size={14} />
-          </div>
+          <WorkspaceMenu state={state} reload={reload}/>
           <button
             className="create-btn"
             disabled={!state}
@@ -336,19 +332,7 @@ export default function Workspace() {
                 );
               }}
             />
-            <span className="avatar small">
-              {state?.user?.avatarUrl ? (
-                <Image
-                  unoptimized
-                  src={state.user.avatarUrl}
-                  width={36}
-                  height={36}
-                  alt={state.user.name}
-                />
-              ) : (
-                state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'
-              )}
-            </span>
+            {state && <Notifications/>}
           </div>
         </header>
         <main className="workspace-main">

@@ -1,3 +1,4 @@
+import { assertBrandWorkspace, activeWorkspace } from '@/lib/workspaces';
 import { authorize, registerUser } from '@/lib/auth';
 import { database, bucket } from '@/lib/repository';
 import { limitedForm, validateUpload } from '@/lib/asset-upload';
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     const kind = form.get('kind');
     const brandValue = form.get('brandId');
     const brandId = typeof brandValue === 'string' ? brandValue : '';
-    if (kind !== 'brand' && kind !== 'user')
+    if (kind !== 'brand' && kind !== 'user' && kind !== 'workspace')
       throw new Error('Perfil inválido.');
     if (
       kind === 'brand' &&
@@ -25,6 +26,8 @@ export async function POST(request: Request) {
         .first())
     )
       throw new Error('Marca não encontrada.');
+    if(kind === 'brand') await assertBrandWorkspace(request,brandId);
+    const workspace = kind === 'workspace' ? await activeWorkspace(request) : null;
     const input = form.get('file');
     if (
       !(input instanceof File) ||
@@ -39,10 +42,10 @@ export async function POST(request: Request) {
       httpMetadata: { contentType: file.type },
     });
     if (kind === 'user') await registerUser(user);
-    const table = kind === 'brand' ? 'brands' : 'users';
+    const table = kind === 'brand' ? 'brands' : kind === 'workspace' ? 'workspaces' : 'users';
     await database()
       .prepare(`UPDATE ${table} SET avatarUrl=? WHERE id=?`)
-      .bind('/api/avatars/' + id, kind === 'brand' ? brandId : user.id)
+      .bind('/api/avatars/' + id, kind === 'brand' ? brandId : workspace?.id || user.id)
       .run();
     return Response.json({ ok: true, url: '/api/avatars/' + id });
   } catch (error) {

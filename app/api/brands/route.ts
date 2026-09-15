@@ -1,3 +1,4 @@
+import { activeWorkspace } from '@/lib/workspaces';
 import { authorize } from '@/lib/auth';
 import { bucket, database, insert, saveGuidelines } from '@/lib/repository';
 import { parseBrand, guidelineRules } from '@/lib/brand-validation';
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     }
     const now = new Date().toISOString();
     await database().batch([
-      insert('brands', brand),
+      insert('brands', {...brand,workspaceId:(await activeWorkspace(request)).id}),
       ...staged.map((a) => insert('brand_assets', a)),
       ...saveGuidelines(brandId, guidelineRules(brand), now),
     ]);

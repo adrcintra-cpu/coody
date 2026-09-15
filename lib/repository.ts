@@ -1,3 +1,4 @@
+import { activeWorkspace } from './workspaces';
 import { env } from 'cloudflare:workers';
 import { canonicalCategory } from './brand-memory';
 import type {
@@ -53,8 +54,9 @@ export function insert(
       }),
     );
 }
-export async function readState(): Promise<State> {
+export async function readState(request?: Request): Promise<State> {
   const db = database();
+  const workspace = await activeWorkspace(request);
   const results = await db.batch(
     [
       'brands',
@@ -65,12 +67,19 @@ export async function readState(): Promise<State> {
       'special_dates',
       'monthly_plans',
     ].map((t) =>
-      db.prepare(
-        `SELECT * FROM ${t}${t === 'content_items' ? ' WHERE deletedAt IS NULL' : ''}`,
-      ),
+      db.prepare(t === 'brands'
+       ? 'SELECT * FROM brands WHERE workspaceId=?'
+       : ['content_versions','comments'].includes(t)
+       ? `SELECT t.* FROM ${t} t JOIN content_items c ON t.contentId=c.id JOIN brands b ON c.brandId=b.id WHERE b.workspaceId=? AND c.deletedAt IS NULL`
+       : t === 'special_dates'
+       ? "SELECT t.* FROM special_dates t LEFT JOIN brands b ON t.brandId=b.id WHERE b.workspaceId=? OR t.isGlobal=1"
+       : `SELECT t.* FROM ${t} t JOIN brands b ON t.brandId=b.id WHERE b.workspaceId=?${t==='content_items'?' AND t.deletedAt IS NULL':''}`
+      ).bind(workspace.id),
     ),
   );
   return {
+    workspace,
+    workspaces: (await db.prepare('SELECT id,name,avatarUrl FROM workspaces ORDER BY createdAt,id').all()).results as {id:string;name:string;avatarUrl:string}[],
     brands: (
       results[0].results as unknown as (Omit<Brand, 'pillars'> & {
         pillars: string;

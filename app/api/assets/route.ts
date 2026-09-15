@@ -1,3 +1,4 @@
+import { activeWorkspace } from '@/lib/workspaces';
 import { authorize } from '@/lib/auth';
 import { bucket, database, insert } from '@/lib/repository';
 import { validateUpload, assetRecord, limitedForm } from '@/lib/asset-upload';
@@ -19,8 +20,8 @@ export async function POST(request: Request) {
       !brandId ||
       brandId === 'all' ||
       !(await database()
-        .prepare('SELECT id FROM brands WHERE id=?')
-        .bind(brandId)
+        .prepare('SELECT id FROM brands WHERE id=? AND workspaceId=?')
+        .bind(brandId,(await activeWorkspace(request)).id)
         .first())
     )
       throw new Error(

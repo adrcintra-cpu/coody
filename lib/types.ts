@@ -113,7 +113,10 @@ export type Plan = {
   campaign: string;
   selectedDates: string[];
 };
+export type WorkspaceInfo = {id:string;name:string;avatarUrl:string};
 export type State = {
+  workspace?: WorkspaceInfo;
+  workspaces?: WorkspaceInfo[];
   user?: import('./identity').CurrentUser;
   brands: Brand[];
   contents: Content[];

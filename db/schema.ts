@@ -12,6 +12,7 @@ export const users = sqliteTable('users', {
   role: text().notNull(),
 });
 export const brands = sqliteTable('brands', {
+  workspaceId: text().notNull().default('main'),
   avatarUrl: text().notNull().default(''),
   id: text().primaryKey(),
   name: text().notNull(),
@@ -251,4 +252,17 @@ export const imageRequests = sqliteTable('image_requests', {
   status: text().notNull(),
   assetId: text().notNull().default(''),
   createdAt: text().notNull(),
+});
+
+export const workspaces = sqliteTable('workspaces', {
+ id:text().primaryKey(),name:text().notNull(),avatarUrl:text().notNull().default(''),createdAt:text().notNull()
+});
+export const apiAlerts = sqliteTable('api_alerts', {
+ id:text().primaryKey(),workspaceId:text().notNull(),provider:text().notNull(),message:text().notNull(),createdAt:text().notNull()
+});
+export const notificationReads = sqliteTable('notification_reads', {
+ id:text().primaryKey(),userId:text().notNull(),notificationId:text().notNull()
+});
+export const magnificJobs = sqliteTable('magnific_jobs', {
+ id:text().primaryKey(),workspaceId:text().notNull(),contentId:text().notNull(),brandId:text().notNull(),taskId:text().notNull().default(''),status:text().notNull(),format:text().notNull(),assetId:text().notNull(),revision:integer().notNull(),message:text().notNull().default(''),createdAt:text().notNull()
 });
