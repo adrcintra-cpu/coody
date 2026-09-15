@@ -67,6 +67,8 @@ export async function POST(request: Request) {
       format?: string;
       prompt?: string;
       assetIds?: string[];
+      baseVersionId?: string;
+      expectedRevision?: number;
     };
     const w = await activeWorkspace(request);
     if (data.action === 'sync') {
@@ -90,6 +92,12 @@ export async function POST(request: Request) {
     const prompt =
       typeof data.prompt === 'string' ? data.prompt.trim().slice(0, 6000) : '';
     if (!prompt) throw new Error('Descreva o criativo.');
+    const editing = data.action === 'revise';
+    if(editing && data.expectedRevision !== (item.revision || 0)) throw new Error('A pauta mudou. Atualize o Studio antes de aplicar alterações.');
+    const latest = state.versions.filter(v=>v.contentId===item.id).sort((a,b)=>b.number-a.number)[0];
+    const currentUrl = latest?.[data.format === 'Feed' ? 'feedUrl' : 'storyUrl'];
+    const base = state.assets.find(a=>a.url===currentUrl && a.brandId===item.brandId && ['image/png','image/jpeg','image/webp'].includes(a.mime));
+    if(editing && (!base || !latest || data.baseVersionId!==latest.id)) throw new Error('Escolha a versão atual com imagem antes de solicitar alterações.');
     const ids = data.assetIds;
     if (
       !Array.isArray(ids) ||
@@ -97,7 +105,9 @@ export async function POST(request: Request) {
       new Set(ids).size !== ids.length
     )
       throw new Error('Selecione até quatro referências.');
-    const refs = ids.map((id) =>
+    const inputIds = editing ? [base!.id,...ids.filter(id=>id!==base!.id)] : ids;
+    if(inputIds.length>4)throw new Error('Na correção, selecione no máximo três referências além da arte atual.');
+    const refs = inputIds.map((id) =>
       state.assets.find(
         (a) =>
           a.id === id &&
@@ -110,6 +120,7 @@ export async function POST(request: Request) {
     const body: Record<string, unknown> = {
       prompt: JSON.stringify({
         pedido: prompt,
+        tarefa: editing ? 'EDITAR a primeira imagem, que é a arte atual. Aplique somente as alterações solicitadas. Preserve composição, texto, logotipo e produto que não foram mencionados. As demais imagens são referências oficiais. Não crie uma composição nova sem necessidade.' : 'Criar nova arte',
         tema: item.title,
         briefing: item.brief,
         marca: brand.name,
@@ -164,6 +175,13 @@ export async function POST(request: Request) {
     if (!reserved.meta.changes) {
       jobId = '';
       throw new Error('Já existe uma geração em andamento para este conteúdo.');
+    }
+    if(editing) {
+      const note='Alteração solicitada · '+data.format+': '+prompt;
+      await database().batch([
+        database().prepare('UPDATE magnific_jobs SET message=? WHERE id=?').bind(note,jobId),
+        database().prepare('INSERT INTO comments (id,contentId,text,createdAt,user) VALUES (?,?,?,?,?)').bind(crypto.randomUUID(),item.id,note,now,user.name),
+      ]);
     }
     submitted = true;
     const result = await magnificRequest(magnificKey(), undefined, body);

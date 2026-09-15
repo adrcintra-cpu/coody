@@ -41,6 +41,9 @@ export function MagnificGenerator({
   disabled: boolean;
   reload: () => Promise<void>;
 }) {
+  const [correction,setCorrection] = useState('');
+  const latest = state.versions.filter(v=>v.contentId===item.id).sort((a,b)=>b.number-a.number)[0];
+  const lastComment = state.comments.filter(c=>c.contentId===item.id).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
   const [prompt, setPrompt] = useState(''),
     [format, setFormat] = useState(
       item.format.includes('Feed') ? 'Feed' : 'Story',
@@ -101,7 +104,7 @@ export function MagnificGenerator({
       clearInterval(timer);
     };
   }, [item.id, reload]);
-  async function generate() {
+  async function generate(revise = false) {
     setBusy(true);
     setMessage('Enviando pedido…');
     try {
@@ -111,7 +114,10 @@ export function MagnificGenerator({
         body: JSON.stringify({
           contentId: item.id,
           format,
-          prompt,
+          prompt: revise ? correction : prompt,
+          action: revise ? 'revise' : 'generate',
+          baseVersionId: latest?.id,
+          expectedRevision: item.revision || 0,
           assetIds: selected,
         }),
       });
@@ -204,6 +210,15 @@ export function MagnificGenerator({
             ? 'Geração em andamento'
             : 'Gerar arte · ' + format}
       </button>
+      {latest?.[format === 'Feed' ? 'feedUrl' : 'storyUrl'] && <div className="art-correction">
+        <h3>Corrigir a arte atual · {format}</h3>
+        <p>A imagem da versão V{latest.number} será usada como base. A correção será salva em uma nova versão para revisão.</p>
+        <label className="field">Alterações necessárias<textarea className="workspace-input" rows={3} value={correction} onChange={e=>setCorrection(e.target.value)} placeholder="Ex.: corrigir o texto, aumentar o logotipo e manter o restante da arte"/></label>
+        {lastComment && <button className="text-btn" onClick={()=>setCorrection(lastComment.text)}>Usar último comentário</button>}
+        {selected.length>3&&<p className="notice">Para corrigir, selecione até três referências. A arte atual ocupa a primeira posição.</p>}
+        <button className="primary-btn" disabled={disabled||busy||pending||!correction.trim()||selected.length>3} onClick={()=>void generate(true)}>Aplicar alterações com IA</button>
+        <p className="form-hint">Usa Magnific e pode consumir créditos. A fase muda para revisão somente após a nova arte ser salva. Compare as versões antes de aprovar.</p>
+      </div>}
       <output aria-live="polite">{message}</output>
       {jobs.slice(0, 3).map((j) => (
         <p className="form-hint" key={j.id}>

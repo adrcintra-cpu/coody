@@ -137,6 +137,7 @@ export async function syncMagnific(job: MagnificJob) {
     .prepare('SELECT * FROM content_items WHERE id=? AND deletedAt IS NULL')
     .bind(job.contentId)
     .first<{ revision: number; status: string }>();
+  const requestedChange = job.message;
   job.status = 'complete';
   job.message =
     'Arte salva na Biblioteca. Selecione-a no Studio e revise antes de enviar à aprovação.';
@@ -169,7 +170,7 @@ export async function syncMagnific(job: MagnificJob) {
             job.format === 'Story'
               ? '/api/assets/' + job.assetId
               : latest.storyUrl,
-          change: 'Arte Magnific · ' + job.format,
+          change: requestedChange.startsWith('Alteração solicitada') ? requestedChange : 'Arte Magnific · ' + job.format,
           createdAt: now,
           locked: 0,
         }),
