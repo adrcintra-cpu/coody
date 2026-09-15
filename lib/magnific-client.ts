@@ -14,8 +14,7 @@ export async function magnificRequest(
   let response: Response;
   try {
     response = await transport(
-      'https://api.magnific.com/v1/ai/text-to-image/flux-2-pro' +
-        (taskId ? '/' + taskId : ''),
+      (!taskId && !body) ? 'https://api.magnific.com/v1/resources?limit=1' : 'https://api.magnific.com/v1/ai/text-to-image/flux-2-pro' + (taskId ? '/' + taskId : ''),
       {
         method: body ? 'POST' : 'GET',
         headers: {
