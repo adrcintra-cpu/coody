@@ -1,4 +1,5 @@
 'use client';
+import { ArtViewer } from './art-viewer';
 import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
 import { useState } from 'react';
@@ -201,9 +202,7 @@ export function Studio({
           <div className="art-workspace">
             <div className={'art-preview ' + format}>
               {draft[format === 'feed' ? 'feedUrl' : 'storyUrl'] ? (
-                <Image
-                  unoptimized
-                  width={1080}
+                <ArtViewer
                   height={format === 'feed' ? 1350 : 1920}
                   src={draft[format === 'feed' ? 'feedUrl' : 'storyUrl']}
                   alt={'Arte ' + format + ' · versão ' + current.number}
