@@ -1,3 +1,4 @@
+import { validatePlanning } from '@/lib/ai-planning';
 import { authorize, registerUser } from '@/lib/auth';
 import { parseBrand, guidelineRules } from '@/lib/brand-validation';
 import { assetCategories, canonicalCategory } from '@/lib/brand-memory';
@@ -339,12 +340,13 @@ export async function POST(request: Request) {
             ),
         );
       } else {
-        const proposal = planProposal(
+        const slots = planProposal(
           brand,
           plan,
           state.dates,
           state.contents.filter((c) => c.brandId === brand.id),
         );
+        const proposal = data.proposal === undefined ? slots : validatePlanning(data.proposal,slots,state.contents.filter(c=>c.brandId===brand.id));
         if (existing)
           throw new Error(
             'Este mês já foi planejado. Edite as pautas existentes ou crie novas pautas.',
@@ -366,7 +368,7 @@ export async function POST(request: Request) {
               hashtags: [],
               feedUrl: '',
               storyUrl: '',
-              change: 'Pauta do planejamento',
+              change: data.proposal ? 'Pauta do planejamento com IA' : 'Pauta do planejamento',
               createdAt: now,
               locked: 0,
             }),

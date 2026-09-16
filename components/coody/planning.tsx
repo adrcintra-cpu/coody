@@ -32,6 +32,7 @@ export function Planning({
   const [days, setDays] = useState([2, 4, 6]);
   const [campaign, setCampaign] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [proposalContext,setProposalContext] = useState('');
   const [proposal, setProposal] = useState<ReturnType<typeof planProposal>>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -54,6 +55,8 @@ export function Planning({
     campaign,
     selectedDates: selected,
   };
+  const planContext=JSON.stringify(plan);
+  const currentProposal=proposalContext===planContext?proposal:[];
   const saved = state.plans.find(
     (p) => p.brandId === brandId && p.month === month,
   );
@@ -375,21 +378,21 @@ export function Planning({
             <>
               <button
                 className="create-btn full section-space"
-                onClick={() => {
-                  setError('');
+                disabled={busy || !b}
+                onClick={async () => {
+                  setBusy(true);setError('');setProposal([]);
                   try {
-                    if (!b) throw new Error('Selecione uma marca');
-                    setProposal(planProposal(b, plan, state.dates, items));
-                  } catch (e) {
-                    setError((e as Error).message);
-                  }
+                    const response=await fetch('/api/planning',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(plan)});
+                    const data=await response.json() as {proposal:ReturnType<typeof planProposal>;error?:string};
+                    if(!response.ok)throw new Error(data.error);
+                    setProposal(data.proposal);setProposalContext(planContext);
+                  } catch (e) {setError((e as Error).message);}finally{setBusy(false);}
                 }}
               >
-                <CalendarRange size={17} /> Montar planejamento
+                <CalendarRange size={17} /> {busy ? 'Criando planejamento…' : 'Planejar mês com ChatGPT'}
               </button>
               <p className="form-hint">
-                <Sparkles size={12} /> Planejar mês com IA estará disponível
-                após a conexão OpenAI.
+                <Sparkles size={12} /> Usa a API OpenAI, os dados da marca e as descrições dos materiais. Revise a proposta antes de salvar. Pode consumir créditos da API.
               </p>
             </>
           )}
@@ -397,25 +400,25 @@ export function Planning({
         <section>
           <div className="section-head">
             <h2>
-              {proposal.length ? 'Proposta para revisar' : 'Pautas do mês'}
+              {currentProposal.length ? 'Proposta para revisar' : 'Pautas do mês'}
             </h2>
             <span className="muted">
-              {proposal.length || items.length} conteúdos
+              {currentProposal.length || items.length} conteúdos
             </span>
           </div>
-          {proposal.length ? (
+          {currentProposal.length ? (
             <>
               <p className="notice">
-                Proposta por regras, sem IA. Pilares distribuídos conforme os
-                percentuais. Você poderá editar e mover cada pauta após salvar.
+                Proposta criada com IA. Confira os temas e briefings antes de salvar. Datas e pilares seguem a configuração; as pautas existentes serão preservadas.
               </p>
-              {proposal.map((p, i) => (
+              {currentProposal.map((p, i) => (
                 <div className="proposal-row" key={i}>
                   <span className="proposal-day">{p.date.slice(8)}</span>
                   <div>
                     <strong>{p.title}</strong>
                     <small>
                       {p.pillar} · {p.format}
+                    </small><p>{p.brief}</p><small>{p.objective}
                     </small>
                   </div>
                 </div>
@@ -427,7 +430,7 @@ export function Planning({
                   setBusy(true);
                   setError('');
                   try {
-                    await act('savePlan', { ...plan });
+                    await act('savePlan', { ...plan, proposal:currentProposal });
                     setProposal([]);
                   } catch (e) {
                     setError((e as Error).message);
