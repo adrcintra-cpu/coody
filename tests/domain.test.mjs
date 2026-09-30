@@ -8,6 +8,8 @@ import {
   assertTransition,
   planProposal,
   similarTopics,
+  sharedAssetUrl,
+  validateSharedCreation,
 } from '../lib/domain.ts';
 const brand = {
   id: 'b',
@@ -139,5 +141,18 @@ void test('datas privadas não entram no planejamento de outra marca', () => {
       [global],
       [],
     ).some((c) => c.title === 'Global'),
+  );
+});
+
+void test('Post e Story compartilham uma única criação visual', () => {
+  assert.equal(sharedAssetUrl('/arte.png', '/arte.png'), '/arte.png');
+  assert.equal(sharedAssetUrl('/arte.png', ''), '/arte.png');
+  assert.throws(() => sharedAssetUrl('/feed.png', '/story.png'));
+  assert.equal(
+    validateSharedCreation('Feed + Story', '/arte.png', '/arte.png'),
+    '/arte.png',
+  );
+  assert.throws(() =>
+    validateSharedCreation('Feed + Story', '/feed.png', '/story.png'),
   );
 });

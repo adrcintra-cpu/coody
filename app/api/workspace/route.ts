@@ -10,6 +10,7 @@ import {
   planProposal,
   dateAvailableToBrand,
   validateMonth,
+  validateSharedCreation,
 } from '@/lib/domain';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET(request: Request) {
@@ -186,6 +187,7 @@ export async function POST(request: Request) {
           throw new Error('Escolha uma imagem da biblioteca desta marca.');
         return value;
       };
+      const sharedAsset = validateSharedCreation(item.format, image(data.feedUrl), image(data.storyUrl));
       statements.push(
         insert('content_versions', {
           id: id(),
@@ -195,8 +197,8 @@ export async function POST(request: Request) {
           copy: str(data.copy),
           caption,
           hashtags: tags,
-          feedUrl: image(data.feedUrl),
-          storyUrl: image(data.storyUrl),
+          feedUrl: sharedAsset,
+          storyUrl: sharedAsset,
           change: str(data.change) || 'Revisão criativa',
           createdAt: now,
           locked: 0,
@@ -209,14 +211,13 @@ export async function POST(request: Request) {
       const version = state.versions
         .filter((v) => v.contentId === item.id)
         .sort((a, b) => b.number - a.number)[0];
+      let sharedAsset = '';
       if (['APROVAÇÃO', 'APROVADO'].includes(target)) {
         if (!version?.headline || !version.caption)
           throw new Error('Complete headline e legenda no Studio.');
         validateHashtags(version.hashtags);
-        if (
-          (item.format.includes('Feed') && !version.feedUrl) ||
-          (item.format.includes('Story') && !version.storyUrl)
-        )
+        sharedAsset = validateSharedCreation(item.format, version.feedUrl, version.storyUrl);
+        if (!sharedAsset)
           throw new Error(
             'Anexe as artes dos formatos selecionados antes da aprovação.',
           );
@@ -235,7 +236,7 @@ export async function POST(request: Request) {
             .bind(version.id),
         );
         if (data.addReference) {
-          for (const url of [version.feedUrl, version.storyUrl].filter(Boolean))
+          for (const url of [sharedAsset].filter(Boolean))
             statements.push(
               db
                 .prepare(
@@ -277,7 +278,7 @@ export async function POST(request: Request) {
           user: user.name,
         }),
       );
-    } else if (action === 'savePlan' || action === 'updatePlan') {
+    } else if (action === 'savePlan' || action === 'updatePlan' || action === 'savePlanConfig') {
       if (!brand) throw new Error('Selecione uma marca.');
       const plan: Plan = {
         id: entityId,
@@ -339,6 +340,10 @@ export async function POST(request: Request) {
               brand.id,
             ),
         );
+      } else if (action === 'savePlanConfig') {
+        if (existing)
+          throw new Error('Este mês já possui planejamento. Use Salvar revisão.');
+        statements.push(insert('monthly_plans', plan));
       } else {
         const slots = planProposal(
           brand,

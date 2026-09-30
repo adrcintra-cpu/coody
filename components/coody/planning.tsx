@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { CalendarRange, Plus, Sparkles, Check } from 'lucide-react';
+import { CalendarRange, Plus, Sparkles, Check, Save } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -376,6 +376,18 @@ export function Planning({
           )}
           {!saved && (
             <>
+              <button
+                className="outline-btn full section-space"
+                disabled={busy || !b}
+                onClick={async () => {
+                  setBusy(true);setError('');
+                  try { await act('savePlanConfig', plan); }
+                  catch (e) { setError((e as Error).message); }
+                  finally { setBusy(false); }
+                }}
+              >
+                <Save size={17} /> {busy ? 'Salvando…' : 'Salvar direção do mês'}
+              </button>
               <button
                 className="create-btn full section-space"
                 disabled={busy || !b}

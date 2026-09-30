@@ -364,7 +364,12 @@ export default function Workspace() {
                 Cadastre a identidade, os pilares e os arquivos da marca para
                 começar o planejamento e a criação.
               </p>
-              <button className="create-btn" onClick={() => navigate('Marcas')}>
+              <button
+                type="button"
+                className="create-btn"
+                aria-label="Cadastrar primeira marca"
+                onClick={() => navigate('Marcas')}
+              >
                 Cadastrar primeira marca
               </button>
             </section>

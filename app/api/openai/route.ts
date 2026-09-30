@@ -186,9 +186,9 @@ export async function POST(request: Request) {
       }),
     );
     const urls = { feedUrl: '', storyUrl: '' };
-    for (const format of ['Feed', 'Story'].filter((f) =>
-      item.format.includes(f),
-    )) {
+    // Generate one master asset. Feed and Story are layout adaptations of this
+    // same source, so a second image request would create visual drift.
+    for (const format of [item.format.includes('Feed') ? 'Feed' : 'Story']) {
       const imageBody = {
         model,
         n: 1,
@@ -247,7 +247,8 @@ export async function POST(request: Request) {
         httpMetadata: { contentType: 'image/png' },
       });
       await insert('brand_assets', asset).run();
-      urls[format === 'Feed' ? 'feedUrl' : 'storyUrl'] = asset.url;
+      urls.feedUrl = asset.url;
+      urls.storyUrl = asset.url;
     }
     if (!urls.feedUrl && !urls.storyUrl)
       throw new OpenAIError('O formato da pauta não é suportado.');

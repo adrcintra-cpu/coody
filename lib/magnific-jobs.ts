@@ -162,14 +162,10 @@ export async function syncMagnific(job: MagnificJob) {
           copy: latest.copy,
           caption: latest.caption,
           hashtags: JSON.parse(String(latest.hashtags)),
-          feedUrl:
-            job.format === 'Feed'
-              ? '/api/assets/' + job.assetId
-              : latest.feedUrl,
-          storyUrl:
-            job.format === 'Story'
-              ? '/api/assets/' + job.assetId
-              : latest.storyUrl,
+          // A Magnific result is the single visual source; the Studio adapts
+          // this source into both canvases.
+          feedUrl: '/api/assets/' + job.assetId,
+          storyUrl: '/api/assets/' + job.assetId,
           change: requestedChange.startsWith('Alteração solicitada') ? requestedChange : 'Arte Magnific · ' + job.format,
           createdAt: now,
           locked: 0,

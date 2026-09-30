@@ -95,7 +95,9 @@ export async function POST(request: Request) {
     const editing = data.action === 'revise';
     if(editing && data.expectedRevision !== (item.revision || 0)) throw new Error('A pauta mudou. Atualize o Studio antes de aplicar alterações.');
     const latest = state.versions.filter(v=>v.contentId===item.id).sort((a,b)=>b.number-a.number)[0];
-    const currentUrl = latest?.[data.format === 'Feed' ? 'feedUrl' : 'storyUrl'];
+    // A revision always starts from the shared source asset, regardless of
+    // which canvas the user currently has selected.
+    const currentUrl = latest?.feedUrl || latest?.storyUrl;
     const base = state.assets.find(a=>a.url===currentUrl && a.brandId===item.brandId && ['image/png','image/jpeg','image/webp'].includes(a.mime));
     if(editing && (!base || !latest || data.baseVersionId!==latest.id)) throw new Error('Escolha a versão atual com imagem antes de solicitar alterações.');
     const ids = data.assetIds;
@@ -136,8 +138,8 @@ export async function POST(request: Request) {
           orientacao: a!.aiNotes,
         })),
       }),
-      width: data.format === 'Feed' ? 1024 : 768,
-      height: data.format === 'Feed' ? 1280 : 1360,
+      width: 1024,
+      height: 1280,
       prompt_upsampling: false,
     };
     let total = 0;

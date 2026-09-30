@@ -40,6 +40,7 @@ import {
   type Action,
   type Status,
 } from '@/lib/types';
+import { sharedAssetUrl } from '@/lib/domain';
 export function Studio({
   state,
   item,
@@ -94,7 +95,7 @@ export function Studio({
     item.brief,
   );
   const dirty =
-    ['headline', 'copy', 'caption', 'feedUrl', 'storyUrl'].some(
+    ['headline', 'copy', 'caption', 'feedUrl'].some(
       (k) => draft[k as keyof Version] !== current[k as keyof Version],
     ) || tags !== current.hashtags.join(' ');
   const run = async (action: string, data: Record<string, unknown>) => {
@@ -127,6 +128,7 @@ export function Studio({
       setFeedback('');
     }
   };
+  const sharedAsset = sharedAssetUrl(draft.feedUrl, draft.storyUrl);
   return (
     <>
       <div className="studio-heading">
@@ -201,10 +203,10 @@ export function Studio({
         <section>
           <div className="art-workspace">
             <div className={'art-preview ' + format}>
-              {draft[format === 'feed' ? 'feedUrl' : 'storyUrl'] ? (
+              {sharedAsset ? (
                 <ArtViewer
                   height={format === 'feed' ? 1350 : 1920}
-                  src={draft[format === 'feed' ? 'feedUrl' : 'storyUrl']}
+                  src={sharedAsset}
                   alt={'Arte ' + format + ' · versão ' + current.number}
                 />
               ) : (
@@ -212,32 +214,31 @@ export function Studio({
                   <ImagePlus size={36} strokeWidth={1} />
                   <strong>
                     {format === 'feed'
-                      ? 'Seu Feed começa aqui'
-                      : 'Uma nova composição para o Story'}
+                      ? 'Sua criação começa aqui'
+                      : 'Story: adaptação vertical da mesma criação'}
                   </strong>
                   <p>{format === 'feed' ? '1080 × 1350' : '1080 × 1920'}</p>
                   <span>
-                    Selecione uma arte da biblioteca.
-                    <br />
-                    Selecione uma arte da biblioteca para este formato.
+                    Selecione uma arte da biblioteca. Ela será aplicada aos
+                    dois layouts da mesma criação.
                   </span>
                 </div>
               )}
             </div>
           </div>
           <div className="art-controls">
-            <Field label={format === 'feed' ? 'Arte do Feed' : 'Arte do Story'}>
+            <Field label="Arte compartilhada do Post e Story">
               <Picker
                 label="Selecionar arte"
                 value={
-                  draft[format === 'feed' ? 'feedUrl' : 'storyUrl'] || 'none'
+                  sharedAsset || 'none'
                 }
                 onChange={(v) =>
                   !disabled &&
                   setDraft({
                     ...draft,
-                    [format === 'feed' ? 'feedUrl' : 'storyUrl']:
-                      v === 'none' ? '' : v,
+                    feedUrl: v === 'none' ? '' : v,
+                    storyUrl: v === 'none' ? '' : v,
                   })
                 }
                 options={[
@@ -254,8 +255,8 @@ export function Studio({
             </button>
           </div>
           <p className="form-hint">
-            Feed e Story usam arquivos independentes. A adaptação preserva o
-            conceito e exige uma composição própria para cada formato.
+            Feed e Story são a mesma criação. O Story apenas adapta o layout
+            vertical, preservando imagem, textos, identidade e conceito.
           </p>
           {dirty && (
             <p className="notice">

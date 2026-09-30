@@ -23,7 +23,7 @@ export function MagnificIntegration() {
       <h2>Magnific · novas artes</h2>
       <output>{message}</output>
       <p>
-        Gere artes Feed e Story no Studio com até quatro imagens da Biblioteca.
+        Gere uma arte-base no Studio e adapte o mesmo criativo para Feed e Story.
         Os resultados são salvos para revisão. As APIs usam créditos separados
         das assinaturas dos aplicativos.
       </p>

@@ -90,7 +90,13 @@ export async function readState(request?: Request): Promise<State> {
       results[2].results as unknown as (Omit<Version, 'hashtags'> & {
         hashtags: string;
       })[]
-    ).map((v) => ({ ...v, hashtags: JSON.parse(v.hashtags) })),
+    ).map((v) => {
+      // Safe runtime migration for databases that have not yet applied the
+      // SQL migration. Existing Story files remain in the Library; the Feed
+      // source becomes canonical for the shared creation.
+      const asset = v.feedUrl || v.storyUrl || '';
+      return { ...v, hashtags: JSON.parse(v.hashtags), feedUrl: asset, storyUrl: asset };
+    }),
     assets: (results[3].results as unknown as Asset[]).map((a) => ({
       ...a,
       category: canonicalCategory(a.category, a.approved),

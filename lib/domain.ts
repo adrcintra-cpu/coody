@@ -23,6 +23,26 @@ export function validateHashtags(tags: string[]) {
   )
     throw new Error('Informe exatamente 5 hashtags únicas, sem espaços.');
 }
+/**
+ * A social piece has one visual source. Feed and Story are canvases for that
+ * source, never separate creative assets. Legacy rows may have one empty URL;
+ * the non-empty value is their canonical source during the migration.
+ */
+export function sharedAssetUrl(feedUrl: string, storyUrl: string) {
+  if (feedUrl && storyUrl && feedUrl !== storyUrl)
+    throw new Error('Feed e Story devem usar a mesma criação visual.');
+  return feedUrl || storyUrl || '';
+}
+export function validateSharedCreation(
+  format: string,
+  feedUrl: string,
+  storyUrl: string,
+) {
+  const asset = sharedAssetUrl(feedUrl, storyUrl);
+  if (format.includes('Feed') && format.includes('Story') && asset && (!feedUrl || !storyUrl))
+    throw new Error('A criação compartilhada precisa estar vinculada aos dois layouts.');
+  return asset;
+}
 export function validateDate(value: string) {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(value) ||
