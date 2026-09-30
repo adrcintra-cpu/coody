@@ -1,4 +1,11 @@
-import type { Brand, Content, Plan, SpecialDate, Status } from './types';
+import type {
+  Asset,
+  Brand,
+  Content,
+  Plan,
+  SpecialDate,
+  Status,
+} from './types';
 export function validatePillars(pillars: Brand['pillars']) {
   if (
     !Array.isArray(pillars) ||
@@ -69,6 +76,64 @@ export function assertTransition(from: Status, to: Status) {
   if (!transitions[from]?.includes(to))
     throw new Error(
       'Transição de status inválida. Siga o fluxo de revisão e aprovação.',
+    );
+}
+/**
+ * A version that received a change request cannot go back to review or
+ * approval: the requested changes must arrive as a new version first.
+ */
+/**
+ * Approving a piece promotes its art to the brand memory as a NEW library
+ * record. The source file (product photo, material, reference) keeps its own
+ * category, priority and description. Returns null when there is nothing to
+ * promote or the art is already registered as approved for this brand.
+ */
+export function approvedArtRecord(
+  assets: Asset[],
+  input: {
+    brandId: string;
+    url: string;
+    title: string;
+    versionNumber: number;
+    id: string;
+    now: string;
+  },
+): Asset | null {
+  if (!input.url) return null;
+  const sameFile = assets.filter(
+    (a) => a.brandId === input.brandId && a.url === input.url,
+  );
+  const source = sameFile[0];
+  if (!source) return null;
+  if (sameFile.some((a) => a.category === 'approved_art' || a.approved === 1))
+    return null;
+  return {
+    id: input.id,
+    brandId: input.brandId,
+    name: ('Arte aprovada · ' + input.title).slice(0, 200),
+    category: 'approved_art',
+    mime: source.mime,
+    url: input.url,
+    description: `Versão V${input.versionNumber} aprovada. Arquivo de origem: ${source.name}.`,
+    aiNotes: '',
+    priority: 1,
+    approved: 1,
+    createdAt: input.now,
+    updatedAt: input.now,
+  };
+}
+export function assertChangesAddressed(
+  to: Status,
+  latestVersionId: string | undefined,
+  changeRequestedVersionId: string | undefined,
+) {
+  if (
+    ['REVISÃO', 'APROVAÇÃO'].includes(to) &&
+    !!changeRequestedVersionId &&
+    latestVersionId === changeRequestedVersionId
+  )
+    throw new Error(
+      'Salve uma nova versão com as alterações solicitadas antes de voltar à revisão.',
     );
 }
 export function similarTopics(title: string, history: Content[]) {

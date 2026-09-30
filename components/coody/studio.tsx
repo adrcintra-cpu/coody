@@ -2,7 +2,7 @@
 import { ArtViewer } from './art-viewer';
 import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Save,
@@ -49,8 +49,10 @@ export function Studio({
   edit,
   library,
   reload,
+  onDirtyChange,
 }: {
   reload: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
   state: State;
   item: Content;
   act: Action;
@@ -77,7 +79,24 @@ export function Studio({
   const [remove, setRemove] = useState(false);
   const [approveReference, setApproveReference] = useState(true);
   const [changeModal, setChangeModal] = useState(false);
+  const [confirmApproval, setConfirmApproval] = useState(false);
   const brand = state.brands.find((b) => b.id === item.brandId)!;
+  const hasUnsaved =
+    !!draft &&
+    !!current &&
+    (['headline', 'copy', 'caption', 'feedUrl'].some(
+      (k) => draft[k as keyof Version] !== current[k as keyof Version],
+    ) ||
+      tags !== current.hashtags.join(' '));
+  // Lets the workspace warn before leaving the Studio with unsaved text.
+  useEffect(() => {
+    onDirtyChange?.(hasUnsaved);
+    if (!hasUnsaved) return;
+    const prevent = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', prevent);
+    return () => window.removeEventListener('beforeunload', prevent);
+  }, [hasUnsaved, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
   if (!draft || !current)
     return <p>Esta pauta ainda não tem uma versão disponível.</p>;
   const historic = current.id !== latest?.id;
@@ -94,10 +113,7 @@ export function Studio({
     state.contents.filter((c) => c.id !== item.id),
     item.brief,
   );
-  const dirty =
-    ['headline', 'copy', 'caption', 'feedUrl'].some(
-      (k) => draft[k as keyof Version] !== current[k as keyof Version],
-    ) || tags !== current.hashtags.join(' ');
+  const dirty = hasUnsaved;
   const run = async (action: string, data: Record<string, unknown>) => {
     setBusy(true);
     setError('');
@@ -397,7 +413,13 @@ export function Studio({
                   <button
                     className="create-btn full"
                     disabled={busy}
-                    onClick={() => void transition('APROVADO')}
+                    onClick={() => {
+                      if (dirty) {
+                        setError('Salve uma nova versão antes de mudar o status.');
+                        return;
+                      }
+                      setConfirmApproval(true);
+                    }}
                   >
                     <Check size={16} /> Aprovar versão
                   </button>
@@ -477,7 +499,7 @@ export function Studio({
             {[current, versions.find((v) => v.id !== current.id)!].map((v) => (
               <section key={v.id}>
                 <h2>
-                  V{v.number} {v.locked && '· Aprovada'}
+                  V{v.number} {!!v.locked && '· Aprovada'}
                 </h2>
                 <h3>{v.headline}</h3>
                 <p>{v.copy}</p>
@@ -521,6 +543,30 @@ export function Studio({
           </button>
         </FormModal>
       )}
+      <AlertDialog open={confirmApproval} onOpenChange={setConfirmApproval}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar a versão V{current.number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A versão ficará protegida contra edições e pronta para publicação.
+              Para mudar algo depois, será preciso criar uma nova pauta.
+              {approveReference &&
+                ' A arte será adicionada às Artes aprovadas da marca; o arquivo original continua na categoria em que foi enviado.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmApproval(false);
+                await transition('APROVADO');
+              }}
+            >
+              Aprovar versão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={remove} onOpenChange={setRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>

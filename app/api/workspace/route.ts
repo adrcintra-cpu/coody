@@ -11,6 +11,8 @@ import {
   dateAvailableToBrand,
   validateMonth,
   validateSharedCreation,
+  assertChangesAddressed,
+  approvedArtRecord,
 } from '@/lib/domain';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET(request: Request) {
@@ -224,6 +226,15 @@ export async function POST(request: Request) {
       }
       if (target === 'ALTERAÇÃO' && !str(data.comment))
         throw new Error('Descreva a alteração solicitada.');
+      if (['REVISÃO', 'APROVAÇÃO'].includes(target)) {
+        const changeRequest = await db
+          .prepare(
+            "SELECT versionId FROM approvals WHERE contentId=? AND decision='ALTERAÇÃO' ORDER BY createdAt DESC LIMIT 1",
+          )
+          .bind(item.id)
+          .first<{ versionId: string }>();
+        assertChangesAddressed(target, version?.id, changeRequest?.versionId);
+      }
       statements.push(
         db
           .prepare('UPDATE content_items SET status=? WHERE id=? AND status=?')
@@ -236,14 +247,17 @@ export async function POST(request: Request) {
             .bind(version.id),
         );
         if (data.addReference) {
-          for (const url of [sharedAsset].filter(Boolean))
-            statements.push(
-              db
-                .prepare(
-                  "UPDATE brand_assets SET approved=1, priority=1, category='approved_art', updatedAt=? WHERE brandId=? AND url=?",
-                )
-                .bind(now, item.brandId, url),
-            );
+          // Registers the approved art as a new library record. The source
+          // file keeps its category (e.g. a product photo stays in Produtos).
+          const approvedArt = approvedArtRecord(state.assets, {
+            brandId: item.brandId,
+            url: sharedAsset,
+            title: item.title,
+            versionNumber: version.number,
+            id: id(),
+            now,
+          });
+          if (approvedArt) statements.push(insert('brand_assets', approvedArt));
         }
       }
       if (['APROVAÇÃO', 'APROVADO', 'ALTERAÇÃO'].includes(target))
