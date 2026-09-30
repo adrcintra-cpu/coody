@@ -1,3 +1,4 @@
+import { assetLimitMB } from '@/lib/upload-limits';
 import { validateFileStructure } from './upload-structure';
 import type { Asset } from './types';
 import { canonicalCategory, assetCategories } from './brand-memory';
@@ -10,8 +11,8 @@ const allowed = new Map([
   ['application/pdf', ['pdf']],
 ]);
 export async function validateUpload(file: unknown) {
-  if (!(file instanceof File) || file.size > 20 * 1024 * 1024 || !file.size)
-    throw new Error('Envie um arquivo de até 20 MB.');
+  if (!(file instanceof File) || file.size > assetLimitMB * 1024 * 1024 || !file.size)
+    throw new Error(`Envie um arquivo de até ${assetLimitMB} MB.`);
   if (
     !allowed
       .get(file.type)

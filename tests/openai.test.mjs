@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openaiRequest, parseCreative } from '../lib/openai-client.ts';
-test('OpenAI quota and rate limit are distinct and secrets stay out of errors', async () => {
+void test('OpenAI quota and rate limit are distinct and secrets stay out of errors', async () => {
   for (const [code, pattern] of [
     ['insufficient_quota', /Créditos/],
     ['rate_limit_exceeded', /limite de requisições/],
@@ -18,7 +18,7 @@ test('OpenAI quota and rate limit are distinct and secrets stay out of errors', 
     );
   }
 });
-test('OpenAI requests use fixed origin, server auth, manual redirects and no retry', async () => {
+void test('OpenAI requests use fixed origin, server auth, manual redirects and no retry', async () => {
   let calls = 0;
   await assert.rejects(
     () =>
@@ -33,7 +33,7 @@ test('OpenAI requests use fixed origin, server auth, manual redirects and no ret
   );
   assert.equal(calls, 1);
 });
-test('Creative parsing accepts structured text and rejects refusals and invalid hashtags', () => {
+void test('Creative parsing accepts structured text and rejects refusals and invalid hashtags', () => {
   const value = {
     headline: 'Headline',
     copy: 'Texto',
@@ -66,7 +66,7 @@ test('Creative parsing accepts structured text and rejects refusals and invalid 
   assert.throws(() => parseCreative(wrap({ ...value, caption: '' })));
 });
 
-test('Unknown 429 is not presented as temporary and quota type is recognized', async () => {
+void test('Unknown 429 is not presented as temporary and quota type is recognized', async () => {
   await assert.rejects(
     () =>
       openaiRequest(
@@ -99,7 +99,7 @@ test('Unknown 429 is not presented as temporary and quota type is recognized', a
   );
 });
 
-test('Image edits transmit original files as multipart without JSON content type', async () => {
+void test('Image edits transmit original files as multipart without JSON content type', async () => {
   const body = new FormData();
   body.append(
     'image[]',
@@ -115,7 +115,7 @@ test('Image edits transmit original files as multipart without JSON content type
   });
 });
 
-test('Materials stay isolated by brand and unapproved AI outputs are excluded', async () => {
+void test('Materials stay isolated by brand and unapproved AI outputs are excluded', async () => {
   const { creativeMaterials, base64 } =
     await import('../lib/creative-materials.ts');
   const assets = [

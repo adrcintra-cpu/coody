@@ -1,4 +1,6 @@
 'use client';
+import { assetLimitMB, onboardingLimitMB } from '@/lib/upload-limits';
+
 import { useRef, useState } from 'react';
 import { Check, FileText, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -97,11 +99,11 @@ export function BrandOnboarding({
     );
     if (
       count > 12 ||
-      total > 25 * 1024 * 1024 ||
-      additions.some((f) => f.size > 20 * 1024 * 1024)
+      total > onboardingLimitMB * 1024 * 1024 ||
+      additions.some((f) => f.size > assetLimitMB * 1024 * 1024)
     ) {
       setError(
-        'Use até 12 arquivos, 20 MB por arquivo e 25 MB no total. Você pode adicionar mais depois na Biblioteca.',
+        `Use até 12 arquivos, ${assetLimitMB} MB por arquivo e ${onboardingLimitMB} MB no total. Você pode adicionar mais depois na Biblioteca.`,
       );
       return;
     }
@@ -299,7 +301,7 @@ export function BrandOnboarding({
             {(step === 1 || step === 2) && (
               <>
                 <p className="form-hint">
-                  {files.length} / 12 arquivos · 20 MB por arquivo · 25 MB por
+                  {files.length} / 12 arquivos · {assetLimitMB} MB por arquivo · {onboardingLimitMB} MB por
                   cadastro
                 </p>
                 {visible.map((f) => (

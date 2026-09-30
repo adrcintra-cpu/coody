@@ -1,4 +1,5 @@
 'use client';
+import { Login } from './login';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
 import { useCallback, useEffect, useState } from 'react';
@@ -65,6 +66,7 @@ export default function Workspace() {
     date?: string;
     brandId?: string;
   } | null>(null);
+  const [loginRequired, setLoginRequired] = useState(false);
   const [loading, setLoading] = useState(true);
   const reload = useCallback(async () => {
     const response = await fetch('/api/workspace', { cache: 'no-store' });
@@ -78,6 +80,7 @@ export default function Workspace() {
     fetch('/api/workspace', { cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         const result = (await response.json()) as State & { error?: string };
+        if (response.status === 401 && (result as State & {loginRequired?: boolean}).loginRequired) setLoginRequired(true);
         if (!response.ok) throw new Error(result.error);
         return result;
       })
@@ -230,6 +233,7 @@ export default function Workspace() {
     navigate('Biblioteca', { brand: id });
   };
   const item = state?.contents.find((c) => c.id === selected);
+  if (loginRequired) return <Login />;
   return (
     <SidebarProvider>
       <Sidebar className="coody-sidebar">
@@ -303,6 +307,7 @@ export default function Workspace() {
             </span>
             <ChevronDown size={15} />
           </button>
+          {state?.user?.id === 'owner' && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.reload(); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

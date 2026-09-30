@@ -20,7 +20,7 @@ const asset = (id, brandId, category, priority = 0) => ({
   priority,
   approved: 0,
 });
-test('Contexto separa identidade oficial, inspiração e histórico da marca', () => {
+void test('Contexto separa identidade oficial, inspiração e histórico da marca', () => {
   const assets = [
     asset('logo', 'a', 'logo'),
     asset('ref', 'a', 'visual_reference'),
@@ -51,11 +51,11 @@ test('Contexto separa identidade oficial, inspiração e histórico da marca', (
   assert.ok(context.identity.logos[0].semanticRole.includes('preservados'));
   assert.equal(context.priorityReferences.length, 1);
 });
-test('Todas as marcas não é um contexto de geração', () => {
+void test('Todas as marcas não é um contexto de geração', () => {
   for (const id of ['', 'all', 'Todas as marcas'])
     assert.throws(() => buildBrandContext({ ...brand, id }, [], [], ''));
 });
-test('Completude ignora arquivos de outras marcas e permite cadastro incompleto', () => {
+void test('Completude ignora arquivos de outras marcas e permite cadastro incompleto', () => {
   assert.equal(
     identityCompleteness(brand, [asset('logo', 'b', 'logo')]).percent,
     50,
@@ -69,7 +69,7 @@ test('Completude ignora arquivos de outras marcas e permite cadastro incompleto'
     100,
   );
 });
-test('Categorias antigas continuam legíveis e aprovação tem papel semântico', () => {
+void test('Categorias antigas continuam legíveis e aprovação tem papel semântico', () => {
   assert.equal(canonicalCategory('Posts anteriores'), 'visual_reference');
   assert.equal(canonicalCategory('Logos'), 'logo');
   assert.equal(canonicalCategory('Referências visuais', 1), 'approved_art');

@@ -1,4 +1,6 @@
 'use client';
+import { avatarLimitMB } from '@/lib/upload-limits';
+
 import { useRef, useState } from 'react';
 import Image from 'next/image';
 export function ProfilePhoto({
@@ -54,8 +56,8 @@ export function ProfilePhoto({
           const file = e.target.files?.[0];
           if (!file) return;
           e.target.value = '';
-          if (file.size > 5 * 1024 * 1024) {
-            setMessage('Use uma imagem de até 5 MB.');
+          if (file.size > avatarLimitMB * 1024 * 1024) {
+            setMessage(`Use uma imagem de até ${avatarLimitMB} MB.`);
             return;
           }
           setBusy(true);

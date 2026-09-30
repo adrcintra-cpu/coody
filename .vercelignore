@@ -1,0 +1,11 @@
+node_modules
+.git
+.wrangler
+.openai
+.dev.vars*
+.env*
+outputs
+work
+dist
+.output
+tests

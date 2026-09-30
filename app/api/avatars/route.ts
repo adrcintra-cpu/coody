@@ -1,3 +1,4 @@
+import { avatarLimitMB } from '@/lib/upload-limits';
 import { assertBrandWorkspace, activeWorkspace } from '@/lib/workspaces';
 import { authorize, registerUser } from '@/lib/auth';
 import { database, bucket } from '@/lib/repository';
@@ -31,10 +32,10 @@ export async function POST(request: Request) {
     const input = form.get('file');
     if (
       !(input instanceof File) ||
-      input.size > 5 * 1024 * 1024 ||
+      input.size > avatarLimitMB * 1024 * 1024 ||
       !['image/png', 'image/jpeg', 'image/webp'].includes(input.type)
     )
-      throw new Error('Use PNG, JPG ou WEBP de até 5 MB.');
+      throw new Error(`Use PNG, JPG ou WEBP de até ${avatarLimitMB} MB.`);
     const { file, bytes } = await validateUpload(input);
     const id = crypto.randomUUID();
     key = 'avatars/' + id;

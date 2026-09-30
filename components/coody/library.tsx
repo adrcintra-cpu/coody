@@ -1,4 +1,6 @@
 'use client';
+import { assetLimitMB } from '@/lib/upload-limits';
+
 import { useState } from 'react';
 import {
   Upload,
@@ -382,12 +384,14 @@ function AssetEditor({
                 accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
+                  if (f && f.size > assetLimitMB * 1024 * 1024) { setError(`Envie um arquivo de até ${assetLimitMB} MB.`); e.target.value = ''; setFile(null); return; }
+                  setError('');
                   setFile(f || null);
                   if (f && !value.name) setValue({ ...value, name: f.name });
                 }}
               />
               <small className="muted">
-                PDF, SVG, PNG, JPG e WEBP · até 20 MB
+                PDF, SVG, PNG, JPG e WEBP · até {assetLimitMB} MB
               </small>
             </Field>
           )}

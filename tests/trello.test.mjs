@@ -8,7 +8,7 @@ import {
 } from '../lib/trello-client.ts';
 const creds = { key: 'a'.repeat(32), token: 'b'.repeat(64) };
 const secret = Buffer.alloc(32, 7).toString('base64');
-test('Trello credentials are encrypted with random IV and tampering is rejected', async () => {
+void test('Trello credentials are encrypted with random IV and tampering is rejected', async () => {
   const a = await seal(creds, secret),
     b = await seal(creds, secret);
   assert.notEqual(a, b);
@@ -18,7 +18,7 @@ test('Trello credentials are encrypted with random IV and tampering is rejected'
   bytes[20] ^= 1;
   await assert.rejects(unseal(bytes.toString('base64'), secret));
 });
-test('invalid credentials rejected', () => {
+void test('invalid credentials rejected', () => {
   for (const c of [
     null,
     {},
@@ -28,7 +28,7 @@ test('invalid credentials rejected', () => {
     assert.equal(validCredentials(c), false);
   assert.equal(validCredentials(creds), true);
 });
-test('Trello authorization stays in header and requests are not blindly retried', async () => {
+void test('Trello authorization stays in header and requests are not blindly retried', async () => {
   let count = 0;
   const result = await trello(creds, '/members/me', {}, async (url, opts) => {
     count++;
@@ -41,7 +41,7 @@ test('Trello authorization stays in header and requests are not blindly retried'
   assert.equal(result.id, 'member');
   assert.equal(count, 1);
 });
-test('provider errors do not leak credentials or raw response', async () => {
+void test('provider errors do not leak credentials or raw response', async () => {
   await assert.rejects(
     trello(
       creds,
@@ -56,11 +56,11 @@ test('provider errors do not leak credentials or raw response', async () => {
     /Limite/,
   );
 });
-test('arbitrary remote URLs rejected', async () => {
+void test('arbitrary remote URLs rejected', async () => {
   await assert.rejects(trello(creds, 'https://example.com'), /inválido/);
 });
 
-test('redirect response is rejected without following or retrying', async () => {
+void test('redirect response is rejected without following or retrying', async () => {
  let calls=0;
  await assert.rejects(trello(creds,'/members/me',{},async()=>{calls++;return new Response('',{status:302,headers:{Location:'https://example.com'}});}),/não concluiu/);
  assert.equal(calls,1);

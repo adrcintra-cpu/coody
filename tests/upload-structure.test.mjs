@@ -6,7 +6,7 @@ const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aG2cAAAAASUVORK5CYII=',
   'base64',
 );
-test('PNG exige estrutura completa, não somente prefixo', () => {
+void test('PNG exige estrutura completa, não somente prefixo', () => {
   assert.throws(() =>
     validateFileStructure(buffer([137, 80, 78, 71]), 'image/png'),
   );
@@ -15,7 +15,7 @@ test('PNG exige estrutura completa, não somente prefixo', () => {
   );
   validateFileStructure(buffer(png), 'image/png');
 });
-test('JPEG, WEBP e PDF truncados são rejeitados', () => {
+void test('JPEG, WEBP e PDF truncados são rejeitados', () => {
   assert.throws(() =>
     validateFileStructure(buffer([255, 216, 255]), 'image/jpeg'),
   );

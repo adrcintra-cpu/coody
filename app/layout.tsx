@@ -4,7 +4,10 @@ export const metadata: Metadata = {
   title: 'COODY — Workspace criativo',
   description:
     'Planejamento editorial, inteligência de marca, produção criativa e aprovação.',
-  icons: { icon: '/coody-logo.svg' },
+  icons: {
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    shortcut: '/favicon.svg',
+  },
 };
 export default function RootLayout({
   children,
