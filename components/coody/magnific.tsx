@@ -20,7 +20,7 @@ export function MagnificIntegration() {
         </p>
       )}
       <p>
-        Gere a arte-base no Studio; o Story é adaptado automaticamente da mesma
+        Gere a arte-base no Studio; o Story usa a mesma
         arte. Os resultados são salvos para revisão. As APIs usam créditos
         separados das assinaturas dos aplicativos.
       </p>
@@ -156,7 +156,7 @@ export function MagnificGenerator({
       <p className="form-hint">
         Formato da arte: {format === 'Feed' ? 'Feed 1080 × 1350' : 'Story 1080 × 1920'}.
         {item.format.includes('Feed') && item.format.includes('Story')
-          ? ' O Story é adaptado automaticamente desta mesma arte.'
+          ? ' O Story usa esta mesma arte.'
           : ''}
       </p>
       <label className="field">
