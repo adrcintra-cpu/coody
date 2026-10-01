@@ -54,7 +54,7 @@ export function ImageGenerator({
   return (
     <section className="panel section-space">
       <h2>Criar criativo com IA</h2>
-      {unavailable && <IntegrationMissing name="A OpenAI" />}
+      {unavailable && <IntegrationMissing name="OpenAI" />}
       <label htmlFor="image-description">Orientação adicional (opcional)</label>
       <textarea
         id="image-description"

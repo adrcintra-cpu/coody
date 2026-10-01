@@ -152,7 +152,7 @@ export function MagnificGenerator({
         Use imagens reais da marca para criar uma nova composição. Os textos
         atuais da pauta são preservados.
       </p>
-      {unavailable && <IntegrationMissing name="O Magnific" />}
+      {unavailable && <IntegrationMissing name="Magnific" />}
       <p className="form-hint">
         Formato da arte: {format === 'Feed' ? 'Feed 1080 × 1350' : 'Story 1080 × 1920'}.
         {item.format.includes('Feed') && item.format.includes('Story')

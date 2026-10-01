@@ -45,8 +45,8 @@ export function useIntegrationStatus(endpoint: '/api/openai' | '/api/magnific') 
 export function IntegrationMissing({ name }: { name: string }) {
   return (
     <p className="notice" role="status">
-      {name} não está configurado neste ambiente, por isso a geração está
-      desativada. A chave deve ser adicionada nas variáveis de ambiente do
+      Integração com {name} não configurada neste ambiente, por isso a geração
+      está desativada. A chave deve ser adicionada nas variáveis de ambiente do
       servidor.{' '}
       <a href="#Integra%C3%A7%C3%B5es">Ver Integrações</a>
     </p>
