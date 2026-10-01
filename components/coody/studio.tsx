@@ -2,7 +2,7 @@
 import { ArtViewer } from './art-viewer';
 import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Save,
@@ -31,6 +31,7 @@ import {
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { Field, FormModal } from './forms';
+import { AssetEditor } from './library';
 import { Picker, StatusBadge } from './shared';
 import { buildBrandContext } from '@/lib/services';
 import {
@@ -40,7 +41,8 @@ import {
   type Action,
   type Status,
 } from '@/lib/types';
-import { sharedAssetUrl } from '@/lib/domain';
+import { sharedAssetUrl, storyAdaptationUrl } from '@/lib/domain';
+import { saveStoryAdaptation } from '@/lib/story-adaptation';
 export function Studio({
   state,
   item,
@@ -49,8 +51,10 @@ export function Studio({
   edit,
   library,
   reload,
+  onDirtyChange,
 }: {
   reload: () => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;
   state: State;
   item: Content;
   act: Action;
@@ -77,7 +81,54 @@ export function Studio({
   const [remove, setRemove] = useState(false);
   const [approveReference, setApproveReference] = useState(true);
   const [changeModal, setChangeModal] = useState(false);
+  const [confirmApproval, setConfirmApproval] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [notice, setNotice] = useState('');
+  // Story canvas = 1080 × 1920 adaptation derived from the shared source art.
+  const [storyState, setStoryState] = useState<
+    Record<string, 'working' | 'ready' | string>
+  >({});
+  const sourceUrl = draft ? draft.feedUrl || '' : '';
+  const derivedStory = storyAdaptationUrl(sourceUrl);
+  const storyExists =
+    !!derivedStory &&
+    ((state.storyAssets ?? []).some((a) => a.url === derivedStory) ||
+      storyState[sourceUrl] === 'ready');
+  const needsStory = item.format.includes('Story');
+  useEffect(() => {
+    if (!needsStory || !derivedStory || storyExists || storyState[sourceUrl])
+      return;
+    setStoryState((s) => ({ ...s, [sourceUrl]: 'working' }));
+    saveStoryAdaptation(sourceUrl)
+      .then(async () => {
+        setStoryState((s) => ({ ...s, [sourceUrl]: 'ready' }));
+        await reload().catch(() => {});
+      })
+      .catch((e: Error) =>
+        setStoryState((s) => ({
+          ...s,
+          [sourceUrl]: e.message || 'Falha ao gerar o Story.',
+        })),
+      );
+  }, [needsStory, derivedStory, storyExists, sourceUrl, storyState, reload]);
+  const storyStatus = storyState[sourceUrl];
   const brand = state.brands.find((b) => b.id === item.brandId)!;
+  const hasUnsaved =
+    !!draft &&
+    !!current &&
+    (['headline', 'copy', 'caption', 'feedUrl'].some(
+      (k) => draft[k as keyof Version] !== current[k as keyof Version],
+    ) ||
+      tags !== current.hashtags.join(' '));
+  // Lets the workspace warn before leaving the Studio with unsaved text.
+  useEffect(() => {
+    onDirtyChange?.(hasUnsaved);
+    if (!hasUnsaved) return;
+    const prevent = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', prevent);
+    return () => window.removeEventListener('beforeunload', prevent);
+  }, [hasUnsaved, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
   if (!draft || !current)
     return <p>Esta pauta ainda não tem uma versão disponível.</p>;
   const historic = current.id !== latest?.id;
@@ -85,8 +136,13 @@ export function Studio({
     !!current.locked ||
     ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status);
   const disabled = historic || locked || busy;
+  // One entry per file: an approved-art record shares the URL of its source
+  // file, so the picker keeps the first record of each URL.
   const images = state.assets.filter(
-    (a) => a.brandId === item.brandId && a.mime.startsWith('image/'),
+    (a, i, all) =>
+      a.brandId === item.brandId &&
+      a.mime.startsWith('image/') &&
+      all.findIndex((o) => o.brandId === a.brandId && o.url === a.url) === i,
   );
   const context = buildBrandContext(
     brand,
@@ -94,10 +150,7 @@ export function Studio({
     state.contents.filter((c) => c.id !== item.id),
     item.brief,
   );
-  const dirty =
-    ['headline', 'copy', 'caption', 'feedUrl'].some(
-      (k) => draft[k as keyof Version] !== current[k as keyof Version],
-    ) || tags !== current.hashtags.join(' ');
+  const dirty = hasUnsaved;
   const run = async (action: string, data: Record<string, unknown>) => {
     setBusy(true);
     setError('');
@@ -203,10 +256,42 @@ export function Studio({
         <section>
           <div className="art-workspace">
             <div className={'art-preview ' + format}>
-              {sharedAsset ? (
+              {sharedAsset && format === 'story' && !storyExists ? (
+                <div className="art-empty" role="status">
+                  <ImagePlus size={36} strokeWidth={1} />
+                  {storyStatus && storyStatus !== 'working' ? (
+                    <>
+                      <strong>Não foi possível gerar o Story</strong>
+                      <span>{storyStatus}</span>
+                      <button
+                        className="outline-btn"
+                        onClick={() =>
+                          setStoryState((s) => {
+                            const next = { ...s };
+                            delete next[sourceUrl];
+                            return next;
+                          })
+                        }
+                      >
+                        Tentar novamente
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <strong>Adaptando a arte para o Story…</strong>
+                      <p>1080 × 1920</p>
+                      <span>
+                        Mesma imagem, textos e identidade do Feed, em formato
+                        vertical.
+                      </span>
+                    </>
+                  )}
+                </div>
+              ) : sharedAsset ? (
                 <ArtViewer
+                  key={format + (format === 'story' ? derivedStory : sharedAsset)}
                   height={format === 'feed' ? 1350 : 1920}
-                  src={sharedAsset}
+                  src={format === 'story' ? derivedStory : sharedAsset}
                   alt={'Arte ' + format + ' · versão ' + current.number}
                 />
               ) : (
@@ -249,14 +334,30 @@ export function Studio({
             </Field>
             <button
               className="outline-btn"
-              onClick={() => library(item.brandId)}
+              disabled={busy}
+              onClick={() => {
+                setNotice('');
+                setUploading(true);
+              }}
             >
               <ImagePlus size={15} /> Adicionar referência ou imagem
             </button>
+            <button
+              className="text-btn"
+              onClick={() => library(item.brandId)}
+            >
+              Abrir Biblioteca
+            </button>
           </div>
+          {notice && (
+            <p className="success" role="status">
+              {notice}
+            </p>
+          )}
           <p className="form-hint">
-            Feed e Story são a mesma criação. O Story apenas adapta o layout
-            vertical, preservando imagem, textos, identidade e conceito.
+            Feed e Story são a mesma criação. O Story é gerado
+            automaticamente a partir da arte escolhida, em 1080 × 1920,
+            preservando imagem, textos, identidade e conceito.
           </p>
           {dirty && (
             <p className="notice">
@@ -397,7 +498,13 @@ export function Studio({
                   <button
                     className="create-btn full"
                     disabled={busy}
-                    onClick={() => void transition('APROVADO')}
+                    onClick={() => {
+                      if (dirty) {
+                        setError('Salve uma nova versão antes de mudar o status.');
+                        return;
+                      }
+                      setConfirmApproval(true);
+                    }}
                   >
                     <Check size={16} /> Aprovar versão
                   </button>
@@ -477,7 +584,7 @@ export function Studio({
             {[current, versions.find((v) => v.id !== current.id)!].map((v) => (
               <section key={v.id}>
                 <h2>
-                  V{v.number} {v.locked && '· Aprovada'}
+                  V{v.number} {!!v.locked && '· Aprovada'}
                 </h2>
                 <h3>{v.headline}</h3>
                 <p>{v.copy}</p>
@@ -521,6 +628,47 @@ export function Studio({
           </button>
         </FormModal>
       )}
+      {uploading && (
+        <AssetEditor
+          state={state}
+          initialCategory="visual_reference"
+          brandId={item.brandId}
+          fixedBrand
+          act={act}
+          close={() => setUploading(false)}
+          saved={async () => {
+            await reload();
+            setUploading(false);
+            setNotice(
+              'Arquivo adicionado à Biblioteca da marca. Selecione-o em “Arte compartilhada do Post e Story”.',
+            );
+          }}
+        />
+      )}
+      <AlertDialog open={confirmApproval} onOpenChange={setConfirmApproval}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aprovar a versão V{current.number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A versão ficará protegida contra edições e pronta para publicação.
+              Para mudar algo depois, será preciso criar uma nova pauta.
+              {approveReference &&
+                ' A arte será adicionada às Artes aprovadas da marca; o arquivo original continua na categoria em que foi enviado.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmApproval(false);
+                await transition('APROVADO');
+              }}
+            >
+              Aprovar versão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={remove} onOpenChange={setRemove}>
         <AlertDialogContent>
           <AlertDialogHeader>

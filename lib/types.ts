@@ -122,6 +122,8 @@ export type State = {
   contents: Content[];
   versions: Version[];
   assets: Asset[];
+  /** Derived 1080 × 1920 Story adaptations; kept out of the Library. */
+  storyAssets?: Asset[];
   comments: Comment[];
   dates: SpecialDate[];
   plans: Plan[];

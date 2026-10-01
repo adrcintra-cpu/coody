@@ -10,6 +10,12 @@ import {
   similarTopics,
   sharedAssetUrl,
   validateSharedCreation,
+  assertChangesAddressed,
+  approvedArtRecord,
+  storyAdaptationUrl,
+  storyAdaptationId,
+  isStoryAdaptation,
+  isRelevantSegment,
 } from '../lib/domain.ts';
 const brand = {
   id: 'b',
@@ -155,4 +161,79 @@ void test('Post e Story compartilham uma única criação visual', () => {
   assert.throws(() =>
     validateSharedCreation('Feed + Story', '/feed.png', '/story.png'),
   );
+});
+
+void test('Alteração solicitada exige nova versão antes da revisão', () => {
+  assert.throws(
+    () => assertChangesAddressed('REVISÃO', 'v3', 'v3'),
+    /nova versão/,
+  );
+  assert.throws(() => assertChangesAddressed('APROVAÇÃO', 'v3', 'v3'));
+  assertChangesAddressed('REVISÃO', 'v4', 'v3');
+  assertChangesAddressed('REVISÃO', 'v1', undefined);
+  assertChangesAddressed('EM CRIAÇÃO', 'v3', 'v3');
+});
+
+void test('Aprovação cria registro de arte aprovada sem alterar o original', () => {
+  const source = {
+    id: 'a1',
+    brandId: 'b',
+    name: 'xicara.png',
+    category: 'product_photo',
+    mime: 'image/png',
+    url: '/api/assets/a1',
+    description: 'Foto do produto',
+    aiNotes: '',
+    priority: 0,
+    approved: 0,
+    createdAt: '2026-09-30T00:00:00Z',
+    updatedAt: '2026-09-30T00:00:00Z',
+  };
+  const assets = [source];
+  const input = {
+    brandId: 'b',
+    url: '/api/assets/a1',
+    title: 'Pauta',
+    versionNumber: 3,
+    id: 'novo',
+    now: '2026-10-01T00:00:00Z',
+  };
+  const record = approvedArtRecord(assets, input);
+  assert.equal(record.id, 'novo');
+  assert.equal(record.category, 'approved_art');
+  assert.equal(record.url, source.url);
+  assert.equal(record.approved, 1);
+  assert.equal(source.category, 'product_photo');
+  assert.equal(source.priority, 0);
+  assert.equal(
+    approvedArtRecord([...assets, { ...record }], { ...input, id: 'x' }),
+    null,
+  );
+  assert.equal(approvedArtRecord(assets, { ...input, brandId: 'outra' }), null);
+  assert.equal(approvedArtRecord(assets, { ...input, url: '' }), null);
+});
+
+void test('Story é sempre a adaptação derivada da arte do Feed', () => {
+  assert.equal(storyAdaptationUrl('/api/assets/abc-1'), '/api/assets/story-abc-1');
+  assert.equal(storyAdaptationId('/api/assets/abc-1'), 'story-abc-1');
+  assert.equal(storyAdaptationUrl('/api/assets/story-abc-1'), '');
+  assert.equal(storyAdaptationUrl('https://outro.site/x.png'), '');
+  assert.equal(storyAdaptationUrl(''), '');
+  assert.ok(isStoryAdaptation({ id: 'story-abc' }));
+  assert.ok(!isStoryAdaptation({ id: 'abc' }));
+  assert.equal(
+    sharedAssetUrl('/api/assets/abc', '/api/assets/story-abc'),
+    '/api/assets/abc',
+  );
+  assert.throws(() => sharedAssetUrl('/api/assets/abc', '/api/assets/story-xyz'));
+  assert.throws(() => sharedAssetUrl('/api/assets/abc', '/api/assets/xyz'));
+});
+
+void test('relevância de datas compara palavras do segmento', () => {
+  assert.ok(isRelevantSegment(['Cafeteria'], 'Cafeteria artesanal — teste'));
+  assert.ok(isRelevantSegment(['Café'], 'cafe especial'));
+  assert.ok(!isRelevantSegment(['Tecnologia', 'Comercial'], 'Cafeteria artesanal'));
+  assert.ok(!isRelevantSegment(['Cafeteria'], ''));
+  assert.ok(isRelevantSegment('Tecnologia, Cafeteria', 'Cafeteria artesanal'));
+  assert.ok(!isRelevantSegment('Tecnologia, Comercial', 'Cafeteria artesanal'));
 });

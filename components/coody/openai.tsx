@@ -1,48 +1,34 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { IntegrationMissing, useIntegrationStatus } from './integration-status';
 export function OpenAIIntegration() {
-  const [message, setMessage] = useState('Verificando conexão…');
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    let active = true;
-    fetch('/api/openai')
-      .then((r) => r.json() as Promise<{ message?: string }>)
-      .then((d) => {
-        if (active) setMessage(d.message || 'Não foi possível verificar.');
-      })
-      .catch(() => {
-        if (active) setMessage('Não foi possível verificar a conexão.');
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const status = useIntegrationStatus('/api/openai');
   return (
     <section className="panel">
       <h2>OpenAI · criativos</h2>
-      <output>{message}</output>
+      <output aria-live="polite">{status.message}</output>
+      {status.checkedAt && !status.checking && (
+        <p className="form-hint">
+          Verificado às{' '}
+          {status.checkedAt.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })}
+        </p>
+      )}
       <p>
-        Criação de headline, legenda, hashtags e artes a partir da pauta. A nova
-        versão aparece no Studio em revisão, antes da aprovação. Cobrança pela
-        conta da API OpenAI.
+        Criação de headline, legenda, hashtags e arte a partir da pauta. O Story
+        é adaptado automaticamente da mesma arte. A nova versão aparece no
+        Studio em revisão, antes da aprovação. Cobrança pela conta da API
+        OpenAI.
       </p>
       <button
         className="outline-btn"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          try {
-            const r = await fetch('/api/openai');
-            const d = (await r.json()) as { message?: string };
-            setMessage(d.message || 'Falha na verificação.');
-          } catch {
-            setMessage('Não foi possível verificar a conexão.');
-          } finally {
-            setBusy(false);
-          }
-        }}
+        disabled={status.checking}
+        onClick={() => void status.check()}
       >
-        {busy ? 'Verificando…' : 'Verificar conexão'}
+        {status.checking ? 'Verificando…' : 'Verificar conexão'}
       </button>
     </section>
   );
@@ -63,9 +49,12 @@ export function ImageGenerator({
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const status = useIntegrationStatus('/api/openai');
+  const unavailable = status.configured === false;
   return (
     <section className="panel section-space">
       <h2>Criar criativo com IA</h2>
+      {unavailable && <IntegrationMissing name="OpenAI" />}
       <label htmlFor="image-description">Orientação adicional (opcional)</label>
       <textarea
         id="image-description"
@@ -73,20 +62,20 @@ export function ImageGenerator({
         rows={4}
         maxLength={3000}
         value={prompt}
-        disabled={busy || disabled}
+        disabled={busy || disabled || unavailable}
         onChange={(e) => setPrompt(e.target.value)}
         placeholder="O briefing e as regras da marca já serão usados. Acrescente uma direção, se desejar."
       />
       <p className="form-hint">
-        Gera textos e artes para {formats}, aplica as imagens automaticamente e
-        salva uma nova versão em revisão. Revise a escrita nas artes antes de
+        Gera textos e uma arte para {formats} (o Story é adaptado
+        automaticamente da mesma arte) e salva uma nova versão em revisão. Revise a escrita nas artes antes de
         aprovar. Usa os logotipos, referências e PDFs da biblioteca desta marca,
         enviados à OpenAI para orientar a criação. Confira a fidelidade do logo
         antes de aprovar. Cobrança pela API OpenAI.
       </p>
       <button
         className="create-btn"
-        disabled={disabled || busy}
+        disabled={disabled || busy || unavailable || status.checking}
         onClick={async () => {
           setBusy(true);
           onBusy(true);

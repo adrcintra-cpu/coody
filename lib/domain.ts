@@ -1,4 +1,11 @@
-import type { Brand, Content, Plan, SpecialDate, Status } from './types';
+import type {
+  Asset,
+  Brand,
+  Content,
+  Plan,
+  SpecialDate,
+  Status,
+} from './types';
 export function validatePillars(pillars: Brand['pillars']) {
   if (
     !Array.isArray(pillars) ||
@@ -29,9 +36,32 @@ export function validateHashtags(tags: string[]) {
  * the non-empty value is their canonical source during the migration.
  */
 export function sharedAssetUrl(feedUrl: string, storyUrl: string) {
-  if (feedUrl && storyUrl && feedUrl !== storyUrl)
+  if (
+    feedUrl &&
+    storyUrl &&
+    feedUrl !== storyUrl &&
+    storyUrl !== storyAdaptationUrl(feedUrl)
+  )
     throw new Error('Feed e Story devem usar a mesma criação visual.');
   return feedUrl || storyUrl || '';
+}
+const STORY_PREFIX = 'story-';
+/**
+ * The Story canvas is a derived file: a 1080 × 1920 adaptation rendered from
+ * the shared source art. Its id is fixed by the source id, so a Story can
+ * never point to an independent image.
+ */
+export function storyAdaptationId(sourceUrl: string) {
+  const id = /^\/api\/assets\/([A-Za-z0-9-]+)$/.exec(sourceUrl || '')?.[1];
+  if (!id || id.startsWith(STORY_PREFIX)) return '';
+  return STORY_PREFIX + id;
+}
+export function storyAdaptationUrl(sourceUrl: string) {
+  const id = storyAdaptationId(sourceUrl);
+  return id ? '/api/assets/' + id : '';
+}
+export function isStoryAdaptation(asset: { id: string }) {
+  return asset.id.startsWith(STORY_PREFIX);
 }
 export function validateSharedCreation(
   format: string,
@@ -69,6 +99,64 @@ export function assertTransition(from: Status, to: Status) {
   if (!transitions[from]?.includes(to))
     throw new Error(
       'Transição de status inválida. Siga o fluxo de revisão e aprovação.',
+    );
+}
+/**
+ * A version that received a change request cannot go back to review or
+ * approval: the requested changes must arrive as a new version first.
+ */
+/**
+ * Approving a piece promotes its art to the brand memory as a NEW library
+ * record. The source file (product photo, material, reference) keeps its own
+ * category, priority and description. Returns null when there is nothing to
+ * promote or the art is already registered as approved for this brand.
+ */
+export function approvedArtRecord(
+  assets: Asset[],
+  input: {
+    brandId: string;
+    url: string;
+    title: string;
+    versionNumber: number;
+    id: string;
+    now: string;
+  },
+): Asset | null {
+  if (!input.url) return null;
+  const sameFile = assets.filter(
+    (a) => a.brandId === input.brandId && a.url === input.url,
+  );
+  const source = sameFile[0];
+  if (!source) return null;
+  if (sameFile.some((a) => a.category === 'approved_art' || a.approved === 1))
+    return null;
+  return {
+    id: input.id,
+    brandId: input.brandId,
+    name: ('Arte aprovada · ' + input.title).slice(0, 200),
+    category: 'approved_art',
+    mime: source.mime,
+    url: input.url,
+    description: `Versão V${input.versionNumber} aprovada. Arquivo de origem: ${source.name}.`,
+    aiNotes: '',
+    priority: 1,
+    approved: 1,
+    createdAt: input.now,
+    updatedAt: input.now,
+  };
+}
+export function assertChangesAddressed(
+  to: Status,
+  latestVersionId: string | undefined,
+  changeRequestedVersionId: string | undefined,
+) {
+  if (
+    ['REVISÃO', 'APROVAÇÃO'].includes(to) &&
+    !!changeRequestedVersionId &&
+    latestVersionId === changeRequestedVersionId
+  )
+    throw new Error(
+      'Salve uma nova versão com as alterações solicitadas antes de voltar à revisão.',
     );
 }
 export function similarTopics(title: string, history: Content[]) {
@@ -197,4 +285,31 @@ export function planProposal(
     };
   });
   return result.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const normalizeWords = (text: string) =>
+  text
+    .toLocaleLowerCase('pt-BR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4);
+/**
+ * A date is relevant when any of its segments shares a meaningful word with
+ * the brand segment ("Cafeteria" ↔ "Cafeteria artesanal"), ignoring case and
+ * accents.
+ */
+export function isRelevantSegment(
+  dateSegments: string | string[],
+  brandSegment: string,
+) {
+  const brand = new Set(normalizeWords(brandSegment || ''));
+  if (!brand.size) return false;
+  // Stored as a comma-separated text ("Tecnologia, Comercial").
+  const list = Array.isArray(dateSegments)
+    ? dateSegments
+    : (dateSegments || '').split(',');
+  return list.some((segment) =>
+    normalizeWords(segment).some((w) => brand.has(w)),
+  );
 }

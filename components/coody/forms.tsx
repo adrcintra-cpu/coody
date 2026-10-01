@@ -57,6 +57,7 @@ export function ContentForm({
   date,
   brandId,
   onClose,
+  onSaved,
   act,
 }: {
   state: State;
@@ -64,6 +65,7 @@ export function ContentForm({
   date?: string;
   brandId?: string;
   onClose: () => void;
+  onSaved?: (date: string) => void;
   act: Action;
 }) {
   const [brand, setBrand] = useState(
@@ -111,6 +113,7 @@ export function ContentForm({
               date: day,
               pillar,
             });
+            onSaved?.(day);
             onClose();
           } catch (e) {
             setError((e as Error).message);

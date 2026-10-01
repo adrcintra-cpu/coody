@@ -71,12 +71,12 @@ export async function send(contentId: string) {
     ['Story', version.storyUrl],
   ]) {
     if (!content.format.includes(format)) continue;
-    const asset = state.assets.find(
+    const asset = [...state.assets, ...(state.storyAssets ?? [])].find(
       (a) => a.brandId === content.brandId && a.url === url,
     );
     if (!asset)
       throw new Error(
-        'Anexe as artes dos formatos selecionados antes de enviar.',
+        'Anexe a arte e aguarde a adaptação do Story antes de enviar.',
       );
     const object = await bucket().head(
       'brands/' + asset.brandId + '/' + asset.id,
@@ -184,7 +184,7 @@ export async function send(contentId: string) {
       ['Story', version.storyUrl],
     ]) {
       if (!url) continue;
-      const asset = state.assets.find(
+      const asset = [...state.assets, ...(state.storyAssets ?? [])].find(
         (a) => a.brandId === content.brandId && a.url === url,
       );
       if (!asset)

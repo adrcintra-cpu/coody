@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 type Notice = {
   id: string;
@@ -12,33 +12,49 @@ export function Notifications() {
   const [open, setOpen] = useState(false),
     [items, setItems] = useState<Notice[]>([]),
     [error, setError] = useState('');
+  const wrap = useRef<HTMLDivElement>(null);
+  const load = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const r = await fetch('/api/notifications', { cache: 'no-store', signal });
+      if (!r.ok) throw new Error('Não foi possível carregar as notificações.');
+      const data = (await r.json()) as { items: Notice[] };
+      setItems(data.items);
+      setError('');
+    } catch (e) {
+      if (!signal?.aborted)
+        setError(e instanceof Error ? e.message : 'Falha ao carregar.');
+    }
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
-    async function load() {
-      try {
-        const r = await fetch('/api/notifications', {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        if (!r.ok)
-          throw new Error('Não foi possível carregar as notificações.');
-        const data = (await r.json()) as { items: Notice[] };
-        setItems(data.items);
-        setError('');
-      } catch (e) {
-        if (!controller.signal.aborted)
-          setError(e instanceof Error ? e.message : 'Falha ao carregar.');
-      }
-    }
-    void load();
+    void load(controller.signal);
     const timer = setInterval(() => {
-      if (!document.hidden) void load();
+      if (!document.hidden) void load(controller.signal);
     }, 30000);
     return () => {
       controller.abort();
       clearInterval(timer);
     };
-  }, []);
+  }, [load]);
+  // Close on Esc, on a click outside and when the page changes.
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    const onPointer = (e: PointerEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) close();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onPointer);
+    window.addEventListener('hashchange', close);
+    window.addEventListener('popstate', close);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('hashchange', close);
+      window.removeEventListener('popstate', close);
+    };
+  }, [open]);
   async function read(ids: string[]) {
     try {
       const r = await fetch('/api/notifications', {
@@ -56,14 +72,17 @@ export function Notifications() {
   }
   const unread = items.filter((i) => !i.read).length;
   return (
-    <div className="notification-wrap">
+    <div className="notification-wrap" ref={wrap}>
       <button
         className="notification-bell"
         aria-label={
           'Notificações' + (unread ? ', ' + unread + ' não lidas' : '')
         }
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (!open) void load();
+          setOpen(!open);
+        }}
       >
         <Bell size={21} />
         {unread > 0 && <span>{unread > 9 ? '9+' : unread}</span>}

@@ -32,6 +32,16 @@ import {
 } from '@/components/ui/sidebar';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
 import { Dashboard } from './dashboard';
 import { Brands } from './brands';
 import { LibraryView } from './library';
@@ -68,6 +78,12 @@ export default function Workspace() {
   } | null>(null);
   const [loginRequired, setLoginRequired] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Unsaved Studio text: navigation away asks before discarding it.
+  const [studioDirty, setStudioDirty] = useState(false);
+  const [pendingNav, setPendingNav] = useState<{
+    view: View;
+    details: Record<string, string>;
+  } | null>(null);
   const reload = useCallback(async () => {
     const response = await fetch('/api/workspace', { cache: 'no-store' });
     const result = (await response.json()) as State & { error?: string };
@@ -91,10 +107,11 @@ export default function Workspace() {
       .finally(() => setLoading(false));
     return () => controller.abort();
   }, []);
-  const navigate = useCallback(
+  const go = useCallback(
     (v: View, details: Record<string, string> = {}) => {
       setView(v);
       if (v === 'Biblioteca') setLibraryBrand(details.brand || '');
+      if (v === 'Studio' && details.id) setSelected(details.id);
       const params = new URLSearchParams({ month, ...details });
       window.history.pushState(
         null,
@@ -104,6 +121,16 @@ export default function Workspace() {
     },
     [month],
   );
+  const navigate = useCallback(
+    (v: View, details: Record<string, string> = {}) => {
+      if (view === 'Studio' && studioDirty) {
+        setPendingNav({ view: v, details });
+        return;
+      }
+      go(v, details);
+    },
+    [go, view, studioDirty],
+  );
   useEffect(() => {
     const restore = () => {
       try {
@@ -112,6 +139,10 @@ export default function Workspace() {
           params = new URLSearchParams(query || '');
         if (nav.some(([v]) => v === name) || name === 'Studio')
           setView(name as View);
+        else if (name) {
+          setView('Dashboard');
+          setMessage('Página não encontrada. Você voltou ao Dashboard.');
+        }
         setSelected(params.get('id') || '');
         setLibraryBrand(params.get('brand') || '');
         const restoredMonth = params.get('month');
@@ -218,7 +249,6 @@ export default function Workspace() {
     return () => lifecycle.abort();
   }, [state?.brands.length, navigate]);
   const open = (c: Content) => {
-    setSelected(c.id);
     navigate('Studio', { id: c.id });
   };
   const create = (date?: string, brandId?: string) => {
@@ -424,6 +454,17 @@ export default function Workspace() {
               create={create}
               approvals={view === 'Aprovações'}
             />
+          ) : view === 'Studio' && !item && selected ? (
+            <section className="panel" role="alert">
+              <h1>Conteúdo não encontrado</h1>
+              <p className="muted">
+                Este conteúdo não existe, foi movido para a lixeira ou pertence
+                a outro workspace.
+              </p>
+              <button className="outline-btn" onClick={() => navigate('Conteúdos')}>
+                Ir para Conteúdos
+              </button>
+            </section>
           ) : view === 'Studio' && item ? (
             <Studio
               reload={reload}
@@ -440,6 +481,7 @@ export default function Workspace() {
               }
               edit={(c) => setForm({ initial: c })}
               library={library}
+              onDirtyChange={setStudioDirty}
             />
           ) : view === 'Integrações' ? (
             <Integrations state={state} />
@@ -456,8 +498,58 @@ export default function Workspace() {
           {...form}
           act={act}
           onClose={() => setForm(null)}
+          onSaved={(date) => {
+            // Follow the piece to its month so it never "disappears".
+            const target = date.slice(0, 7);
+            if (/^\d{4}-(0[1-9]|1[0-2])$/.test(target) && target !== month) {
+              setMonth(target);
+              const [path, query] = window.location.hash.split('?');
+              const params = new URLSearchParams(query || '');
+              params.set('month', target);
+              window.history.replaceState(
+                null,
+                '',
+                (path || '#Dashboard') + '?' + params.toString(),
+              );
+              setMessage(
+                'Pauta salva em ' +
+                  new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', {
+                    month: 'long',
+                    year: 'numeric',
+                  }) +
+                  '. Mostrando esse mês.',
+              );
+            }
+          }}
         />
       )}{' '}
+      <AlertDialog
+        open={!!pendingNav}
+        onOpenChange={(open) => !open && setPendingNav(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Sair sem salvar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Há textos ou arte alterados no Studio que ainda não viraram uma
+              nova versão. Se sair agora, essas alterações serão perdidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const next = pendingNav;
+                setPendingNav(null);
+                setStudioDirty(false);
+                if (next) go(next.view, next.details);
+              }}
+            >
+              Descartar e sair
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {message && (
         <output className="save-notice">
           {message}

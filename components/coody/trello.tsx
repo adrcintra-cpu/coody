@@ -120,15 +120,17 @@ export function TrelloIntegration({ state }: { state: State }) {
   return (
     <section className="panel">
       <h2>Trello</h2>
-      <p>
-        <a
-          href="https://trello.com/b/nvUBy791/meu-quadro-do-trello"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Abrir seu quadro do Trello
-        </a>
-      </p>
+      {model?.connected && model.config?.boardId && (
+        <p>
+          <a
+            href={'https://trello.com/b/' + encodeURIComponent(model.config.boardId)}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir o quadro {model.config.boardName || 'conectado'} no Trello
+          </a>
+        </p>
+      )}
       {error && (
         <p role="alert" className="notice error">
           {error}

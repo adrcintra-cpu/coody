@@ -275,7 +275,7 @@ export function LibraryView({
     </>
   );
 }
-function AssetEditor({
+export function AssetEditor({
   initialCategory,
   state,
   asset,
