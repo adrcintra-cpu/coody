@@ -12,6 +12,10 @@ import {
   validateSharedCreation,
   assertChangesAddressed,
   approvedArtRecord,
+  storyAdaptationUrl,
+  storyAdaptationId,
+  isStoryAdaptation,
+  isRelevantSegment,
 } from '../lib/domain.ts';
 const brand = {
   id: 'b',
@@ -207,4 +211,29 @@ void test('Aprovação cria registro de arte aprovada sem alterar o original', (
   );
   assert.equal(approvedArtRecord(assets, { ...input, brandId: 'outra' }), null);
   assert.equal(approvedArtRecord(assets, { ...input, url: '' }), null);
+});
+
+void test('Story é sempre a adaptação derivada da arte do Feed', () => {
+  assert.equal(storyAdaptationUrl('/api/assets/abc-1'), '/api/assets/story-abc-1');
+  assert.equal(storyAdaptationId('/api/assets/abc-1'), 'story-abc-1');
+  assert.equal(storyAdaptationUrl('/api/assets/story-abc-1'), '');
+  assert.equal(storyAdaptationUrl('https://outro.site/x.png'), '');
+  assert.equal(storyAdaptationUrl(''), '');
+  assert.ok(isStoryAdaptation({ id: 'story-abc' }));
+  assert.ok(!isStoryAdaptation({ id: 'abc' }));
+  assert.equal(
+    sharedAssetUrl('/api/assets/abc', '/api/assets/story-abc'),
+    '/api/assets/abc',
+  );
+  assert.throws(() => sharedAssetUrl('/api/assets/abc', '/api/assets/story-xyz'));
+  assert.throws(() => sharedAssetUrl('/api/assets/abc', '/api/assets/xyz'));
+});
+
+void test('relevância de datas compara palavras do segmento', () => {
+  assert.ok(isRelevantSegment(['Cafeteria'], 'Cafeteria artesanal — teste'));
+  assert.ok(isRelevantSegment(['Café'], 'cafe especial'));
+  assert.ok(!isRelevantSegment(['Tecnologia', 'Comercial'], 'Cafeteria artesanal'));
+  assert.ok(!isRelevantSegment(['Cafeteria'], ''));
+  assert.ok(isRelevantSegment('Tecnologia, Cafeteria', 'Cafeteria artesanal'));
+  assert.ok(!isRelevantSegment('Tecnologia, Comercial', 'Cafeteria artesanal'));
 });

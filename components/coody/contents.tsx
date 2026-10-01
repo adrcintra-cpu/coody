@@ -66,15 +66,25 @@ export function Contents({
   const [brand, setBrand] = useState(fixedBrandId || 'all');
   const [status, setStatus] = useState('all');
   const [query, setQuery] = useState('');
-  const items = state.contents.filter(
-    (c) =>
-      c.date.startsWith(month) &&
-      (brand === 'all' || c.brandId === brand) &&
-      (status === 'all' || c.status === status) &&
-      (!approvals ||
-        ['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO'].includes(c.status)) &&
-      c.title.toLowerCase().includes(query.toLowerCase()),
-  );
+  // A search looks at every month (title, briefing and brand), so a piece is
+  // found even when the workspace month is different.
+  const normalize = (t: string) =>
+    t.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const q = normalize(query.trim());
+  const brandName = (id: string) =>
+    state.brands.find((b) => b.id === id)?.name || '';
+  const items = state.contents
+    .filter(
+      (c) =>
+        (q ? true : c.date.startsWith(month)) &&
+        (brand === 'all' || c.brandId === brand) &&
+        (status === 'all' || c.status === status) &&
+        (!approvals ||
+          ['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO'].includes(c.status)) &&
+        (!q ||
+          normalize(c.title + ' ' + c.brief + ' ' + brandName(c.brandId)).includes(q)),
+    )
+    .sort((a, b) => (q ? b.date.localeCompare(a.date) : 0));
   return (
     <>
       <div className="page-heading">
@@ -201,6 +211,7 @@ export function Contents({
       <div className="section-head">
         <span className="muted">
           {items.length} {items.length === 1 ? 'conteúdo' : 'conteúdos'}
+          {q ? ' · buscando em todos os meses' : ''}
         </span>
         {approvals && (
           <span className="form-hint">
@@ -288,7 +299,11 @@ export function Calendar({
   open: (c: Content) => void;
   create: (date?: string, brandId?: string) => void;
 }) {
-  const [view, setView] = useState('month');
+  // On phones the 7-column month grid does not fit; start in the list view.
+  const narrow =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(max-width: 640px)').matches;
+  const [view, setView] = useState(() => (narrow ? 'list' : 'month'));
   const [brand, setBrand] = useState('all');
   const [week, setWeek] = useState('1');
   const items = state.contents.filter(
@@ -369,6 +384,11 @@ export function Calendar({
         )
       ) : (
         <div className="calendar-scroll">
+          {narrow && (
+            <p className="form-hint calendar-swipe-hint">
+              Deslize a grade para o lado para ver todos os dias da semana.
+            </p>
+          )}
           <div
             className={'calendar-grid ' + (view === 'week' ? 'week-view' : '')}
           >

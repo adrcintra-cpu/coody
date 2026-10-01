@@ -13,6 +13,7 @@ import {
   validateSharedCreation,
   assertChangesAddressed,
   approvedArtRecord,
+  storyAdaptationUrl,
 } from '@/lib/domain';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET(request: Request) {
@@ -189,7 +190,22 @@ export async function POST(request: Request) {
           throw new Error('Escolha uma imagem da biblioteca desta marca.');
         return value;
       };
-      const sharedAsset = validateSharedCreation(item.format, image(data.feedUrl), image(data.storyUrl));
+      // One source art per piece. The Story canvas is always derived from it
+      // (storyAdaptationUrl), so a Story URL sent by the client is never used
+      // as an independent image.
+      const source = str(data.feedUrl, 1000);
+      const story = str(data.storyUrl, 1000);
+      const sharedAsset = image(
+        source ||
+          (story && !story.startsWith('/api/assets/story-') ? story : ''),
+      );
+      if (
+        story &&
+        sharedAsset &&
+        story !== sharedAsset &&
+        story !== storyAdaptationUrl(sharedAsset)
+      )
+        throw new Error('Feed e Story devem usar a mesma criação visual.');
       statements.push(
         insert('content_versions', {
           id: id(),
@@ -222,6 +238,15 @@ export async function POST(request: Request) {
         if (!sharedAsset)
           throw new Error(
             'Anexe as artes dos formatos selecionados antes da aprovação.',
+          );
+        if (
+          item.format.includes('Story') &&
+          !(state.storyAssets ?? []).some(
+            (a) => a.url === storyAdaptationUrl(sharedAsset),
+          )
+        )
+          throw new Error(
+            'Aguarde a adaptação do Story ser gerada no Studio antes da aprovação.',
           );
       }
       if (target === 'ALTERAÇÃO' && !str(data.comment))

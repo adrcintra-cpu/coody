@@ -139,6 +139,10 @@ export default function Workspace() {
           params = new URLSearchParams(query || '');
         if (nav.some(([v]) => v === name) || name === 'Studio')
           setView(name as View);
+        else if (name) {
+          setView('Dashboard');
+          setMessage('Página não encontrada. Você voltou ao Dashboard.');
+        }
         setSelected(params.get('id') || '');
         setLibraryBrand(params.get('brand') || '');
         const restoredMonth = params.get('month');
@@ -450,6 +454,17 @@ export default function Workspace() {
               create={create}
               approvals={view === 'Aprovações'}
             />
+          ) : view === 'Studio' && !item && selected ? (
+            <section className="panel" role="alert">
+              <h1>Conteúdo não encontrado</h1>
+              <p className="muted">
+                Este conteúdo não existe, foi movido para a lixeira ou pertence
+                a outro workspace.
+              </p>
+              <button className="outline-btn" onClick={() => navigate('Conteúdos')}>
+                Ir para Conteúdos
+              </button>
+            </section>
           ) : view === 'Studio' && item ? (
             <Studio
               reload={reload}
@@ -483,6 +498,29 @@ export default function Workspace() {
           {...form}
           act={act}
           onClose={() => setForm(null)}
+          onSaved={(date) => {
+            // Follow the piece to its month so it never "disappears".
+            const target = date.slice(0, 7);
+            if (/^\d{4}-(0[1-9]|1[0-2])$/.test(target) && target !== month) {
+              setMonth(target);
+              const [path, query] = window.location.hash.split('?');
+              const params = new URLSearchParams(query || '');
+              params.set('month', target);
+              window.history.replaceState(
+                null,
+                '',
+                (path || '#Dashboard') + '?' + params.toString(),
+              );
+              setMessage(
+                'Pauta salva em ' +
+                  new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', {
+                    month: 'long',
+                    year: 'numeric',
+                  }) +
+                  '. Mostrando esse mês.',
+              );
+            }
+          }}
         />
       )}{' '}
       <AlertDialog

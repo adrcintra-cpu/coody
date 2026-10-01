@@ -1,6 +1,7 @@
 import { activeWorkspace } from './workspaces';
 import { env } from 'cloudflare:workers';
 import { canonicalCategory } from './brand-memory';
+import { isStoryAdaptation, storyAdaptationUrl } from './domain';
 import type {
   State,
   Brand,
@@ -95,9 +96,17 @@ export async function readState(request?: Request): Promise<State> {
       // SQL migration. Existing Story files remain in the Library; the Feed
       // source becomes canonical for the shared creation.
       const asset = v.feedUrl || v.storyUrl || '';
-      return { ...v, hashtags: JSON.parse(v.hashtags), feedUrl: asset, storyUrl: asset };
+      // The Story canvas is always the vertical adaptation derived from the
+      // shared source (see storyAdaptationUrl); never an independent file.
+      return {
+        ...v,
+        hashtags: JSON.parse(v.hashtags),
+        feedUrl: asset,
+        storyUrl: storyAdaptationUrl(asset),
+      };
     }),
-    assets: (results[3].results as unknown as Asset[]).map((a) => ({
+    storyAssets: (results[3].results as unknown as Asset[]).filter(isStoryAdaptation),
+    assets: (results[3].results as unknown as Asset[]).filter((a) => !isStoryAdaptation(a)).map((a) => ({
       ...a,
       category: canonicalCategory(a.category, a.approved),
       description: a.description || '',

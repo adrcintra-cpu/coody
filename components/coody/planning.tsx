@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Picker, ContentRow, NoData, Meter } from './shared';
 import { Field, FormModal } from './forms';
-import { planProposal, dateAvailableToBrand } from '@/lib/domain';
+import { planProposal, dateAvailableToBrand, isRelevantSegment } from '@/lib/domain';
 import type { State, Action, Content, Plan } from '@/lib/types';
 export function Planning({
   state,
@@ -61,6 +61,17 @@ export function Planning({
     (p) => p.brandId === brandId && p.month === month,
   );
   const activeSaved = editingPlan ? undefined : saved;
+  // Unsaved "Direção do mês": warn so campaign/days are not silently lost.
+  const reference = editingPlan ? saved : undefined;
+  const directionDirty =
+    (!saved || editingPlan) &&
+    (campaign.trim() !== (reference?.campaign ?? '').trim() ||
+      JSON.stringify([...days].sort()) !==
+        JSON.stringify([...(reference?.days ?? [2, 4, 6])].sort()) ||
+      monthly !== (reference?.monthlyGoal ?? b?.monthlyGoal ?? 12) ||
+      weekly !== (reference?.weeklyGoal ?? b?.weeklyGoal ?? 3) ||
+      JSON.stringify([...selected].sort()) !==
+        JSON.stringify([...(reference?.selectedDates ?? [])].sort()));
   const legacyDates = state.dates.filter((d) => !d.brandId && !d.isGlobal);
   const concentrated =
     b?.pillars.filter(
@@ -324,7 +335,7 @@ export function Planning({
                 {d.name}
                 <small>
                   {d.date.slice(8)}/{d.date.slice(5, 7)} ·{' '}
-                  {d.segments.includes(b?.segment || '—')
+                  {isRelevantSegment(d.segments, b?.segment || '')
                     ? 'Alta relevância'
                     : 'Baixa relevância'}
                 </small>
@@ -337,6 +348,14 @@ export function Planning({
           {error && (
             <p className="error" role="alert">
               {error}
+            </p>
+          )}
+          {directionDirty && (
+            <p className="notice" role="status">
+              Alterações ainda não salvas.{' '}
+              {saved
+                ? 'Clique em Salvar revisão para guardá-las.'
+                : 'Clique em Salvar direção do mês para guardá-las.'}
             </p>
           )}
           {saved && editingPlan && (

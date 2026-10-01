@@ -9,6 +9,7 @@ import {
 import { ContentRow, BrandMark, Meter, StatusBadge, NoData } from './shared';
 import {
   displayDate,
+  today,
   statusLabels,
   type State,
   type Content,
@@ -27,11 +28,21 @@ export function Dashboard({
   navigate: (v: View) => void;
 }) {
   const items = state.contents.filter((c) => c.date.startsWith(month));
-  const attention = items.filter(
-    (c) => c.status === 'ALTERAÇÃO' || c.status === 'APROVAÇÃO',
-  );
-  const upcoming = items
-    .filter((c) => c.status !== 'PUBLICADO')
+  const now = today();
+  // Overdue: publication date already passed and the piece is not approved.
+  const overdue = (c: Content) =>
+    c.date < now && !['APROVADO', 'PUBLICADO'].includes(c.status);
+  const attention = state.contents
+    .filter(
+      (c) =>
+        c.status === 'ALTERAÇÃO' || c.status === 'APROVAÇÃO' || overdue(c),
+    )
+    .sort(
+      (a, b) =>
+        Number(overdue(b)) - Number(overdue(a)) || a.date.localeCompare(b.date),
+    );
+  const upcoming = state.contents
+    .filter((c) => c.status !== 'PUBLICADO' && c.date >= now)
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 4);
   const metrics: Status[] = [
@@ -128,9 +139,13 @@ export function Dashboard({
                     <strong>{c.title}</strong>
                     <small>
                       {state.brands.find((b) => b.id === c.brandId)?.name} ·{' '}
-                      {c.status === 'ALTERAÇÃO'
-                        ? 'Uma nova direção para esta peça'
-                        : 'Pronto para seu olhar final'}
+                      {overdue(c)
+                        ? 'Data de publicação já passou (' +
+                          displayDate(c.date) +
+                          ')'
+                        : c.status === 'ALTERAÇÃO'
+                          ? 'Uma nova direção para esta peça'
+                          : 'Pronto para seu olhar final'}
                     </small>
                   </span>
                   <StatusBadge status={c.status} />
@@ -179,6 +194,9 @@ export function Dashboard({
               <Clock3 size={17} />
             </div>
             <div className="timeline">
+              {!upcoming.length && (
+                <p className="muted">Nenhuma publicação agendada a partir de hoje.</p>
+              )}
               {upcoming.map((c) => (
                 <button
                   className="timeline-item"

@@ -36,9 +36,32 @@ export function validateHashtags(tags: string[]) {
  * the non-empty value is their canonical source during the migration.
  */
 export function sharedAssetUrl(feedUrl: string, storyUrl: string) {
-  if (feedUrl && storyUrl && feedUrl !== storyUrl)
+  if (
+    feedUrl &&
+    storyUrl &&
+    feedUrl !== storyUrl &&
+    storyUrl !== storyAdaptationUrl(feedUrl)
+  )
     throw new Error('Feed e Story devem usar a mesma criação visual.');
   return feedUrl || storyUrl || '';
+}
+const STORY_PREFIX = 'story-';
+/**
+ * The Story canvas is a derived file: a 1080 × 1920 adaptation rendered from
+ * the shared source art. Its id is fixed by the source id, so a Story can
+ * never point to an independent image.
+ */
+export function storyAdaptationId(sourceUrl: string) {
+  const id = /^\/api\/assets\/([A-Za-z0-9-]+)$/.exec(sourceUrl || '')?.[1];
+  if (!id || id.startsWith(STORY_PREFIX)) return '';
+  return STORY_PREFIX + id;
+}
+export function storyAdaptationUrl(sourceUrl: string) {
+  const id = storyAdaptationId(sourceUrl);
+  return id ? '/api/assets/' + id : '';
+}
+export function isStoryAdaptation(asset: { id: string }) {
+  return asset.id.startsWith(STORY_PREFIX);
 }
 export function validateSharedCreation(
   format: string,
@@ -262,4 +285,31 @@ export function planProposal(
     };
   });
   return result.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const normalizeWords = (text: string) =>
+  text
+    .toLocaleLowerCase('pt-BR')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4);
+/**
+ * A date is relevant when any of its segments shares a meaningful word with
+ * the brand segment ("Cafeteria" ↔ "Cafeteria artesanal"), ignoring case and
+ * accents.
+ */
+export function isRelevantSegment(
+  dateSegments: string | string[],
+  brandSegment: string,
+) {
+  const brand = new Set(normalizeWords(brandSegment || ''));
+  if (!brand.size) return false;
+  // Stored as a comma-separated text ("Tecnologia, Comercial").
+  const list = Array.isArray(dateSegments)
+    ? dateSegments
+    : (dateSegments || '').split(',');
+  return list.some((segment) =>
+    normalizeWords(segment).some((w) => brand.has(w)),
+  );
 }
