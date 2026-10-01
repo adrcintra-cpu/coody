@@ -41,8 +41,7 @@ import {
   type Action,
   type Status,
 } from '@/lib/types';
-import { sharedAssetUrl, storyAdaptationUrl } from '@/lib/domain';
-import { saveStoryAdaptation } from '@/lib/story-adaptation';
+import { sharedAssetUrl } from '@/lib/domain';
 export function Studio({
   state,
   item,
@@ -84,34 +83,6 @@ export function Studio({
   const [confirmApproval, setConfirmApproval] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState('');
-  // Story canvas = 1080 × 1920 adaptation derived from the shared source art.
-  const [storyState, setStoryState] = useState<
-    Record<string, 'working' | 'ready' | string>
-  >({});
-  const sourceUrl = draft ? draft.feedUrl || '' : '';
-  const derivedStory = storyAdaptationUrl(sourceUrl);
-  const storyExists =
-    !!derivedStory &&
-    ((state.storyAssets ?? []).some((a) => a.url === derivedStory) ||
-      storyState[sourceUrl] === 'ready');
-  const needsStory = item.format.includes('Story');
-  useEffect(() => {
-    if (!needsStory || !derivedStory || storyExists || storyState[sourceUrl])
-      return;
-    setStoryState((s) => ({ ...s, [sourceUrl]: 'working' }));
-    saveStoryAdaptation(sourceUrl)
-      .then(async () => {
-        setStoryState((s) => ({ ...s, [sourceUrl]: 'ready' }));
-        await reload().catch(() => {});
-      })
-      .catch((e: Error) =>
-        setStoryState((s) => ({
-          ...s,
-          [sourceUrl]: e.message || 'Falha ao gerar o Story.',
-        })),
-      );
-  }, [needsStory, derivedStory, storyExists, sourceUrl, storyState, reload]);
-  const storyStatus = storyState[sourceUrl];
   const brand = state.brands.find((b) => b.id === item.brandId)!;
   const hasUnsaved =
     !!draft &&
@@ -256,42 +227,10 @@ export function Studio({
         <section>
           <div className="art-workspace">
             <div className={'art-preview ' + format}>
-              {sharedAsset && format === 'story' && !storyExists ? (
-                <div className="art-empty" role="status">
-                  <ImagePlus size={36} strokeWidth={1} />
-                  {storyStatus && storyStatus !== 'working' ? (
-                    <>
-                      <strong>Não foi possível gerar o Story</strong>
-                      <span>{storyStatus}</span>
-                      <button
-                        className="outline-btn"
-                        onClick={() =>
-                          setStoryState((s) => {
-                            const next = { ...s };
-                            delete next[sourceUrl];
-                            return next;
-                          })
-                        }
-                      >
-                        Tentar novamente
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <strong>Adaptando a arte para o Story…</strong>
-                      <p>1080 × 1920</p>
-                      <span>
-                        Mesma imagem, textos e identidade do Feed, em formato
-                        vertical.
-                      </span>
-                    </>
-                  )}
-                </div>
-              ) : sharedAsset ? (
+              {sharedAsset ? (
                 <ArtViewer
-                  key={format + (format === 'story' ? derivedStory : sharedAsset)}
                   height={format === 'feed' ? 1350 : 1920}
-                  src={format === 'story' ? derivedStory : sharedAsset}
+                  src={sharedAsset}
                   alt={'Arte ' + format + ' · versão ' + current.number}
                 />
               ) : (
@@ -355,9 +294,8 @@ export function Studio({
             </p>
           )}
           <p className="form-hint">
-            Feed e Story são a mesma criação. O Story é gerado
-            automaticamente a partir da arte escolhida, em 1080 × 1920,
-            preservando imagem, textos, identidade e conceito.
+            Feed e Story são a mesma criação e usam a mesma arte, preservando
+            imagem, textos, identidade e conceito.
           </p>
           {dirty && (
             <p className="notice">
