@@ -1977,3 +1977,16 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
   font-size: 12px;
   opacity: 0.7;
 }
+/* Brand lifecycle: inactivate, trash and restore. */
+.brand-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.outline-btn.danger{color:#e6a3a8;border-color:#5a3338}
+.outline-btn.danger:hover{background:#2a1619}
+.create-btn.danger-btn{background:#b9474f;border-color:#b9474f;color:#fff}
+.create-btn.danger-btn:disabled{opacity:.5}
+.brand-inactive-notice{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.brand-lifecycle-section{margin-top:40px}
+.brand-lifecycle-section h2{margin-bottom:4px}
+.brand-lifecycle-section .trash-row{flex-wrap:wrap}
+.brand-row-link{display:flex;align-items:center;gap:12px;text-align:left;background:none;border:0;color:inherit;padding:0;cursor:pointer}
+.brand-row-link .brand-mark{width:36px;height:36px;flex:none}
+@media(max-width:640px){.brand-actions{width:100%}.brand-actions>button{flex:1 1 auto;justify-content:center}}

@@ -2,7 +2,7 @@
 import { Login } from './login';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
   CalendarDays,
@@ -51,6 +51,7 @@ import { Studio } from './studio';
 import { Integrations, Settings } from './settings';
 import { ContentForm } from './forms';
 import { today } from '@/lib/types';
+import { activeState } from '@/lib/brand-lifecycle';
 import type { View, State, Content, Action } from '@/lib/types';
 const nav = [
   ['Dashboard', LayoutDashboard],
@@ -84,6 +85,8 @@ export default function Workspace() {
     view: View;
     details: Record<string, string>;
   } | null>(null);
+  // Every screen except Marcas works without inactive brands and their data.
+  const visible = useMemo(() => (state ? activeState(state) : null), [state]);
   const reload = useCallback(async () => {
     const response = await fetch('/api/workspace', { cache: 'no-store' });
     const result = (await response.json()) as State & { error?: string };
@@ -194,7 +197,15 @@ export default function Workspace() {
     }
     await reload();
     setMessage(
-      action === 'saveVersion'
+      action === 'setBrandStatus'
+        ? data.status === 'inactive'
+          ? 'Marca inativada. Ela saiu das telas e da criação; os dados foram mantidos.'
+          : 'Marca reativada.'
+        : action === 'deleteBrand'
+          ? 'Marca movida para a lixeira. Você pode restaurá-la por 30 dias.'
+          : action === 'restoreBrand'
+            ? 'Marca restaurada.'
+            : action === 'saveVersion'
         ? 'Nova versão salva. O histórico foi preservado.'
         : action === 'status'
           ? 'Status atualizado.'
@@ -235,7 +246,7 @@ export default function Workspace() {
               Object.keys(input).length
             )
               throw new Error('Envie um objeto vazio.');
-            if (!state?.brands.length) {
+            if (!visible?.brands.length) {
               navigate('Marcas');
               return { opened: true, saved: false };
             }
@@ -247,12 +258,12 @@ export default function Workspace() {
       ),
     ).catch(() => {});
     return () => lifecycle.abort();
-  }, [state?.brands.length, navigate]);
+  }, [visible?.brands.length, navigate]);
   const open = (c: Content) => {
     navigate('Studio', { id: c.id });
   };
   const create = (date?: string, brandId?: string) => {
-    if (!state?.brands.length) {
+    if (!visible?.brands.length) {
       navigate('Marcas');
       return;
     }
@@ -262,7 +273,7 @@ export default function Workspace() {
     setLibraryBrand(id);
     navigate('Biblioteca', { brand: id });
   };
-  const item = state?.contents.find((c) => c.id === selected);
+  const item = visible?.contents.find((c) => c.id === selected);
   if (loginRequired) return <Login />;
   return (
     <SidebarProvider>
@@ -299,11 +310,11 @@ export default function Workspace() {
                   <Icon />
                   <span>{name}</span>
                   {name === 'Aprovações' &&
-                    !!state?.contents.filter((c) => c.status === 'APROVAÇÃO')
+                    !!visible?.contents.filter((c) => c.status === 'APROVAÇÃO')
                       .length && (
                       <span className="nav-badge">
                         {
-                          state.contents.filter((c) => c.status === 'APROVAÇÃO')
+                          visible.contents.filter((c) => c.status === 'APROVAÇÃO')
                             .length
                         }
                       </span>
@@ -381,12 +392,29 @@ export default function Workspace() {
                 Tentar novamente
               </button>
             </div>
-          ) : loading || !state ? (
+          ) : loading || !state || !visible ? (
             <output className="loading-state">
               <LoaderCircle className="animate-spin" /> Abrindo seu workspace…
             </output>
-          ) : !state.brands.length &&
+          ) : !visible.brands.length &&
             !['Marcas', 'Configurações', 'Integrações'].includes(view) ? (
+            state.brands.length ? (
+              <section className="panel">
+                <p className="eyebrow">MARCAS INATIVAS</p>
+                <h1>Todas as marcas estão inativas</h1>
+                <p className="muted">
+                  Reative uma marca ou cadastre uma nova para voltar a planejar
+                  e criar.
+                </p>
+                <button
+                  type="button"
+                  className="create-btn"
+                  onClick={() => navigate('Marcas')}
+                >
+                  Ir para Marcas
+                </button>
+              </section>
+            ) : (
             <section className="panel">
               <p className="eyebrow">COMECE AQUI</p>
               <h1>Seu workspace está pronto para a primeira marca</h1>
@@ -403,9 +431,10 @@ export default function Workspace() {
                 Cadastrar primeira marca
               </button>
             </section>
+            )
           ) : view === 'Dashboard' ? (
             <Dashboard
-              state={state}
+              state={visible}
               month={month}
               open={open}
               navigate={navigate}
@@ -421,7 +450,7 @@ export default function Workspace() {
             />
           ) : view === 'Biblioteca' ? (
             <LibraryView
-              state={state}
+              state={visible}
               act={act}
               reload={reload}
               initialBrand={libraryBrand}
@@ -429,7 +458,7 @@ export default function Workspace() {
           ) : view === 'Planejamento' ? (
             <Planning
               key={month}
-              state={state}
+              state={visible}
               month={month}
               act={act}
               open={open}
@@ -438,7 +467,7 @@ export default function Workspace() {
           ) : view === 'Calendário' ? (
             <Calendar
               key={month}
-              state={state}
+              state={visible}
               month={month}
               open={open}
               create={create}
@@ -448,7 +477,7 @@ export default function Workspace() {
               act={act}
               reload={reload}
               key={view}
-              state={state}
+              state={visible}
               month={month}
               open={open}
               create={create}
@@ -471,9 +500,9 @@ export default function Workspace() {
               key={
                 item.id +
                 '-' +
-                state.versions.filter((v) => v.contentId === item.id).length
+                visible.versions.filter((v) => v.contentId === item.id).length
               }
-              state={state}
+              state={visible}
               item={item}
               act={act}
               back={() =>
@@ -484,17 +513,17 @@ export default function Workspace() {
               onDirtyChange={setStudioDirty}
             />
           ) : view === 'Integrações' ? (
-            <Integrations state={state} />
+            <Integrations state={visible} />
           ) : view === 'Configurações' ? (
             <Settings state={state} reload={reload} />
           ) : (
-            <Contents state={state} month={month} open={open} create={create} act={act} reload={reload} />
+            <Contents state={visible} month={month} open={open} create={create} act={act} reload={reload} />
           )}
         </main>
       </SidebarInset>
-      {form && state && (
+      {form && visible && (
         <ContentForm
-          state={state}
+          state={visible}
           {...form}
           act={act}
           onClose={() => setForm(null)}

@@ -1,10 +1,11 @@
+import { activeState } from '@/lib/brand-lifecycle';
 import { authorize } from '@/lib/auth';
 import { database, readState } from '@/lib/repository';
 import { statusLabels, type Status } from '@/lib/types';
 export async function GET(request:Request){
  const user=authorize(request);if(user instanceof Response)return user;
  try {
- const state=await readState(request);
+ const state=activeState(await readState(request));
  const alerts=await database().prepare('SELECT * FROM api_alerts WHERE workspaceId=? ORDER BY createdAt DESC LIMIT 20').bind(state.workspace!.id).all<{id:string;provider:string;message:string;createdAt:string}>();
  const reads=await database().prepare('SELECT notificationId FROM notification_reads WHERE userId=?').bind(user.id).all<{notificationId:string}>();
  const seen=new Set(reads.results.map(r=>r.notificationId));

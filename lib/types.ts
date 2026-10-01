@@ -44,6 +44,16 @@ export type Brand = {
   monthlyGoal: number;
   weeklyGoal: number;
   pillars: { name: string; percent: number }[];
+  /** 'inactive' hides the brand from every screen except Marcas. */
+  status?: 'active' | 'inactive';
+};
+/** A brand in the trash: restorable until it is purged. */
+export type DeletedBrand = {
+  id: string;
+  name: string;
+  segment: string;
+  avatarUrl?: string;
+  deletedAt: string;
 };
 export type Content = {
   deletedAt?: string | null;
@@ -127,6 +137,8 @@ export type State = {
   comments: Comment[];
   dates: SpecialDate[];
   plans: Plan[];
+  /** Brands in the trash (restorable for BRAND_TRASH_DAYS). */
+  deletedBrands?: DeletedBrand[];
 };
 export type View =
   | 'Dashboard'

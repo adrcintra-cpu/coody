@@ -37,6 +37,8 @@ export const brands = sqliteTable('brands', {
   monthlyGoal: integer().notNull(),
   weeklyGoal: integer().notNull(),
   pillars: text().notNull(),
+  status: text().notNull().default('active'),
+  deletedAt: text(),
 });
 export const brandAssets = sqliteTable(
   'brand_assets',

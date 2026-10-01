@@ -1,6 +1,6 @@
 import { activeWorkspace } from '@/lib/workspaces';
 import { authorize } from '@/lib/auth';
-import { bucket, database, insert } from '@/lib/repository';
+import { bucket, database, ensureBrandLifecycle, insert } from '@/lib/repository';
 import { validateUpload, assetRecord, limitedForm } from '@/lib/asset-upload';
 export async function POST(request: Request) {
   const user = authorize(request);
@@ -19,8 +19,10 @@ export async function POST(request: Request) {
     if (
       !brandId ||
       brandId === 'all' ||
+      !(await ensureBrandLifecycle().then(() => true)) ||
+      // Files go only to active brands (not inactive nor in the trash).
       !(await database()
-        .prepare('SELECT id FROM brands WHERE id=? AND workspaceId=?')
+        .prepare("SELECT id FROM brands WHERE id=? AND workspaceId=? AND deletedAt IS NULL AND status<>'inactive'")
         .bind(brandId,(await activeWorkspace(request)).id)
         .first())
     )

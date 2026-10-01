@@ -16,6 +16,7 @@ import {
   approvedArtRecord,
   storyAdaptationUrl,
 } from '@/lib/domain';
+import { isInactive } from '@/lib/brand-lifecycle';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET(request: Request) {
   const user = authorize(request);
@@ -79,7 +80,56 @@ export async function POST(request: Request) {
       data.expectedRevision !== (item.revision ?? 0)
     )
       throw new ConflictError(conflictMessage);
-    if (action === 'saveBrand') {
+    // An inactive brand keeps its data but takes part in no creation flow
+    // until it is reactivated.
+    const owner = brand || state.brands.find((b) => b.id === item?.brandId);
+    if (
+      owner &&
+      isInactive(owner) &&
+      ![
+        'saveBrand',
+        'setBrandStatus',
+        'deleteBrand',
+        'restoreBrand',
+      ].includes(action)
+    )
+      throw new Error(
+        'A marca ' + owner.name + ' está inativa. Reative-a em Marcas para continuar.',
+      );
+    if (action === 'setBrandStatus') {
+      const target = state.brands.find((b) => b.id === data.id);
+      if (!target) throw new Error('Marca não encontrada neste workspace.');
+      const status = data.status;
+      if (status !== 'active' && status !== 'inactive')
+        throw new Error('Status de marca inválido.');
+      statements.push(
+        db
+          .prepare('UPDATE brands SET status=? WHERE id=? AND deletedAt IS NULL')
+          .bind(status, target.id),
+      );
+    } else if (action === 'deleteBrand') {
+      const target = state.brands.find((b) => b.id === data.id);
+      if (!target) throw new Error('Marca não encontrada neste workspace.');
+      if (str(data.confirmName, 200) !== target.name.trim())
+        throw new Error('Digite o nome da marca exatamente como aparece para confirmar.');
+      // Soft delete: the brand and everything linked to it leave every
+      // screen and stay restorable until the purge.
+      statements.push(
+        db
+          .prepare('UPDATE brands SET deletedAt=? WHERE id=? AND deletedAt IS NULL')
+          .bind(now, target.id),
+      );
+    } else if (action === 'restoreBrand') {
+      const target = state.deletedBrands?.find((b) => b.id === data.id);
+      if (!target) throw new Error('Marca não encontrada na lixeira.');
+      statements.push(
+        db
+          .prepare(
+            'UPDATE brands SET deletedAt=NULL WHERE id=? AND workspaceId=? AND deletedAt IS NOT NULL',
+          )
+          .bind(target.id, state.workspace!.id),
+      );
+    } else if (action === 'saveBrand') {
       const existing = state.brands.find((b) => b.id === data.id);
       const row = parseBrand(data, existing?.id || entityId, existing);
       if (existing) {

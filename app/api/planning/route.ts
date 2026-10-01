@@ -1,3 +1,4 @@
+import { activeState } from '@/lib/brand-lifecycle';
 import {env} from 'cloudflare:workers';
 import {authorize} from '@/lib/auth';
 import {readState} from '@/lib/repository';
@@ -13,7 +14,7 @@ export async function POST(request:Request){
  if(Number(request.headers.get('content-length'))>20000)throw new Error('Solicitação muito grande.');
  const plan=await request.json() as Plan;
  if(!Array.isArray(plan.selectedDates)||typeof plan.campaign!=='string'||plan.campaign.length>6000||!Number.isInteger(plan.weeklyGoal)||plan.weeklyGoal<1||plan.weeklyGoal>30)throw new Error('Revise as metas e campanhas.');
- const state=await readState(request),brand=state.brands.find(b=>b.id===plan.brandId);if(!brand)throw new Error('Selecione uma marca deste workspace.');
+ const state=activeState(await readState(request)),brand=state.brands.find(b=>b.id===plan.brandId);if(!brand)throw new Error('Selecione uma marca deste workspace.');
  if(state.plans.some(p=>p.brandId===brand.id&&p.month===plan.month))throw new Error('Este mês já foi planejado. As pautas existentes foram preservadas.');
  const existing=state.contents.filter(c=>c.brandId===brand.id);const slots=planProposal(brand,plan,state.dates,existing);
  const key=(env as unknown as Record<string,string>).OPENAI_API_KEY;if(!key)throw new Error('Configure a chave OpenAI para gerar o planejamento.');

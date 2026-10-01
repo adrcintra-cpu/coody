@@ -1,7 +1,26 @@
 'use client';
 import { ProfilePhoto } from './profile-photo';
 import { useEffect, useState } from 'react';
-import { Plus, ArrowUpRight, Palette, BookOpen, Layers } from 'lucide-react';
+import {
+  Plus,
+  ArrowUpRight,
+  Palette,
+  BookOpen,
+  Layers,
+  Power,
+  Trash2,
+  RotateCcw,
+} from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { BRAND_TRASH_DAYS, isInactive, trashDaysLeft } from '@/lib/brand-lifecycle';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -66,7 +85,41 @@ export function Brands({
     };
   }, []);
   const [editing, setEditing] = useState<Brand | null>(null);
+  // Lifecycle dialogs: inactivate/reactivate and move to the trash.
+  const [statusTarget, setStatusTarget] = useState<Brand | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Brand | null>(null);
+  const [confirmName, setConfirmName] = useState('');
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const [lifecycleError, setLifecycleError] = useState('');
+  const [restoring, setRestoring] = useState('');
+  const closeLifecycle = () => {
+    setStatusTarget(null);
+    setDeleteTarget(null);
+    setConfirmName('');
+    setLifecycleError('');
+  };
+  const runLifecycle = async (
+    action: string,
+    data: Record<string, unknown>,
+    after?: () => void,
+  ) => {
+    setLifecycleBusy(true);
+    setLifecycleError('');
+    try {
+      await act(action, data);
+      closeLifecycle();
+      after?.();
+    } catch (e) {
+      setLifecycleError((e as Error).message);
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+  const activeBrands = state.brands.filter((x) => !isInactive(x));
+  const inactiveBrands = state.brands.filter(isInactive);
+  const trash = state.deletedBrands || [];
   const b = state.brands.find((b) => b.id === selected);
+  const inactive = !!b && isInactive(b);
   const completeness = b ? identityCompleteness(b, state.assets) : null;
   const scoped = b
     ? {
@@ -89,28 +142,82 @@ export function Brands({
               : 'Cada marca, um universo de possibilidades.'}
           </p>
         </div>
-        <button
-          className="create-btn"
-          onClick={() => (b ? setEditing(b) : setOnboarding(true))}
-        >
-          <Plus size={17} />
-          {b ? 'Editar marca' : 'Adicionar marca'}
-        </button>
+        <div className="brand-actions">
+          {b && (
+            <>
+              <button
+                className="outline-btn"
+                onClick={() =>
+                  inactive
+                    ? runLifecycle('setBrandStatus', { id: b.id, status: 'active' })
+                    : setStatusTarget(b)
+                }
+                disabled={lifecycleBusy}
+              >
+                <Power size={16} /> {inactive ? 'Reativar' : 'Inativar'}
+              </button>
+              <button
+                className="outline-btn danger"
+                onClick={() => setDeleteTarget(b)}
+              >
+                <Trash2 size={16} /> Excluir
+              </button>
+            </>
+          )}
+          <button
+            className="create-btn"
+            onClick={() => (b ? setEditing(b) : setOnboarding(true))}
+          >
+            <Plus size={17} />
+            {b ? 'Editar marca' : 'Adicionar marca'}
+          </button>
+        </div>
       </div>
+      {lifecycleError && !statusTarget && !deleteTarget && (
+        <p role="alert" className="notice error">
+          {lifecycleError}
+        </p>
+      )}
       {b ? (
         <>
           <button className="text-btn back" onClick={() => choose('')}>
             ← Todas as marcas
           </button>
+          {inactive && (
+            <div className="notice brand-inactive-notice" role="status">
+              <span>
+                <strong>Marca inativa.</strong> Ela não aparece no Dashboard,
+                no Calendário, nos seletores nem na criação de pautas. Os
+                conteúdos, planejamentos e arquivos continuam guardados.
+              </span>
+              <button
+                className="create-btn"
+                disabled={lifecycleBusy}
+                onClick={() =>
+                  runLifecycle('setBrandStatus', { id: b.id, status: 'active' })
+                }
+              >
+                <Power size={16} /> Reativar marca
+              </button>
+            </div>
+          )}
           <Tabs
-            value={brandTab}
+            value={
+              inactive && !['overview', 'settings'].includes(brandTab)
+                ? 'overview'
+                : brandTab
+            }
             onValueChange={(v) => choose(selected, String(v))}
           >
             <TabsList className="brand-tabs" variant="line">
               <TabsTrigger value="overview">Visão geral</TabsTrigger>
-              <TabsTrigger value="planning">Planejamento</TabsTrigger>
-              <TabsTrigger value="contents">Conteúdos</TabsTrigger>
-              <TabsTrigger value="library">Biblioteca</TabsTrigger>
+              {!inactive && (
+                <>
+                  <TabsTrigger value="planning">Planejamento</TabsTrigger>
+                  <TabsTrigger value="contents">Conteúdos</TabsTrigger>
+                  <TabsTrigger value="library">Biblioteca</TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="settings">Configurações</TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
@@ -160,6 +267,7 @@ export function Brands({
                   </div>
                   <button
                     className="outline-btn"
+                    disabled={inactive}
                     onClick={() => choose(selected, 'library')}
                   >
                     <BookOpen size={16} /> Abrir biblioteca{' '}
@@ -219,6 +327,8 @@ export function Brands({
                 ))}
               </section>
             </TabsContent>
+            {!inactive && (
+            <>
             <TabsContent value="planning" className="brand-module">
               <Planning
                 key={b.id + month}
@@ -251,11 +361,14 @@ export function Brands({
                 reload={reload}
               />
             </TabsContent>
+            </>
+            )}
           </Tabs>
         </>
       ) : (
+        <>
         <div className="brand-grid">
-          {state.brands.map((b) => (
+          {activeBrands.map((b) => (
             <button
               key={b.id}
               className="brand-card"
@@ -288,7 +401,174 @@ export function Brands({
             </button>
           ))}
         </div>
+        {!activeBrands.length && (
+          <p className="muted">
+            Nenhuma marca ativa. Adicione uma marca ou reative uma das marcas
+            inativas abaixo.
+          </p>
+        )}
+        {!!inactiveBrands.length && (
+          <section className="brand-lifecycle-section">
+            <h2>Marcas inativas</h2>
+            <p className="muted">
+              Fora do Dashboard, do Calendário e da criação. Os dados continuam
+              guardados.
+            </p>
+            {inactiveBrands.map((x) => (
+              <div className="trash-row" key={x.id}>
+                <button className="brand-row-link" onClick={() => choose(x.id)}>
+                  <BrandMark brand={x} />
+                  <span>
+                    <strong>{x.name}</strong>
+                    <small className="muted"> · {x.segment}</small>
+                  </span>
+                </button>
+                <button
+                  className="outline-btn"
+                  disabled={lifecycleBusy}
+                  onClick={() =>
+                    runLifecycle('setBrandStatus', { id: x.id, status: 'active' })
+                  }
+                >
+                  <Power size={16} /> Reativar
+                </button>
+              </div>
+            ))}
+          </section>
+        )}
+        {!!trash.length && (
+          <section className="brand-lifecycle-section">
+            <h2>Lixeira de marcas</h2>
+            <p className="muted">
+              Marcas excluídas podem ser restauradas por {BRAND_TRASH_DAYS} dias,
+              com conteúdos, planejamentos e arquivos. Depois disso, são
+              apagadas de vez.
+            </p>
+            {trash.map((x) => {
+              const days = trashDaysLeft(x.deletedAt);
+              return (
+                <div className="trash-row" key={x.id}>
+                  <span>
+                    <strong>{x.name}</strong>
+                    <small className="muted">
+                      {' '}
+                      ·{' '}
+                      {days > 1
+                        ? `apagada de vez em ${days} dias`
+                        : days === 1
+                          ? 'apagada de vez em 1 dia'
+                          : 'será apagada de vez em breve'}
+                    </small>
+                  </span>
+                  <button
+                    className="outline-btn"
+                    disabled={!!restoring}
+                    onClick={async () => {
+                      setRestoring(x.id);
+                      setLifecycleError('');
+                      try {
+                        await act('restoreBrand', { id: x.id });
+                      } catch (e) {
+                        setLifecycleError((e as Error).message);
+                      } finally {
+                        setRestoring('');
+                      }
+                    }}
+                  >
+                    <RotateCcw size={16} />{' '}
+                    {restoring === x.id ? 'Restaurando…' : 'Restaurar'}
+                  </button>
+                </div>
+              );
+            })}
+          </section>
+        )}
+        </>
       )}
+      <AlertDialog
+        open={!!statusTarget}
+        onOpenChange={(open) => !open && !lifecycleBusy && closeLifecycle()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Inativar {statusTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A marca sai do Dashboard, do Calendário, dos seletores e da
+              criação de pautas. Conteúdos, planejamentos e arquivos ficam
+              guardados, e você pode reativá-la a qualquer momento em Marcas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {lifecycleError && (
+            <p role="alert" className="error">
+              {lifecycleError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={lifecycleBusy}>Cancelar</AlertDialogCancel>
+            <button
+              className="create-btn"
+              disabled={lifecycleBusy}
+              onClick={() =>
+                statusTarget &&
+                runLifecycle('setBrandStatus', {
+                  id: statusTarget.id,
+                  status: 'inactive',
+                })
+              }
+            >
+              {lifecycleBusy ? 'Inativando…' : 'Inativar marca'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && !lifecycleBusy && closeLifecycle()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A marca, os conteúdos, os planejamentos e os arquivos saem de
+              todas as telas e vão para a lixeira de marcas. Você pode
+              restaurar tudo por {BRAND_TRASH_DAYS} dias; depois disso, são
+              apagados de vez.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Field label={`Digite "${deleteTarget?.name || ''}" para confirmar`}>
+            <Input
+              value={confirmName}
+              autoComplete="off"
+              onChange={(e) => setConfirmName(e.target.value)}
+            />
+          </Field>
+          {lifecycleError && (
+            <p role="alert" className="error">
+              {lifecycleError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={lifecycleBusy}>Cancelar</AlertDialogCancel>
+            <button
+              className="create-btn danger-btn"
+              disabled={
+                lifecycleBusy ||
+                confirmName.trim() !== (deleteTarget?.name || '').trim()
+              }
+              onClick={() =>
+                deleteTarget &&
+                runLifecycle(
+                  'deleteBrand',
+                  { id: deleteTarget.id, confirmName: confirmName.trim() },
+                  () => choose(''),
+                )
+              }
+            >
+              {lifecycleBusy ? 'Excluindo…' : 'Mover para a lixeira'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {onboarding && (
         <BrandOnboarding
           close={() => setOnboarding(false)}

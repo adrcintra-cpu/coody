@@ -3,6 +3,7 @@ import { env } from 'cloudflare:workers';
 import { canonicalCategory } from './brand-memory';
 import { isStoryAdaptation, storyAdaptationUrl } from './domain';
 import { isRecomposedStory } from './story-recompose';
+import { purgeCutoff } from './brand-lifecycle';
 import type {
   State,
   Brand,
@@ -12,6 +13,7 @@ import type {
   Plan,
   Comment,
   SpecialDate,
+  DeletedBrand,
 } from './types';
 export function database() {
   if (!env.DB) throw new Error('Banco de dados indisponível.');
@@ -56,9 +58,103 @@ export function insert(
       }),
     );
 }
+/**
+ * Adds the brand lifecycle columns (status, deletedAt) when the database has
+ * not received them yet. Runs once per server instance; a column that already
+ * exists is ignored, so it is safe alongside any manual migration.
+ */
+let lifecycleReady: Promise<void> | null = null;
+export function ensureBrandLifecycle() {
+  lifecycleReady ??= (async () => {
+    const db = database();
+    const columns = (
+      await db.prepare('PRAGMA table_info(brands)').all<{ name: string }>()
+    ).results.map((c) => c.name);
+    for (const [name, ddl] of [
+      ['status', "ALTER TABLE brands ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"],
+      ['deletedAt', 'ALTER TABLE brands ADD COLUMN deletedAt TEXT'],
+    ])
+      if (!columns.includes(name))
+        await db
+          .prepare(ddl)
+          .run()
+          .catch((e: Error) => {
+            if (!/duplicate column/i.test(e.message)) throw e;
+          });
+  })().catch((e) => {
+    lifecycleReady = null;
+    throw e;
+  });
+  return lifecycleReady;
+}
+/**
+ * Permanently removes brands that stayed in the trash longer than
+ * BRAND_TRASH_DAYS, with everything linked to them (children first), then
+ * their stored files. Checked at most once an hour per server instance.
+ */
+let lastPurge = 0;
+export async function purgeExpiredBrands(workspaceId: string) {
+  if (Date.now() - lastPurge < 60 * 60 * 1000) return;
+  lastPurge = Date.now();
+  const db = database();
+  const expired = (
+    await db
+      .prepare(
+        'SELECT id,avatarUrl FROM brands WHERE workspaceId=? AND deletedAt IS NOT NULL AND deletedAt<?',
+      )
+      .bind(workspaceId, purgeCutoff())
+      .all<{ id: string; avatarUrl: string }>()
+  ).results;
+  for (const brand of expired) {
+    try {
+      const files = (
+        await db
+          .prepare('SELECT id FROM brand_assets WHERE brandId=?')
+          .bind(brand.id)
+          .all<{ id: string }>()
+      ).results.map((a) => 'brands/' + brand.id + '/' + a.id);
+      const contents = 'SELECT id FROM content_items WHERE brandId=?';
+      await db.batch(
+        [
+          `DELETE FROM generated_assets WHERE versionId IN (SELECT id FROM content_versions WHERE contentId IN (${contents}))`,
+          ...[
+            'approvals',
+            'comments',
+            'trello_cards',
+            'trello_exports',
+            'image_requests',
+            'content_versions',
+          ].map((t) => `DELETE FROM ${t} WHERE contentId IN (${contents})`),
+          ...[
+            'magnific_jobs',
+            'content_items',
+            'monthly_plans',
+            'special_dates',
+            'brand_assets',
+            'brand_guidelines',
+            'products',
+            'services',
+            'content_pillars',
+          ].map((t) => `DELETE FROM ${t} WHERE brandId=?`),
+          'DELETE FROM brands WHERE id=? AND deletedAt IS NOT NULL',
+        ].map((sql) => db.prepare(sql).bind(brand.id)),
+      );
+      const avatar = /^\/api\/avatars\/([A-Za-z0-9-]+)$/.exec(brand.avatarUrl || '')?.[1];
+      if (avatar) files.push('avatars/' + avatar);
+      for (const key of files) await bucket().delete(key).catch(() => {});
+    } catch (error) {
+      console.error('brand purge', brand.id, error);
+    }
+  }
+}
 export async function readState(request?: Request): Promise<State> {
   const db = database();
+  await ensureBrandLifecycle();
   const workspace = await activeWorkspace(request);
+  await purgeExpiredBrands(workspace.id).catch((e) =>
+    console.error('brand purge', e),
+  );
+  // Brands in the trash, and everything linked to them, leave every screen.
   const results = await db.batch(
     [
       'brands',
@@ -68,14 +164,17 @@ export async function readState(request?: Request): Promise<State> {
       'comments',
       'special_dates',
       'monthly_plans',
+      'deleted_brands',
     ].map((t) =>
       db.prepare(t === 'brands'
-       ? 'SELECT * FROM brands WHERE workspaceId=?'
+       ? 'SELECT * FROM brands WHERE workspaceId=? AND deletedAt IS NULL'
+       : t === 'deleted_brands'
+       ? 'SELECT id,name,segment,avatarUrl,deletedAt FROM brands WHERE workspaceId=? AND deletedAt IS NOT NULL ORDER BY deletedAt DESC'
        : ['content_versions','comments'].includes(t)
-       ? `SELECT t.* FROM ${t} t JOIN content_items c ON t.contentId=c.id JOIN brands b ON c.brandId=b.id WHERE b.workspaceId=? AND c.deletedAt IS NULL`
+       ? `SELECT t.* FROM ${t} t JOIN content_items c ON t.contentId=c.id JOIN brands b ON c.brandId=b.id WHERE b.workspaceId=? AND b.deletedAt IS NULL AND c.deletedAt IS NULL`
        : t === 'special_dates'
-       ? "SELECT t.* FROM special_dates t LEFT JOIN brands b ON t.brandId=b.id WHERE b.workspaceId=? OR t.isGlobal=1"
-       : `SELECT t.* FROM ${t} t JOIN brands b ON t.brandId=b.id WHERE b.workspaceId=?${t==='content_items'?' AND t.deletedAt IS NULL':''}`
+       ? "SELECT t.* FROM special_dates t LEFT JOIN brands b ON t.brandId=b.id WHERE (b.workspaceId=? AND b.deletedAt IS NULL) OR t.isGlobal=1"
+       : `SELECT t.* FROM ${t} t JOIN brands b ON t.brandId=b.id WHERE b.workspaceId=? AND b.deletedAt IS NULL${t==='content_items'?' AND t.deletedAt IS NULL':''}`
       ).bind(workspace.id),
     ),
   );
@@ -91,7 +190,12 @@ export async function readState(request?: Request): Promise<State> {
       results[0].results as unknown as (Omit<Brand, 'pillars'> & {
         pillars: string;
       })[]
-    ).map((b) => ({ ...b, pillars: JSON.parse(b.pillars) })),
+    ).map((b) => ({
+      ...b,
+      status: b.status === 'inactive' ? 'inactive' : 'active',
+      pillars: JSON.parse(b.pillars),
+    })),
+    deletedBrands: results[7].results as unknown as DeletedBrand[],
     contents: results[1].results as unknown as Content[],
     versions: (
       results[2].results as unknown as (Omit<Version, 'hashtags'> & {
