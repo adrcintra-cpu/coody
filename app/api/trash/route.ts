@@ -1,12 +1,13 @@
 import { activeWorkspace } from '@/lib/workspaces';
 import { authorize } from '@/lib/auth';
-import { database } from '@/lib/repository';
+import { database, ensureBrandLifecycle } from '@/lib/repository';
 export async function GET(request: Request) {
   const user = authorize(request);
   if (user instanceof Response) return user;
+  await ensureBrandLifecycle();
   const rows = await database()
     .prepare(
-      'SELECT c.id,c.title,c.brandId,c.deletedAt FROM content_items c JOIN brands b ON c.brandId=b.id WHERE c.deletedAt IS NOT NULL AND b.workspaceId=? ORDER BY c.deletedAt DESC',
+      'SELECT c.id,c.title,c.brandId,c.deletedAt FROM content_items c JOIN brands b ON c.brandId=b.id WHERE c.deletedAt IS NOT NULL AND b.deletedAt IS NULL AND b.workspaceId=? ORDER BY c.deletedAt DESC',
     )
     .bind((await activeWorkspace(request)).id).all();
   return Response.json(

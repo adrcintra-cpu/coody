@@ -1,3 +1,4 @@
+import { activeState } from '@/lib/brand-lifecycle';
 import { authorize } from '@/lib/auth';
 import { database, bucket, readState } from '@/lib/repository';
 import { activeWorkspace, apiAlert } from '@/lib/workspaces';
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
       if (!job) throw new Error('Pedido não encontrado.');
       return Response.json({ job: await syncMagnific(job) });
     }
-    const state = await readState(request);
+    const state = activeState(await readState(request));
     const item = state.contents.find((c) => c.id === data.contentId);
     if (!item) throw new Error('Conteúdo não encontrado.');
     if (['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status))

@@ -1,3 +1,4 @@
+import { activeState } from '@/lib/brand-lifecycle';
 import { env } from 'cloudflare:workers';
 import { apiAlert } from '@/lib/workspaces';
 import { authorize } from '@/lib/auth';
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     };
     requestId = typeof data.requestId === 'string' ? data.requestId : '';
     if (!/^[a-f0-9-]{36}$/.test(requestId)) throw new Error('Pedido inválido.');
-    const state = await readState(request);
+    const state = activeState(await readState(request));
     const item = state.contents.find((c) => c.id === data.contentId);
     if (!item) throw new Error('Pauta não encontrada.');
     if (!item.format.includes('Story'))

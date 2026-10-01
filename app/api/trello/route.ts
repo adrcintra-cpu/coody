@@ -1,3 +1,4 @@
+import { activeState } from '@/lib/brand-lifecycle';
 import { authorize } from '@/lib/auth';
 import { activeWorkspace } from '@/lib/workspaces';
 import { database, readState } from '@/lib/repository';
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
       return Response.json({ ok: true, message: 'Quadro e listas salvos.' });
     }
     if (data.action === 'send') {
-      if(!(await readState(request)).contents.some(c=>c.id===data.contentId))throw new Error('Conteúdo não encontrado neste workspace.');
+      if(!(activeState(await readState(request))).contents.some(c=>c.id===data.contentId))throw new Error('Conteúdo não encontrado neste workspace.');
       return Response.json(await send(data.contentId));
     }
     throw new Error('Ação não disponível.');

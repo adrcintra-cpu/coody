@@ -266,3 +266,63 @@ void test('Story recomposto: pedido preserva a mesma criação e marca o arquivo
   );
   assert.ok(!isRecomposedStory({ id: 'abc', description: STORY_AI_MARKER }));
 });
+
+import {
+  activeState,
+  trashDaysLeft,
+  purgeCutoff,
+  BRAND_TRASH_DAYS,
+} from '../lib/brand-lifecycle.ts';
+test('inactive brands and their data leave the working state', () => {
+  const state = {
+    brands: [
+      { id: 'a', name: 'A', status: 'active' },
+      { id: 'i', name: 'I', status: 'inactive' },
+      { id: 'legacy', name: 'L' },
+    ],
+    contents: [
+      { id: 'ca', brandId: 'a' },
+      { id: 'ci', brandId: 'i' },
+    ],
+    versions: [
+      { id: 'va', contentId: 'ca' },
+      { id: 'vi', contentId: 'ci' },
+    ],
+    comments: [{ id: 'mi', contentId: 'ci' }],
+    assets: [
+      { id: 'fa', brandId: 'a' },
+      { id: 'fi', brandId: 'i' },
+    ],
+    storyAssets: [{ id: 'story-fi', brandId: 'i' }],
+    plans: [{ id: 'pi', brandId: 'i' }],
+    dates: [
+      { id: 'g', isGlobal: 1, brandId: null },
+      { id: 'di', isGlobal: 0, brandId: 'i' },
+      { id: 'free', isGlobal: 0, brandId: null },
+    ],
+  };
+  const v = activeState(state);
+  assert.deepEqual(v.brands.map((b) => b.id), ['a', 'legacy']);
+  assert.deepEqual(v.contents.map((c) => c.id), ['ca']);
+  assert.deepEqual(v.versions.map((c) => c.id), ['va']);
+  assert.equal(v.comments.length, 0);
+  assert.deepEqual(v.assets.map((c) => c.id), ['fa']);
+  assert.equal(v.storyAssets.length, 0);
+  assert.equal(v.plans.length, 0);
+  assert.deepEqual(v.dates.map((d) => d.id), ['g', 'free']);
+  // Nothing inactive: the same object is returned.
+  const none = { ...state, brands: [state.brands[0]] };
+  assert.equal(activeState(none), none);
+});
+test('brand trash keeps 30 days and then purges', () => {
+  const now = Date.parse('2026-10-01T12:00:00Z');
+  assert.equal(BRAND_TRASH_DAYS, 30);
+  assert.equal(trashDaysLeft('2026-10-01T12:00:00Z', now), 30);
+  assert.equal(trashDaysLeft('2026-09-01T13:00:00Z', now), 1);
+  assert.equal(trashDaysLeft('2026-08-01T00:00:00Z', now), 0);
+  assert.equal(trashDaysLeft('inválida', now), 0);
+  const cutoff = purgeCutoff(now);
+  assert.equal(cutoff, '2026-09-01T12:00:00.000Z');
+  assert.ok('2026-08-31T23:59:59.000Z' < cutoff);
+  assert.ok(!('2026-09-02T00:00:00.000Z' < cutoff));
+});

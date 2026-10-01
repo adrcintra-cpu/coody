@@ -1,4 +1,4 @@
-import { database } from './repository';
+import { database, ensureBrandLifecycle } from './repository';
 export const defaultWorkspace = 'main';
 export async function activeWorkspace(request?: Request) {
   await database()
@@ -24,9 +24,11 @@ export async function activeWorkspace(request?: Request) {
 }
 export async function assertBrandWorkspace(request: Request, brandId: string) {
   const w = await activeWorkspace(request);
+  await ensureBrandLifecycle();
+  // Brands in the trash accept no new files or changes.
   if (
     !(await database()
-      .prepare('SELECT id FROM brands WHERE id=? AND workspaceId=?')
+      .prepare('SELECT id FROM brands WHERE id=? AND workspaceId=? AND deletedAt IS NULL')
       .bind(brandId, w.id)
       .first())
   )

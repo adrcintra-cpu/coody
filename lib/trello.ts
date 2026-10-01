@@ -1,3 +1,4 @@
+import { activeState } from './brand-lifecycle';
 import { env } from 'cloudflare:workers';
 import { database, bucket, readState } from './repository';
 import { trello, unseal } from './trello-client';
@@ -58,7 +59,7 @@ export async function send(contentId: string) {
   const { config, call } = await client();
   if (!config.boardId || !config.approvalList)
     throw new Error('Escolha o quadro e as listas.');
-  const state = await readState(),
+  const state = activeState(await readState()),
     content = state.contents.find((c) => c.id === contentId);
   if (!content || content.status !== 'APROVAÇÃO')
     throw new Error('Envie apenas conteúdos que estejam aguardando aprovação.');
