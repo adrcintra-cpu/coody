@@ -1,3 +1,4 @@
+import { env } from 'cloudflare:workers';
 import { validatePlanning } from '@/lib/ai-planning';
 import { authorize, registerUser } from '@/lib/auth';
 import { parseBrand, guidelineRules } from '@/lib/brand-validation';
@@ -238,6 +239,16 @@ export async function POST(request: Request) {
         if (!sharedAsset)
           throw new Error(
             'Anexe as artes dos formatos selecionados antes da aprovação.',
+          );
+        // With OpenAI configured, the Story must be the 9:16 recomposition
+        // of this same art, not the Feed file shown in the vertical canvas.
+        if (
+          item.format.includes('Story') &&
+          (env as unknown as Record<string, string>).OPENAI_API_KEY &&
+          version.storyUrl === version.feedUrl
+        )
+          throw new Error(
+            'Recomponha o Story 9:16 com IA no Studio e revise-o ao lado do Feed antes da aprovação.',
           );
       }
       if (target === 'ALTERAÇÃO' && !str(data.comment))

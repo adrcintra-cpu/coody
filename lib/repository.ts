@@ -1,7 +1,8 @@
 import { activeWorkspace } from './workspaces';
 import { env } from 'cloudflare:workers';
 import { canonicalCategory } from './brand-memory';
-import { isStoryAdaptation } from './domain';
+import { isStoryAdaptation, storyAdaptationUrl } from './domain';
+import { isRecomposedStory } from './story-recompose';
 import type {
   State,
   Brand,
@@ -78,6 +79,11 @@ export async function readState(request?: Request): Promise<State> {
       ).bind(workspace.id),
     ),
   );
+  const recomposed = new Set(
+    (results[3].results as unknown as Asset[])
+      .filter(isRecomposedStory)
+      .map((a) => a.url),
+  );
   return {
     workspace,
     workspaces: (await db.prepare('SELECT id,name,avatarUrl FROM workspaces ORDER BY createdAt,id').all()).results as {id:string;name:string;avatarUrl:string}[],
@@ -96,11 +102,19 @@ export async function readState(request?: Request): Promise<State> {
       // SQL migration. Existing Story files remain in the Library; the Feed
       // source becomes canonical for the shared creation.
       const asset = v.feedUrl || v.storyUrl || '';
-      return { ...v, hashtags: JSON.parse(v.hashtags), feedUrl: asset, storyUrl: asset };
+      // The Story canvas is the AI recomposition of this same art when it
+      // exists (story-<source id>); otherwise it shows the Feed art itself.
+      const story = storyAdaptationUrl(asset);
+      return {
+        ...v,
+        hashtags: JSON.parse(v.hashtags),
+        feedUrl: asset,
+        storyUrl: story && recomposed.has(story) ? story : asset,
+      };
     }),
-    // Derived story-* files (provisional blurred adaptations) stay out of the
-    // Library and are never used as the Story canvas.
-    storyAssets: (results[3].results as unknown as Asset[]).filter(isStoryAdaptation),
+    // story-* files stay out of the Library. Only AI recompositions are used
+    // as the Story canvas; the old blurred previews are ignored.
+    storyAssets: (results[3].results as unknown as Asset[]).filter(isRecomposedStory),
     assets: (results[3].results as unknown as Asset[]).filter((a) => !isStoryAdaptation(a)).map((a) => ({
       ...a,
       category: canonicalCategory(a.category, a.approved),
