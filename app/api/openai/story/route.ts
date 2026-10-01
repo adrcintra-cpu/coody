@@ -125,9 +125,23 @@ export async function POST(request: Request) {
     await validateUpload(
       new File([bytes], 'story-9x16.png', { type: 'image/png' }),
     );
-    await bucket().put('brands/' + source.brandId + '/' + storyId, bytes, {
-      httpMetadata: { contentType: 'image/png' },
-    });
+    // The storage refuses to overwrite a key, so an earlier Story for this art
+    // (an older recomposition or the old blurred preview) is removed first.
+    const key = 'brands/' + source.brandId + '/' + storyId;
+    if (await bucket().head(key)) await bucket().delete(key);
+    try {
+      await bucket().put(key, bytes, {
+        httpMetadata: { contentType: 'image/png' },
+      });
+    } catch (e) {
+      // Without the file, drop the row so the Story falls back to the Feed art.
+      await database()
+        .prepare('DELETE FROM brand_assets WHERE id=?')
+        .bind(storyId)
+        .run()
+        .catch(() => {});
+      throw e;
+    }
     const now = new Date().toISOString();
     await database()
       .prepare(
