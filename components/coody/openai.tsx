@@ -18,8 +18,7 @@ export function OpenAIIntegration() {
         </p>
       )}
       <p>
-        Criação de headline, legenda, hashtags e arte a partir da pauta. O Story
-        usa a mesma arte. A nova versão aparece no
+        Criação de headline, legenda, hashtags e arte a partir da pauta. O Story é recomposto em 9:16 a partir desta arte, no Studio. A nova versão aparece no
         Studio em revisão, antes da aprovação. Cobrança pela conta da API
         OpenAI.
       </p>
@@ -67,8 +66,7 @@ export function ImageGenerator({
         placeholder="O briefing e as regras da marca já serão usados. Acrescente uma direção, se desejar."
       />
       <p className="form-hint">
-        Gera textos e uma arte para {formats} (o Story
-        usa a mesma arte) e salva uma nova versão em revisão. Revise a escrita nas artes antes de
+        Gera textos e uma arte para {formats} (o Story é recomposto em 9:16 a partir dela, no Studio) e salva uma nova versão em revisão. Revise a escrita nas artes antes de
         aprovar. Usa os logotipos, referências e PDFs da biblioteca desta marca,
         enviados à OpenAI para orientar a criação. Confira a fidelidade do logo
         antes de aprovar. Cobrança pela API OpenAI.

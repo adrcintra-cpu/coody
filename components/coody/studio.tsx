@@ -42,6 +42,7 @@ import {
   type Status,
 } from '@/lib/types';
 import { sharedAssetUrl } from '@/lib/domain';
+import { IntegrationMissing, useIntegrationStatus } from './integration-status';
 export function Studio({
   state,
   item,
@@ -81,6 +82,8 @@ export function Studio({
   const [approveReference, setApproveReference] = useState(true);
   const [changeModal, setChangeModal] = useState(false);
   const [confirmApproval, setConfirmApproval] = useState(false);
+  const [recomposing, setRecomposing] = useState(false);
+  const openai = useIntegrationStatus('/api/openai');
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState('');
   const brand = state.brands.find((b) => b.id === item.brandId)!;
@@ -153,6 +156,42 @@ export function Studio({
     }
   };
   const sharedAsset = sharedAssetUrl(draft.feedUrl, draft.storyUrl);
+  // Story 9:16 = AI recomposition of this same saved art (story-<source id>).
+  const needsStory = item.format.includes('Story');
+  const recomposedStory =
+    current.storyUrl && current.storyUrl !== current.feedUrl
+      ? current.storyUrl
+      : '';
+  const storyForDraft =
+    recomposedStory && draft.feedUrl === current.feedUrl ? recomposedStory : '';
+  const canvasSrc =
+    format === 'story' && storyForDraft ? storyForDraft : sharedAsset;
+  const recomposeStory = async () => {
+    setRecomposing(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch('/api/openai/story', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contentId: item.id,
+          requestId: crypto.randomUUID(),
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'Falha ao recompor.');
+      await reload();
+      setFormat('story');
+      setNotice(
+        'Story recomposto em 9:16. Revise lado a lado com o Feed antes de aprovar.',
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRecomposing(false);
+    }
+  };
   return (
     <>
       <div className="studio-heading">
@@ -229,8 +268,9 @@ export function Studio({
             <div className={'art-preview ' + format}>
               {sharedAsset ? (
                 <ArtViewer
+                  key={canvasSrc}
                   height={format === 'feed' ? 1350 : 1920}
-                  src={sharedAsset}
+                  src={canvasSrc}
                   alt={'Arte ' + format + ' · versão ' + current.number}
                 />
               ) : (
@@ -294,9 +334,63 @@ export function Studio({
             </p>
           )}
           <p className="form-hint">
-            Feed e Story são a mesma criação e usam a mesma arte, preservando
-            imagem, textos, identidade e conceito.
+            Feed e Story são a mesma criação: o Story é a recomposição em 9:16
+            desta arte, preservando imagem, textos, identidade e conceito.
           </p>
+          {needsStory && sharedAsset && (
+            <section className="story-recompose" aria-live="polite">
+              <h3>Story 9:16</h3>
+              {storyForDraft ? (
+                <>
+                  <p className="form-hint">
+                    Recomposto com IA a partir desta arte. Confira se foto,
+                    textos, logotipo e elementos são os mesmos do Feed.
+                  </p>
+                  <div className="story-compare">
+                    <figure>
+                      <img src={sharedAsset} alt="Arte do Feed" />
+                      <figcaption>Feed · 4:5</figcaption>
+                    </figure>
+                    <figure>
+                      <img src={storyForDraft} alt="Story recomposto" />
+                      <figcaption>Story · 9:16</figcaption>
+                    </figure>
+                  </div>
+                </>
+              ) : (
+                <p className="notice">
+                  Story ainda não recomposto: o formato vertical está mostrando
+                  a arte do Feed.
+                </p>
+              )}
+              {openai.configured === false && <IntegrationMissing name="OpenAI" />}
+              {dirty && !disabled && (
+                <p className="form-hint">
+                  Salve uma nova versão com a arte antes de recompor o Story.
+                </p>
+              )}
+              <button
+                className="outline-btn"
+                disabled={
+                  disabled ||
+                  dirty ||
+                  recomposing ||
+                  openai.checking ||
+                  openai.configured === false
+                }
+                onClick={() => void recomposeStory()}
+              >
+                {recomposing
+                  ? 'Recompondo o Story… (pode levar até 2 minutos)'
+                  : storyForDraft
+                    ? 'Recompor novamente'
+                    : 'Recompor Story com IA'}
+              </button>
+              <p className="form-hint">
+                Usa a API OpenAI e consome créditos a cada recomposição.
+              </p>
+            </section>
+          )}
           {dirty && (
             <p className="notice">
               Salve as alterações dos textos antes de criar outro criativo.

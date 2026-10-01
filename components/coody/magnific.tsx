@@ -20,8 +20,7 @@ export function MagnificIntegration() {
         </p>
       )}
       <p>
-        Gere a arte-base no Studio; o Story usa a mesma
-        arte. Os resultados são salvos para revisão. As APIs usam créditos
+        Gere a arte-base no Studio; o Story é recomposto em 9:16 a partir dela, no Studio. Os resultados são salvos para revisão. As APIs usam créditos
         separados das assinaturas dos aplicativos.
       </p>
       <button
@@ -156,7 +155,7 @@ export function MagnificGenerator({
       <p className="form-hint">
         Formato da arte: {format === 'Feed' ? 'Feed 1080 × 1350' : 'Story 1080 × 1920'}.
         {item.format.includes('Feed') && item.format.includes('Story')
-          ? ' O Story usa esta mesma arte.'
+          ? ' O Story é recomposto em 9:16 a partir desta arte, no Studio.'
           : ''}
       </p>
       <label className="field">

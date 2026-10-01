@@ -237,3 +237,32 @@ void test('relevância de datas compara palavras do segmento', () => {
   assert.ok(isRelevantSegment('Tecnologia, Cafeteria', 'Cafeteria artesanal'));
   assert.ok(!isRelevantSegment('Tecnologia, Comercial', 'Cafeteria artesanal'));
 });
+
+void test('Story recomposto: pedido preserva a mesma criação e marca o arquivo', async () => {
+  const { storyRecomposePrompt, isRecomposedStory, STORY_AI_MARKER, STORY_SIZE } =
+    await import('../lib/story-recompose.ts');
+  const prompt = storyRecomposePrompt({
+    headline: 'Seu primeiro gole de outubro',
+    copy: 'Café coado da casa, feito na hora.',
+    brandName: 'Aurora Café',
+    colors: '#123B32, #F7E9D0',
+    fonts: 'Montserrat',
+  });
+  assert.ok(prompt.includes('"Seu primeiro gole de outubro"'));
+  assert.ok(prompt.includes('"Café coado da casa, feito na hora."'));
+  assert.ok(prompt.includes('9:16'));
+  assert.ok(/mesma imagem principal/.test(prompt));
+  assert.ok(/sem faixas, molduras, bordas desfocadas/.test(prompt));
+  assert.equal(STORY_SIZE, '1152x2048');
+  assert.ok(
+    isRecomposedStory({ id: 'story-abc', description: STORY_AI_MARKER + ' a partir de "x".' }),
+  );
+  // Old blurred previews are never treated as a recomposed Story.
+  assert.ok(
+    !isRecomposedStory({
+      id: 'story-abc',
+      description: 'Adaptação vertical 1080 × 1920 gerada automaticamente a partir de "x".',
+    }),
+  );
+  assert.ok(!isRecomposedStory({ id: 'abc', description: STORY_AI_MARKER }));
+});
