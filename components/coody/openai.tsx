@@ -67,8 +67,9 @@ export function ImageGenerator({
       />
       <p className="form-hint">
         Gera textos e uma arte para {formats} (o Story é recomposto em 9:16 a partir dela, no Studio) e salva uma nova versão em revisão. Revise a escrita nas artes antes de
-        aprovar. Usa os logotipos, referências e PDFs da biblioteca desta marca,
-        enviados à OpenAI para orientar a criação. Confira a fidelidade do logo
+        aprovar. Usa o logo e o manual da marca e os produtos anexados à peça
+        (sem anexos, usa toda a biblioteca da marca), enviados à OpenAI para
+        orientar a criação. Confira a fidelidade do logo
         antes de aprovar. Cobrança pela API OpenAI.
       </p>
       <button

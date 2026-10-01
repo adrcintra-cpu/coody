@@ -59,28 +59,37 @@ export function insert(
     );
 }
 /**
- * Adds the brand lifecycle columns (status, deletedAt) when the database has
- * not received them yet. Runs once per server instance; a column that already
- * exists is ignored, so it is safe alongside any manual migration.
+ * Adds columns the database may not have received yet: the brand lifecycle
+ * (status, deletedAt) and the files attached to a piece (attachments). Runs
+ * once per server instance; a column that already exists is ignored, so it is
+ * safe alongside any manual migration.
  */
+const runtimeColumns: [table: string, column: string, ddl: string][] = [
+  ['brands', 'status', "ALTER TABLE brands ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"],
+  ['brands', 'deletedAt', 'ALTER TABLE brands ADD COLUMN deletedAt TEXT'],
+  ['content_items', 'attachments', "ALTER TABLE content_items ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'"],
+];
 let lifecycleReady: Promise<void> | null = null;
 export function ensureBrandLifecycle() {
   lifecycleReady ??= (async () => {
     const db = database();
-    const columns = (
-      await db.prepare('PRAGMA table_info(brands)').all<{ name: string }>()
-    ).results.map((c) => c.name);
-    for (const [name, ddl] of [
-      ['status', "ALTER TABLE brands ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"],
-      ['deletedAt', 'ALTER TABLE brands ADD COLUMN deletedAt TEXT'],
-    ])
-      if (!columns.includes(name))
+    const columns = new Map<string, string[]>();
+    for (const [table, name, ddl] of runtimeColumns) {
+      if (!columns.has(table))
+        columns.set(
+          table,
+          (
+            await db.prepare(`PRAGMA table_info(${table})`).all<{ name: string }>()
+          ).results.map((c) => c.name),
+        );
+      if (!columns.get(table)!.includes(name))
         await db
           .prepare(ddl)
           .run()
           .catch((e: Error) => {
             if (!/duplicate column/i.test(e.message)) throw e;
           });
+    }
   })().catch((e) => {
     lifecycleReady = null;
     throw e;
@@ -196,7 +205,11 @@ export async function readState(request?: Request): Promise<State> {
       pillars: JSON.parse(b.pillars),
     })),
     deletedBrands: results[7].results as unknown as DeletedBrand[],
-    contents: results[1].results as unknown as Content[],
+    contents: (
+      results[1].results as unknown as (Omit<Content, 'attachments'> & {
+        attachments?: string;
+      })[]
+    ).map((c) => ({ ...c, attachments: parseIds(c.attachments) })),
     versions: (
       results[2].results as unknown as (Omit<Version, 'hashtags'> & {
         hashtags: string;
@@ -244,6 +257,16 @@ export async function readState(request?: Request): Promise<State> {
   };
 }
 
+function parseIds(value: unknown): string[] {
+  try {
+    const list = JSON.parse(typeof value === 'string' ? value : '[]');
+    return Array.isArray(list)
+      ? list.filter((x): x is string => typeof x === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
 export function saveGuidelines(brandId: string, rules: string, now: string) {
   const db = database();
   return [

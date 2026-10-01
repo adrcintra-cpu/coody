@@ -2,6 +2,7 @@
 import { ArtViewer } from './art-viewer';
 import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
+import { AttachmentPicker } from './attachments';
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
@@ -397,6 +398,21 @@ export function Studio({
             </p>
           )}
           <MagnificGenerator key={item.id} state={state} item={item} disabled={disabled || dirty} reload={reload}/>
+          <section className="panel section-space">
+            <h2>Produtos desta peça</h2>
+            <AttachmentPicker
+              key={item.id}
+              state={state}
+              brandId={item.brandId}
+              value={item.attachments || []}
+              disabled={
+                busy ||
+                ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status)
+              }
+              onUploaded={reload}
+              onChange={(ids) => act('setAttachments', { id: item.id, attachments: ids })}
+            />
+          </section>
           <ImageGenerator
             contentId={item.id}
             formats={item.format}

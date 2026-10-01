@@ -53,7 +53,19 @@ export function MagnificGenerator({
   // a Feed; the Story is adapted from it automatically in the Studio.
   const format = item.format.includes('Feed') ? 'Feed' : 'Story';
   const [prompt, setPrompt] = useState(''),
-    [selected, setSelected] = useState<string[]>([]),
+    // Starts with the products attached to the piece (up to 4).
+    [selected, setSelected] = useState<string[]>(() =>
+      (item.attachments || [])
+        .filter((id) =>
+          state.assets.some(
+            (a) =>
+              a.id === id &&
+              a.brandId === item.brandId &&
+              ['image/png', 'image/jpeg', 'image/webp'].includes(a.mime),
+          ),
+        )
+        .slice(0, 4),
+    ),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
     [jobs, setJobs] = useState<Job[]>([]);

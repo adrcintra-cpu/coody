@@ -326,3 +326,38 @@ test('brand trash keeps 30 days and then purges', () => {
   assert.ok('2026-08-31T23:59:59.000Z' < cutoff);
   assert.ok(!('2026-09-02T00:00:00.000Z' < cutoff));
 });
+
+import {
+  validateAttachments,
+  pieceMaterials,
+  MAX_ATTACHMENTS,
+} from '../lib/creative-materials.ts';
+const lib = [
+  { id: 'logo', brandId: 'b', category: 'logo', mime: 'image/png', name: 'Logo principal', aiNotes: '', approved: 0, priority: 0 },
+  { id: 'manual', brandId: 'b', category: 'brandbook', mime: 'application/pdf', name: 'Manual', aiNotes: '', approved: 0, priority: 0 },
+  { id: 'p1', brandId: 'b', category: 'product_photo', mime: 'image/jpeg', name: 'Café Bourbon', aiNotes: '', approved: 0, priority: 0 },
+  { id: 'p2', brandId: 'b', category: 'product_photo', mime: 'image/png', name: 'Café Gourmet', aiNotes: '', approved: 0, priority: 0 },
+  { id: 'ref', brandId: 'b', category: 'visual_reference', mime: 'image/png', name: 'Ref', aiNotes: '', approved: 0, priority: 0 },
+  { id: 'other', brandId: 'x', category: 'product_photo', mime: 'image/png', name: 'Outra marca', aiNotes: '', approved: 0, priority: 0 },
+  { id: 'story-p1', brandId: 'b', category: 'material', mime: 'image/png', name: 'Story', aiNotes: '', approved: 0, priority: 0 },
+];
+test('attachments: only images of the brand, unique, limited', () => {
+  assert.deepEqual(validateAttachments(['p1', 'p1', 'p2'], 'b', lib), ['p1', 'p2']);
+  assert.deepEqual(validateAttachments(undefined, 'b', lib), []);
+  assert.throws(() => validateAttachments(['other'], 'b', lib), /desta marca/);
+  assert.throws(() => validateAttachments(['manual'], 'b', lib), /desta marca/);
+  assert.throws(() => validateAttachments(['story-p1'], 'b', lib), /desta marca/);
+  assert.throws(() => validateAttachments('p1', 'b', lib), /inválidos/);
+  const many = Array.from({ length: MAX_ATTACHMENTS + 1 }, (_, i) => 'p' + i);
+  assert.throws(() => validateAttachments(many, 'b', lib), /até/);
+});
+test('generation sends identity plus only the attached products', () => {
+  const { materials, attached } = pieceMaterials('b', lib, ['p1']);
+  assert.deepEqual(attached.map((a) => a.id), ['p1']);
+  assert.deepEqual(materials.map((a) => a.id).sort(), ['logo', 'manual', 'p1']);
+  // Without attachments: the whole brand library, as before.
+  const all = pieceMaterials('b', lib, []).materials.map((a) => a.id);
+  assert.ok(all.includes('p2') && all.includes('ref') && !all.includes('other'));
+  // Stale ids are ignored.
+  assert.equal(pieceMaterials('b', lib, ['gone']).attached.length, 0);
+});
