@@ -327,6 +327,62 @@ test('brand trash keeps 30 days and then purges', () => {
   assert.ok(!('2026-09-02T00:00:00.000Z' < cutoff));
 });
 
+import {
+  normalizePillars,
+  parseSuggestion,
+  mergeSuggestion,
+  publicSiteUrl,
+  siteText,
+} from '../lib/brand-assist.ts';
+test('brand assist: pillars always add up to 100', () => {
+  const p = normalizePillars([
+    { name: 'Produtos', percent: 40 },
+    { name: 'Dicas', percent: 40 },
+    { name: 'Bastidores', percent: 40 },
+    { name: 'dicas', percent: 10 },
+    { name: '', percent: 10 },
+  ]);
+  assert.equal(p.length, 3);
+  assert.equal(p.reduce((n, x) => n + x.percent, 0), 100);
+  assert.deepEqual(normalizePillars('x'), []);
+});
+test('brand assist fills only empty fields and keeps user choices', () => {
+  const defaults = { pillars: [{ name: 'A', percent: 100 }], monthlyGoal: 12, weeklyGoal: 3 };
+  const brand = {
+    name: 'Café', segment: 'Cafeteria', description: 'Minha descrição', voice: '',
+    products: '', services: '', communicationStyle: '', keywords: '', forbidden: '',
+    direction: '', rules: '', creationNotes: '', colors: '#111111', fonts: '',
+    pillars: defaults.pillars, monthlyGoal: 12, weeklyGoal: 3,
+  };
+  const suggestion = parseSuggestion({
+    description: 'Outra', voice: 'Acolhedor', colors: '#FFFFFF', products: '',
+    pillars: [{ name: 'X', percent: 60 }, { name: 'Y', percent: 40 }],
+    monthlyGoal: 16, weeklyGoal: 99, review: 'Confirme as cores.',
+  });
+  assert.equal(suggestion.weeklyGoal, 3); // out of range → default
+  const { brand: next, filled } = mergeSuggestion(brand, suggestion, defaults);
+  assert.equal(next.description, 'Minha descrição');
+  assert.equal(next.colors, '#111111');
+  assert.equal(next.voice, 'Acolhedor');
+  assert.deepEqual(next.pillars.map((p) => p.name), ['X', 'Y']);
+  assert.equal(next.monthlyGoal, 16);
+  assert.ok(filled.includes('Tom de voz') && !filled.includes('Descrição'));
+  // Pillars already edited by the user are kept.
+  const edited = { ...brand, pillars: [{ name: 'Meu', percent: 100 }] };
+  assert.deepEqual(mergeSuggestion(edited, suggestion, defaults).brand.pillars, edited.pillars);
+});
+test('brand assist reads only public sites', () => {
+  assert.equal(publicSiteUrl('auroracafe.com.br'), 'https://auroracafe.com.br/');
+  assert.equal(publicSiteUrl('http://site.com/sobre#x'), 'http://site.com/sobre');
+  for (const bad of ['http://localhost:3000', 'http://127.0.0.1', 'http://10.0.0.5/', 'ftp://site.com', 'https://user:pw@site.com', 'https://site.com:8080', 'http://[::1]/', 'intranet', 'http://printer.local'])
+    assert.equal(publicSiteUrl(bad), '', bad);
+  const text = siteText('<html><head><title>Aurora &amp; Café</title><meta name="description" content="Cafés especiais"><style>.a{color:#ff0000}</style><script>alert(1)</script></head><body style="background:#1A1A1A"><h1>Grãos</h1><p>Torra média</p></body></html>');
+  assert.match(text, /Título: Aurora & Café/);
+  assert.match(text, /Descrição: Cafés especiais/);
+  assert.match(text, /#1A1A1A/);
+  assert.ok(!text.includes('alert'));
+});
+
 import { validSlackWebhook, maskWebhook, parseEvents, slackMessage } from '../lib/slack.ts';
 test('slack: only incoming webhooks, events and message', () => {
   const ok = 'https://hooks.slack.com/services/T000/B000/abcDEF123';
