@@ -6,7 +6,10 @@ export const metadata: Metadata = {
     'Planejamento editorial, inteligência de marca, produção criativa e aprovação.',
   // App icon: browser tab, home screen (iOS/Android) and installed app.
   icons: {
+    // Browser tab: the official SVG symbol (ICO/PNG for older browsers).
+    // Home screen and installed app keep the purple tile (192/512/apple).
     icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/favicon.ico', sizes: 'any' },
       { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
