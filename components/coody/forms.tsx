@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Picker } from './shared';
+import { AttachmentPicker } from './attachments';
 import { similarTopics } from '@/lib/domain';
 import type { State, Content, Action } from '@/lib/types';
 export function Field({
@@ -83,6 +84,9 @@ export function ContentForm({
       state.brands.find((b) => b.id === brand)?.pillars[0]?.name ||
       '',
   );
+  const [attachments, setAttachments] = useState<string[]>(
+    initial?.attachments || [],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const selected = state.brands.find((b) => b.id === brand);
@@ -112,6 +116,7 @@ export function ContentForm({
               format,
               date: day,
               pillar,
+              attachments,
             });
             onSaved?.(day);
             onClose();
@@ -135,6 +140,8 @@ export function ContentForm({
                 value={brand}
                 onChange={(v) => {
                   setBrand(v);
+                  // Attachments belong to one brand's library.
+                  setAttachments([]);
                   setPillar(
                     state.brands.find((b) => b.id === v)?.pillars[0]?.name ||
                       '',
@@ -212,6 +219,15 @@ export function ContentForm({
         <p className="form-hint">
           Tom de voz: {selected?.voice || 'Ainda não definido'}
         </p>
+        {brand && (
+          <AttachmentPicker
+            state={state}
+            brandId={brand}
+            value={attachments}
+            onChange={setAttachments}
+            disabled={busy}
+          />
+        )}
         {error && (
           <p className="error" role="alert">
             {error}

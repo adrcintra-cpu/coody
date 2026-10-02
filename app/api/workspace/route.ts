@@ -17,6 +17,7 @@ import {
   storyAdaptationUrl,
 } from '@/lib/domain';
 import { isInactive } from '@/lib/brand-lifecycle';
+import { validateAttachments } from '@/lib/creative-materials';
 import { notifySlack } from '@/lib/slack-send';
 import type { SlackEvent } from '@/lib/slack';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
@@ -75,9 +76,13 @@ export async function POST(request: Request) {
     const item = state.contents.find((c) => c.id === data.id);
     if (
       item &&
-      ['editContent', 'saveVersion', 'status', 'deleteContent'].includes(
-        action,
-      ) &&
+      [
+        'editContent',
+        'saveVersion',
+        'status',
+        'deleteContent',
+        'setAttachments',
+      ].includes(action) &&
       data.expectedRevision !== undefined &&
       data.expectedRevision !== (item.revision ?? 0)
     )
@@ -163,6 +168,11 @@ export async function POST(request: Request) {
         throw new Error('Selecione um formato válido.');
       if (!brand.pillars.some((p) => p.name === data.pillar))
         throw new Error('Selecione um pilar válido.');
+      // Product photos chosen for this piece; omitted on edit keeps them.
+      const attachments =
+        data.attachments === undefined
+          ? undefined
+          : validateAttachments(data.attachments, brand.id, state.assets);
       if (action === 'editContent') {
         if (!item) throw new Error('Conteúdo não encontrado.');
         if (item.brandId !== brand.id)
@@ -174,7 +184,7 @@ export async function POST(request: Request) {
         statements.push(
           db
             .prepare(
-              'UPDATE content_items SET title=?, brief=?, objective=?, pillar=?, date=?, format=? WHERE id=?',
+              'UPDATE content_items SET title=?, brief=?, objective=?, pillar=?, date=?, format=?, attachments=? WHERE id=?',
             )
             .bind(
               title,
@@ -183,6 +193,7 @@ export async function POST(request: Request) {
               str(data.pillar),
               date,
               format,
+              JSON.stringify(attachments ?? item.attachments ?? []),
               item.id,
             ),
         );
@@ -198,6 +209,7 @@ export async function POST(request: Request) {
           format,
           status: 'IDEIA',
           createdAt: now,
+          attachments: attachments ?? [],
         };
         statements.push(insert('content_items', content));
         statements.push(
@@ -473,6 +485,22 @@ export async function POST(request: Request) {
           );
         }
       }
+    } else if (action === 'setAttachments') {
+      if (!item) throw new Error('Conteúdo não encontrado.');
+      if (['APROVADO', 'PUBLICADO', 'APROVAÇÃO'].includes(item.status))
+        throw new Error(
+          'Esta pauta está protegida. Solicite alteração antes de trocar os anexos.',
+        );
+      statements.push(
+        db
+          .prepare('UPDATE content_items SET attachments=? WHERE id=?')
+          .bind(
+            JSON.stringify(
+              validateAttachments(data.attachments, item.brandId, state.assets),
+            ),
+            item.id,
+          ),
+      );
     } else if (action === 'deleteContent') {
       if (!item) throw new Error('Conteúdo não encontrado.');
       statements.push(
@@ -547,7 +575,13 @@ export async function POST(request: Request) {
     } else throw new Error('Ação não disponível.');
     if (
       item &&
-      ['editContent', 'saveVersion', 'status', 'deleteContent'].includes(action)
+      [
+        'editContent',
+        'saveVersion',
+        'status',
+        'deleteContent',
+        'setAttachments',
+      ].includes(action)
     ) {
       const expected = data.expectedRevision ?? item.revision ?? 0;
       if (expected !== (item.revision ?? 0))

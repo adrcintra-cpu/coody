@@ -181,6 +181,7 @@ export default function Workspace() {
             'saveVersion',
             'status',
             'deleteContent',
+            'setAttachments',
           ].includes(action)
             ? {
                 expectedRevision:
@@ -205,7 +206,9 @@ export default function Workspace() {
           ? 'Marca movida para a lixeira. Você pode restaurá-la por 30 dias.'
           : action === 'restoreBrand'
             ? 'Marca restaurada.'
-            : action === 'saveVersion'
+            : action === 'setAttachments'
+              ? 'Anexos da peça atualizados.'
+              : action === 'saveVersion'
         ? 'Nova versão salva. O histórico foi preservado.'
         : action === 'status'
           ? 'Status atualizado.'

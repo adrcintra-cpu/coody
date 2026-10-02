@@ -134,6 +134,7 @@ export const contentItems = sqliteTable(
     format: text().notNull(),
     status: text().notNull(),
     createdAt: text().notNull(),
+    attachments: text().notNull().default('[]'),
   },
   (t) => [index('idx_content_brand_date').on(t.brandId, t.date)],
 );

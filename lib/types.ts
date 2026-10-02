@@ -57,6 +57,8 @@ export type DeletedBrand = {
 };
 export type Content = {
   deletedAt?: string | null;
+  /** Library files (product photos) attached to this piece for creation. */
+  attachments?: string[];
   id: string;
   revision?: number;
   brandId: string;
