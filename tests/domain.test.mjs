@@ -326,3 +326,18 @@ test('brand trash keeps 30 days and then purges', () => {
   assert.ok('2026-08-31T23:59:59.000Z' < cutoff);
   assert.ok(!('2026-09-02T00:00:00.000Z' < cutoff));
 });
+
+import { validSlackWebhook, maskWebhook, parseEvents, slackMessage } from '../lib/slack.ts';
+test('slack: only incoming webhooks, events and message', () => {
+  const ok = 'https://hooks.slack.com/services/T000/B000/abcDEF123';
+  assert.equal(validSlackWebhook(' ' + ok + ' '), ok);
+  for (const bad of ['http://hooks.slack.com/services/T/B/x', 'https://evil.com/services/T/B/x', 'https://hooks.slack.com/services/T/B', ok + '?x=1'])
+    assert.equal(validSlackWebhook(bad), '', bad);
+  assert.equal(maskWebhook(ok), 'https://hooks.slack.com/services/…F123');
+  assert.deepEqual(parseEvents('["APROVADO","x","comment"]'), ['APROVADO', 'comment']);
+  assert.deepEqual(parseEvents('lixo'), []);
+  const m = slackMessage({ event: 'ALTERAÇÃO', title: 'Lançamento <café>', brand: 'Aurora', date: '2026-10-20', user: 'André', link: 'https://x.app/#Studio?id=1', comment: 'Trocar a foto\nmais clara' });
+  assert.match(m.text, /\*Em alteração\* · Aurora/);
+  assert.match(m.text, /<https:\/\/x\.app\/#Studio\?id=1\|Lançamento &lt;café&gt;> · publicação em 20\/10\/2026/);
+  assert.match(m.text, /> Trocar a foto\n> mais clara/);
+});
