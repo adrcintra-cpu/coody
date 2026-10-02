@@ -89,7 +89,7 @@ export function LibraryView({
           onClick={() => setEditor('new')}
         >
           <Upload size={17} />
-          Adicionar arquivo
+          Adicionar arquivos
         </button>
       </div>
       <div className="toolbar library-context">
@@ -295,7 +295,49 @@ export function AssetEditor({
   act: Action;
 }) {
   const [brand, setBrand] = useState(brandId);
-  const [file, setFile] = useState<File | null>(null);
+  // New files: several at once, each with its own name and thumbnail.
+  const [files, setFiles] = useState<
+    { id: string; file: File; name: string; preview: string; error?: string }[]
+  >([]);
+  const [preparing, setPreparing] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [uploadedAny, setUploadedAny] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const MAX_BATCH = 20;
+  const addFiles = async (list: File[]) => {
+    if (!list.length) return;
+    if (files.length + list.length > MAX_BATCH) {
+      setError(`Envie até ${MAX_BATCH} arquivos por vez.`);
+      return;
+    }
+    setPreparing(true);
+    setError('');
+    const problems: string[] = [];
+    const ready: typeof files = [];
+    for (const original of list) {
+      try {
+        const file = await fitUpload(original, assetLimitMB);
+        ready.push({
+          id: crypto.randomUUID(),
+          file,
+          name: original.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 200),
+          preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
+        });
+      } catch (e) {
+        problems.push((e as Error).message);
+      }
+    }
+    setFiles((old) => [...old, ...ready]);
+    if (problems.length) setError(problems.join(' '));
+    setPreparing(false);
+  };
+  const removeFile = (id: string) =>
+    setFiles((old) => {
+      const f = old.find((x) => x.id === id);
+      if (f?.preview) URL.revokeObjectURL(f.preview);
+      return old.filter((x) => x.id !== id);
+    });
+  const finish = () => (uploadedAny ? saved(brand) : close());
   const [value, setValue] = useState<AssetFieldsValue>(
     asset
       ? {
@@ -316,9 +358,9 @@ export function AssetEditor({
     <FormModal
       open
       onClose={() => {
-        if (!busy) close();
+        if (!busy) void finish();
       }}
-      title={asset ? 'Detalhes do arquivo' : 'Adicionar arquivo'}
+      title={asset ? 'Detalhes do arquivo' : 'Adicionar arquivos'}
       description="O arquivo pertence a uma única marca. As orientações ajudam a compor seu contexto criativo."
     >
       <form
@@ -336,26 +378,51 @@ export function AssetEditor({
                 ...value,
               });
             } else {
-              if (!file) throw new Error('Selecione o arquivo.');
-              // Large photos are reduced in the browser to fit the limit.
-              const fitted = await fitUpload(file, assetLimitMB);
-              await checkImageFile(fitted);
-              const form = new FormData();
-              form.set('file', fitted);
-              form.set('brandId', brand);
-              Object.entries(value).forEach(([k, v]) => form.set(k, String(v)));
-              const response = await fetch('/api/assets', {
-                method: 'POST',
-                body: form,
-              });
-              const result = (await response.json()) as { error?: string };
-              if (!response.ok) throw new Error(result.error);
+              if (!files.length) throw new Error('Selecione ao menos um arquivo.');
+              // One request per file (hosting limit); failures stay listed.
+              let failed = 0;
+              for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                setProgress(`Enviando ${i + 1} de ${files.length}…`);
+                try {
+                  if (!f.name.trim()) throw new Error('Informe o nome do arquivo.');
+                  await checkImageFile(f.file);
+                  const form = new FormData();
+                  form.set('file', f.file);
+                  form.set('brandId', brand);
+                  Object.entries({ ...value, name: f.name.trim() }).forEach(([k, v]) =>
+                    form.set(k, String(v)),
+                  );
+                  const response = await fetch('/api/assets', {
+                    method: 'POST',
+                    body: form,
+                  });
+                  const result = (await response.json()) as { error?: string };
+                  if (!response.ok) throw new Error(result.error || 'Falha no envio.');
+                  setUploadedAny(true);
+                  removeFile(f.id);
+                } catch (e) {
+                  failed++;
+                  setFiles((old) =>
+                    old.map((x) =>
+                      x.id === f.id ? { ...x, error: (e as Error).message } : x,
+                    ),
+                  );
+                }
+              }
+              if (failed) {
+                setError(
+                  `${files.length - failed} de ${files.length} arquivos enviados. Corrija ou exclua os marcados e envie de novo.`,
+                );
+                return;
+              }
             }
             await saved(brand);
           } catch (e) {
             setError((e as Error).message);
           } finally {
             setBusy(false);
+            setProgress('');
           }
         }}
       >
@@ -379,25 +446,91 @@ export function AssetEditor({
             )}
           </Field>
           {!asset && (
-            <Field label="Arquivo">
-              <Input
-                type="file"
-                required
-                accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f && f.size > assetLimitMB * 1024 * 1024 && !['image/png','image/jpeg','image/webp'].includes(f.type)) { setError(`Envie um arquivo de até ${assetLimitMB} MB.`); e.target.value = ''; setFile(null); return; }
-                  setError('');
-                  setFile(f || null);
-                  if (f && !value.name) setValue({ ...value, name: f.name });
+            <>
+              <label
+                className={'drop-zone' + (dragging ? ' dragging' : '')}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragging(true);
                 }}
-              />
-              <small className="muted">
-                PDF, SVG, PNG, JPG e WEBP · até {assetLimitMB} MB
-              </small>
-            </Field>
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragging(false);
+                  void addFiles(Array.from(e.dataTransfer.files));
+                }}
+              >
+                <strong>Arraste arquivos aqui ou clique para escolher</strong>
+                <small className="muted">
+                  Vários de uma vez (até {MAX_BATCH}) · PDF, SVG, PNG, JPG e
+                  WEBP · até {assetLimitMB} MB cada (fotos maiores são
+                  reduzidas automaticamente)
+                </small>
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files || []) as File[];
+                    e.target.value = '';
+                    void addFiles(list);
+                  }}
+                />
+              </label>
+              {preparing && <p className="form-hint">Preparando arquivos…</p>}
+              {!!files.length && (
+                <ul className="upload-list">
+                  {files.map((f) => (
+                    <li key={f.id} className={f.error ? 'failed' : ''}>
+                      {f.preview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={f.preview} alt="" />
+                      ) : (
+                        <span className="upload-icon">
+                          {f.file.name.split('.').pop()?.toUpperCase()}
+                        </span>
+                      )}
+                      <div>
+                        <Input
+                          aria-label={'Nome de ' + f.file.name}
+                          maxLength={200}
+                          value={f.name}
+                          onChange={(e) =>
+                            setFiles((old) =>
+                              old.map((x) =>
+                                x.id === f.id ? { ...x, name: e.target.value } : x,
+                              ),
+                            )
+                          }
+                        />
+                        <small className="muted">
+                          {(f.file.size / 1024 / 1024).toFixed(1)} MB
+                          {f.error ? ' · ' : ''}
+                        </small>
+                        {f.error && <small className="error">{f.error}</small>}
+                      </div>
+                      <button
+                        type="button"
+                        className="outline-btn"
+                        aria-label={'Excluir ' + f.file.name}
+                        onClick={() => removeFile(f.id)}
+                      >
+                        Excluir
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {files.length > 1 && (
+                <p className="form-hint">
+                  Categoria, descrição e observação abaixo valem para todos os
+                  arquivos desta leva.
+                </p>
+              )}
+            </>
           )}
-          <AssetFields value={value} onChange={setValue} />
+          <AssetFields value={value} onChange={setValue} hideName={!asset} />
           <p className="form-hint">
             Papel no contexto: {categoryInfo(value.category).role}.
           </p>
@@ -412,16 +545,21 @@ export function AssetEditor({
             disabled={busy}
             type="button"
             className="outline-btn"
-            onClick={close}
+            onClick={() => void finish()}
           >
-            Cancelar
+            {uploadedAny ? 'Fechar' : 'Cancelar'}
           </button>
-          <button disabled={busy} className="create-btn">
+          <button
+            disabled={busy || preparing || (!asset && !files.length)}
+            className="create-btn"
+          >
             {busy
-              ? 'Salvando…'
+              ? progress || 'Salvando…'
               : asset
                 ? 'Salvar detalhes'
-                : 'Adicionar à biblioteca'}
+                : files.length > 1
+                  ? `Adicionar ${files.length} arquivos`
+                  : 'Adicionar à biblioteca'}
           </button>
         </div>
       </form>

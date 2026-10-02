@@ -23,22 +23,27 @@ export function AssetFields({
   value,
   onChange,
   prefix = 'asset',
+  hideName = false,
 }: {
   value: AssetFieldsValue;
   onChange: (v: AssetFieldsValue) => void;
   prefix?: string;
+  /** Several files at once: each keeps its own name in the file list. */
+  hideName?: boolean;
 }) {
   return (
     <>
       <div className="form-grid">
-        <Field label="Nome">
-          <Input
-            required
-            maxLength={200}
-            value={value.name}
-            onChange={(e) => onChange({ ...value, name: e.target.value })}
-          />
-        </Field>
+        {!hideName && (
+          <Field label="Nome">
+            <Input
+              required
+              maxLength={200}
+              value={value.name}
+              onChange={(e) => onChange({ ...value, name: e.target.value })}
+            />
+          </Field>
+        )}
         <Field label="Categoria">
           <Picker
             label="Categoria do arquivo"
