@@ -1104,6 +1104,13 @@ small {
 .invite-link-row{display:flex;gap:8px}
 .invite-link-row .outline-btn{display:inline-flex;align-items:center;gap:6px;flex:none}
 .role-notice{margin-bottom:16px}
+.library-select-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:8px 0 14px}
+.library-select-bar .outline-btn{display:inline-flex;align-items:center;gap:6px}
+.asset-card{position:relative}
+.asset-card.picked{outline:2px solid #e6a3a8}
+.asset-pick{position:absolute;top:10px;left:10px;z-index:2;background:#16121bcc;border-radius:6px;padding:6px;display:flex}
+.asset-pick input{width:18px;height:18px}
+.asset-title .text-btn.danger{color:#e6a3a8}
 .brand-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

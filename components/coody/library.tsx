@@ -11,7 +11,17 @@ import {
   Check,
   ArrowUpRight,
   Pencil,
+  Trash2,
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { Picker, NoData } from './shared';
@@ -48,6 +58,44 @@ export function LibraryView({
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [editor, setEditor] = useState<Asset | 'new' | null>(null);
+  // Removing files: one from its card, or several in selection mode.
+  const canEdit = can(state.user?.role, 'edit');
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [confirmIds, setConfirmIds] = useState<string[] | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removal, setRemoval] = useState<{
+    removed: string[];
+    kept: { name: string; reason: string }[];
+    error?: string;
+  } | null>(null);
+  const togglePick = (id: string) =>
+    setPicked((old) => (old.includes(id) ? old.filter((x) => x !== id) : [...old, id]));
+  const removeFiles = async (ids: string[]) => {
+    setRemoving(true);
+    try {
+      const r = await fetch('/api/assets', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+      const d = (await r.json()) as {
+        removed?: string[];
+        kept?: { name: string; reason: string }[];
+        error?: string;
+      };
+      if (!r.ok) throw new Error(d.error || 'Não foi possível excluir.');
+      setRemoval({ removed: d.removed || [], kept: d.kept || [] });
+      setPicked([]);
+      setPicking(false);
+      await reload();
+    } catch (e) {
+      setRemoval({ removed: [], kept: [], error: (e as Error).message });
+    } finally {
+      setRemoving(false);
+      setConfirmIds(null);
+    }
+  };
   const items = state.assets
     .filter(
       (a) =>
@@ -178,10 +226,85 @@ export function LibraryView({
           </button>
         </p>
       )}
+      {removal && (
+        <div className={'notice' + (removal.error || removal.kept.length ? ' error' : '')} role="status">
+          {removal.error ? (
+            <p>{removal.error}</p>
+          ) : (
+            <>
+              {!!removal.removed.length && (
+                <p>
+                  {removal.removed.length === 1
+                    ? '1 arquivo excluído.'
+                    : `${removal.removed.length} arquivos excluídos.`}
+                </p>
+              )}
+              {removal.kept.map((k) => (
+                <p key={k.name}>
+                  <strong>{k.name}</strong> não foi excluído: {k.reason}. Troque a
+                  arte dessa peça ou exclua a peça antes.
+                </p>
+              ))}
+            </>
+          )}
+          <button className="text-btn" onClick={() => setRemoval(null)}>
+            Fechar
+          </button>
+        </div>
+      )}
+      {canEdit && items.length > 0 && (
+        <div className="library-select-bar">
+          {picking ? (
+            <>
+              <span>{picked.length} selecionado(s)</span>
+              <button
+                className="text-btn"
+                onClick={() =>
+                  setPicked(picked.length === items.length ? [] : items.map((a) => a.id))
+                }
+              >
+                {picked.length === items.length ? 'Limpar seleção' : 'Selecionar todos'}
+              </button>
+              <button
+                className="outline-btn danger"
+                disabled={!picked.length || removing}
+                onClick={() => setConfirmIds(picked)}
+              >
+                <Trash2 size={15} /> Excluir selecionados
+              </button>
+              <button
+                className="text-btn"
+                onClick={() => {
+                  setPicking(false);
+                  setPicked([]);
+                }}
+              >
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <button className="text-btn" onClick={() => setPicking(true)}>
+              Selecionar arquivos para excluir
+            </button>
+          )}
+        </div>
+      )}
       {items.length ? (
         <div className="asset-grid">
           {items.map((a) => (
-            <article className="asset-card" key={a.id}>
+            <article
+              className={'asset-card' + (picked.includes(a.id) ? ' picked' : '')}
+              key={a.id}
+            >
+              {picking && (
+                <label className="asset-pick" aria-label={'Selecionar ' + a.name}>
+                  <input
+                    type="checkbox"
+                    checked={picked.includes(a.id)}
+                    onChange={() => togglePick(a.id)}
+                  />
+                </label>
+              )}
               <a
                 href={a.url}
                 target="_blank"
@@ -211,6 +334,16 @@ export function LibraryView({
                   >
                     <Pencil size={14} />
                   </button>
+                  {canEdit && (
+                    <button
+                      className="text-btn danger"
+                      aria-label={'Excluir ' + a.name}
+                      title="Excluir arquivo"
+                      onClick={() => setConfirmIds([a.id])}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
                 <p>
                   {categoryInfo(a.category, a.approved).label} ·{' '}
@@ -259,6 +392,35 @@ export function LibraryView({
           }
         />
       )}
+      <AlertDialog
+        open={!!confirmIds}
+        onOpenChange={(open) => !open && !removing && setConfirmIds(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmIds?.length === 1
+                ? `Excluir “${state.assets.find((a) => a.id === confirmIds[0])?.name || 'arquivo'}”?`
+                : `Excluir ${confirmIds?.length || 0} arquivos?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Os arquivos saem da biblioteca e deixam de ser usados pela IA. Isso
+              não pode ser desfeito. Arquivos usados na arte de alguma peça são
+              mantidos e listados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>Cancelar</AlertDialogCancel>
+            <button
+              className="create-btn danger-btn"
+              disabled={removing}
+              onClick={() => confirmIds && void removeFiles(confirmIds)}
+            >
+              {removing ? 'Excluindo…' : 'Excluir'}
+            </button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {editor && (
         <AssetEditor
           initialCategory={category === 'all' ? 'material' : category}
