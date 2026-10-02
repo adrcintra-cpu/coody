@@ -1071,6 +1071,13 @@ small {
 .brand-assist-result p{margin:0 0 6px}
 .slack-events{display:flex;flex-direction:column;gap:6px;margin:12px 0;border:0;padding:0}
 .slack-events legend{font-weight:600;margin-bottom:6px}
+.pending-asset .section-head h3{display:flex;align-items:center;gap:10px;min-width:0}
+.pending-asset .section-head h3 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pending-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none;background:#0f0c12}
+.pending-remove{display:inline-flex;align-items:center;gap:6px;flex:none}
+.pending-summary span{display:flex;align-items:center;gap:10px;min-width:0}
+.pending-summary .pending-thumb{width:32px;height:32px}
+.pending-summary strong{display:inline-flex;align-items:center;gap:8px}
 .brand-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

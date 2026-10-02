@@ -1,7 +1,7 @@
 'use client';
-import { assetLimitMB, onboardingLimitMB } from '@/lib/upload-limits';
+import { assetLimitMB } from '@/lib/upload-limits';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Check, FileText, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,7 +13,7 @@ import {
   type AssetFieldsValue,
 } from './asset-fields';
 import { categoryInfo } from '@/lib/brand-memory';
-import { checkImageFile } from '@/lib/client-upload';
+import { checkImageFile, fitUpload } from '@/lib/client-upload';
 import { useDiscardGuard } from './discard-guard';
 import { BrandAssist } from './brand-assist';
 import type { Brand } from '@/lib/types';
@@ -49,7 +49,12 @@ type PendingAsset = AssetFieldsValue & {
   id: string;
   file: File;
   step: 'identity' | 'references';
+  /** Thumbnail for images (object URL, revoked on removal). */
+  preview: string;
+  /** Library id once uploaded (a retry skips it). */
+  uploadedId?: string;
 };
+const MAX_FILES = 20;
 const steps = [
   'Informações',
   'Identidade',
@@ -70,6 +75,20 @@ export function BrandOnboarding({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const requestId = useRef('');
+  const [adding, setAdding] = useState(false);
+  const [progress, setProgress] = useState('');
+  // Brand created but some files failed: list them instead of closing.
+  const [partial, setPartial] = useState<{ id: string; failed: string[] } | null>(null);
+  const previews = useRef<string[]>([]);
+  useEffect(
+    () => () => previews.current.forEach((u) => URL.revokeObjectURL(u)),
+    [],
+  );
+  const remove = (id: string) => {
+    const f = files.find((a) => a.id === id);
+    if (f?.preview) URL.revokeObjectURL(f.preview);
+    setFiles((list) => list.filter((a) => a.id !== id));
+  };
   const guard = useDiscardGuard(
     files.length > 0 || JSON.stringify(brand) !== JSON.stringify(newBrand),
     busy,
@@ -90,36 +109,43 @@ export function BrandOnboarding({
   const changeStep = (i: number) => {
     if (!busy && (i === 0 || valid())) setStep(i);
   };
-  const add = (list: FileList | null, category: string, label: string) => {
-    if (!list) return;
+  // Each file is uploaded on its own after the brand is created, so there is
+  // no total limit; large photos are reduced in the browser to fit.
+  const add = async (list: FileList | null, category: string, label: string) => {
+    if (!list?.length) return;
     const additions = Array.from(list);
-    const count = files.length + additions.length;
-    const total = [...files.map((f) => f.file), ...additions].reduce(
-      (n, f) => n + f.size,
-      0,
-    );
-    if (
-      count > 12 ||
-      total > onboardingLimitMB * 1024 * 1024 ||
-      additions.some((f) => f.size > assetLimitMB * 1024 * 1024)
-    ) {
-      setError(
-        `Use até 12 arquivos, ${assetLimitMB} MB por arquivo e ${onboardingLimitMB} MB no total. Você pode adicionar mais depois na Biblioteca.`,
-      );
+    if (files.length + additions.length > MAX_FILES) {
+      setError(`Use até ${MAX_FILES} arquivos no cadastro. Você pode adicionar mais depois na Biblioteca.`);
       return;
     }
-    setFiles([
-      ...files,
-      ...additions.map((file) => ({
-        ...emptyAssetFields,
-        id: crypto.randomUUID(),
-        file,
-        category,
-        name: label ? label + ' — ' + file.name : file.name,
-        step: section as PendingAsset['step'],
-      })),
-    ]);
+    setAdding(true);
     setError('');
+    const accepted: PendingAsset[] = [];
+    const problems: string[] = [];
+    for (const original of additions) {
+      try {
+        const file = await fitUpload(original, assetLimitMB);
+        const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
+        if (preview) previews.current.push(preview);
+        accepted.push({
+          ...emptyAssetFields,
+          id: crypto.randomUUID(),
+          file,
+          preview,
+          category,
+          name: (label && label !== 'Adicionar referências'
+            ? label + ' — ' + original.name
+            : original.name
+          ).slice(0, 200),
+          step: section as PendingAsset['step'],
+        });
+      } catch (e) {
+        problems.push((e as Error).message);
+      }
+    }
+    setFiles((old) => [...old, ...accepted]);
+    if (problems.length) setError(problems.join(' '));
+    setAdding(false);
   };
   const upload = (label: string, category: string, multiple = true) => (
     <Field key={label} label={label}>
@@ -127,10 +153,15 @@ export function BrandOnboarding({
         type="file"
         accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
         multiple={multiple}
-        disabled={busy}
+        disabled={busy || adding}
         onChange={(e) => {
-          add(e.target.files, category, label);
+          const list = e.target.files;
+          // Copy before clearing: the FileList is live.
+          const copy = list ? (Array.from(list) as File[]) : [];
           e.target.value = '';
+          const dt = new DataTransfer();
+          copy.forEach((f) => dt.items.add(f));
+          void add(dt.files, category, label);
         }}
       />
     </Field>
@@ -163,27 +194,17 @@ export function BrandOnboarding({
             }
             if (!valid()) return;
             setBusy(true);
+            setError('');
             try {
               requestId.current ||= crypto.randomUUID();
               for (const asset of files) await checkImageFile(asset.file);
+              // 1) The brand itself (no files: they go one by one below).
+              setProgress('Salvando a marca…');
               const form = new FormData();
               form.set(
                 'payload',
-                JSON.stringify({
-                  id: requestId.current,
-                  brand,
-                  assets: files.map(
-                    ({ name, category, description, aiNotes, priority }) => ({
-                      name,
-                      category,
-                      description,
-                      aiNotes,
-                      priority,
-                    }),
-                  ),
-                }),
+                JSON.stringify({ id: requestId.current, brand, assets: [] }),
               );
-              files.forEach((f) => form.append('files', f.file));
               const response = await fetch('/api/brands', {
                 method: 'POST',
                 body: form,
@@ -193,11 +214,38 @@ export function BrandOnboarding({
                 error?: string;
               };
               if (!response.ok) throw new Error(result.error);
-              await created(result.id);
+              // 2) Each file in its own request (within the hosting limit).
+              const failed: string[] = [];
+              const pending = files.filter((f) => !f.uploadedId);
+              for (let i = 0; i < pending.length; i++) {
+                const f = pending[i];
+                setProgress(`Enviando arquivo ${i + 1} de ${pending.length}…`);
+                try {
+                  const body = new FormData();
+                  body.set('file', f.file);
+                  body.set('brandId', result.id);
+                  body.set('name', f.name);
+                  body.set('category', f.category);
+                  body.set('description', f.description);
+                  body.set('aiNotes', f.aiNotes);
+                  body.set('priority', String(f.priority));
+                  const r = await fetch('/api/assets', { method: 'POST', body });
+                  const data = (await r.json()) as { id?: string; error?: string };
+                  if (!r.ok || !data.id) throw new Error(data.error || 'falha no envio');
+                  setFiles((list) =>
+                    list.map((a) => (a.id === f.id ? { ...a, uploadedId: data.id } : a)),
+                  );
+                } catch (e) {
+                  failed.push(`${f.file.name} (${(e as Error).message})`);
+                }
+              }
+              if (failed.length) setPartial({ id: result.id, failed });
+              else await created(result.id);
             } catch (e) {
               setError((e as Error).message);
             } finally {
               setBusy(false);
+              setProgress('');
             }
           }}
         >
@@ -309,25 +357,43 @@ export function BrandOnboarding({
             {(step === 1 || step === 2) && (
               <>
                 <p className="form-hint">
-                  {files.length} / 12 arquivos · {assetLimitMB} MB por arquivo · {onboardingLimitMB} MB por
-                  cadastro
+                  {files.length} / {MAX_FILES} arquivos · até {assetLimitMB} MB
+                  por arquivo (fotos maiores são reduzidas automaticamente)
+                  {adding ? ' · preparando arquivos…' : ''}
                 </p>
+                {error && (
+                  <p className="error" role="alert">
+                    {error}
+                  </p>
+                )}
+                {!visible.length && !adding && (
+                  <p className="muted">Nenhum arquivo adicionado nesta etapa.</p>
+                )}
                 {visible.map((f) => (
                   <section className="pending-asset" key={f.id}>
                     <div className="section-head">
                       <h3>
-                        <FileText size={16} />
-                        {f.file.name}
+                        {f.preview ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="pending-thumb" src={f.preview} alt="" />
+                        ) : (
+                          <FileText size={16} />
+                        )}
+                        <span>
+                          {f.file.name}
+                          <small className="muted">
+                            {' '}
+                            · {(f.file.size / 1024 / 1024).toFixed(1)} MB
+                          </small>
+                        </span>
                       </h3>
                       <button
                         type="button"
-                        aria-label={'Remover ' + f.file.name}
-                        className="text-btn"
-                        onClick={() =>
-                          setFiles(files.filter((a) => a.id !== f.id))
-                        }
+                        aria-label={'Excluir ' + f.file.name}
+                        className="outline-btn pending-remove"
+                        onClick={() => remove(f.id)}
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={15} /> Excluir
                       </button>
                     </div>
                     <AssetFields
@@ -396,9 +462,28 @@ export function BrandOnboarding({
                   </strong>
                 </div>
                 {files.map((f) => (
-                  <div className="detail-line" key={f.id}>
-                    <span>{f.name}</span>
-                    <strong>{categoryInfo(f.category).label}</strong>
+                  <div className="detail-line pending-summary" key={f.id}>
+                    <span>
+                      {f.preview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="pending-thumb" src={f.preview} alt="" />
+                      ) : (
+                        <FileText size={16} />
+                      )}
+                      {f.name}
+                    </span>
+                    <strong>
+                      {categoryInfo(f.category).label}
+                      <button
+                        type="button"
+                        className="text-btn"
+                        aria-label={'Excluir ' + f.file.name}
+                        disabled={busy}
+                        onClick={() => remove(f.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </strong>
                   </div>
                 ))}
                 <div className="detail-line">
@@ -413,10 +498,32 @@ export function BrandOnboarding({
               </section>
             )}
           </fieldset>
-          {error && (
+          {error && step !== 1 && step !== 2 && (
             <p className="error" role="alert">
               {error}
             </p>
+          )}
+          {partial && (
+            <div className="notice error" role="alert">
+              <p>
+                <strong>A marca foi criada</strong>, mas{' '}
+                {partial.failed.length === 1
+                  ? 'um arquivo não foi enviado'
+                  : `${partial.failed.length} arquivos não foram enviados`}
+                : {partial.failed.join('; ')}.
+              </p>
+              <p>
+                Tente “Finalizar cadastro” de novo para reenviar só os que
+                faltam, ou siga para a marca e adicione depois na Biblioteca.
+              </p>
+              <button
+                type="button"
+                className="outline-btn"
+                onClick={() => created(partial.id)}
+              >
+                Ir para a marca
+              </button>
+            </div>
           )}
           <div className="form-actions">
             <button
@@ -432,7 +539,7 @@ export function BrandOnboarding({
             </button>
             <button disabled={busy} className="create-btn">
               {busy
-                ? 'Salvando marca…'
+                ? progress || 'Salvando marca…'
                 : step === 4
                   ? 'Finalizar cadastro'
                   : 'Continuar'}
