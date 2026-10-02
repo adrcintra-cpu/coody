@@ -15,6 +15,7 @@ import {
 import { categoryInfo } from '@/lib/brand-memory';
 import { checkImageFile } from '@/lib/client-upload';
 import { useDiscardGuard } from './discard-guard';
+import { BrandAssist } from './brand-assist';
 import type { Brand } from '@/lib/types';
 export const newBrand: Brand = {
   id: '',
@@ -258,6 +259,13 @@ export function BrandOnboarding({
                     />
                   </Field>
                 ))}
+                <BrandAssist
+                  brand={brand}
+                  onChange={setBrand}
+                  defaults={newBrand}
+                  files={files}
+                  hint="Com nome, segmento e, se tiver, site e anotações, a IA sugere descrição, produtos, tom de voz, regras, cores e pilares. Ela só preenche campos vazios, inclusive das próximas etapas, e nada é salvo antes de você finalizar."
+                />
               </>
             )}
             {step === 1 && (
@@ -339,6 +347,13 @@ export function BrandOnboarding({
             )}
             {step === 3 && (
               <>
+                <BrandAssist
+                  brand={brand}
+                  onChange={setBrand}
+                  defaults={newBrand}
+                  files={files}
+                  hint="Agora a IA também lê o manual e os logos enviados na etapa Identidade para sugerir as regras, cores e fontes que ainda estão vazias."
+                />
                 {[
                   ['voice', 'Tom de voz'],
                   ['direction', 'Direção visual'],
