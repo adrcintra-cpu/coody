@@ -1,10 +1,11 @@
 import { activeWorkspace } from '@/lib/workspaces';
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { bucket, database, ensureBrandLifecycle, insert } from '@/lib/repository';
 import { validateUpload, assetRecord, limitedForm } from '@/lib/asset-upload';
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
+  { const denied = forbid(user, 'edit'); if (denied) return denied; }
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin

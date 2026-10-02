@@ -3,7 +3,7 @@ import { authorize } from '@/lib/auth';
 import { database, readState } from '@/lib/repository';
 import { statusLabels, type Status } from '@/lib/types';
 export async function GET(request:Request){
- const user=authorize(request);if(user instanceof Response)return user;
+ const user=await authorize(request);if(user instanceof Response)return user;
  try {
  const state=activeState(await readState(request));
  const alerts=await database().prepare('SELECT * FROM api_alerts WHERE workspaceId=? ORDER BY createdAt DESC LIMIT 20').bind(state.workspace!.id).all<{id:string;provider:string;message:string;createdAt:string}>();
@@ -14,7 +14,7 @@ export async function GET(request:Request){
  }catch{return Response.json({error:'Não foi possível carregar notificações.'},{status:503});}
 }
 export async function POST(request:Request){
- const user=authorize(request);if(user instanceof Response)return user;
+ const user=await authorize(request);if(user instanceof Response)return user;
  if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return new Response(null,{status:403});
  try{const {ids}=await request.json() as {ids:string[]};if(!Array.isArray(ids)||ids.length>50||ids.some(id=>typeof id!=='string'||id.length>150))throw new Error();
  if(ids.length)await database().batch(ids.map(id=>database().prepare('INSERT OR IGNORE INTO notification_reads (id,userId,notificationId) VALUES (?,?,?)').bind(user.id+':'+id,user.id,id)));

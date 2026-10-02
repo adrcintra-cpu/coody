@@ -1,6 +1,6 @@
 import { activeState } from '@/lib/brand-lifecycle';
 import {env} from 'cloudflare:workers';
-import {authorize} from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import {readState} from '@/lib/repository';
 import {planProposal} from '@/lib/domain';
 import {openaiRequest,OpenAIError} from '@/lib/openai-client';
@@ -8,8 +8,9 @@ import {parsePlanning,planningSchema} from '@/lib/ai-planning';
 import {apiAlert} from '@/lib/workspaces';
 import type {Plan} from '@/lib/types';
 export async function POST(request:Request){
- const user=authorize(request);if(user instanceof Response)return user;
+ const user=await authorize(request);if(user instanceof Response)return user;
  if(request.headers.get('origin')&&request.headers.get('origin')!==new URL(request.url).origin)return new Response(null,{status:403});
+  { const denied = forbid(user, 'edit'); if (denied) return denied; }
  try{
  if(Number(request.headers.get('content-length'))>20000)throw new Error('Solicitação muito grande.');
  const plan=await request.json() as Plan;

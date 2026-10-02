@@ -10,6 +10,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { ProfilePhoto } from './profile-photo';
+import { can } from '@/lib/permissions';
 import type { State } from '@/lib/types';
 export function WorkspaceMenu({
   state,
@@ -18,6 +19,7 @@ export function WorkspaceMenu({
   state: State | null;
   reload: () => Promise<void>;
 }) {
+  const canManage = can(state?.user?.role, 'manage');
   const [open, setOpen] = useState(false),
     [name, setName] = useState(''),
     [newName, setNewName] = useState(''),
@@ -98,6 +100,9 @@ export function WorkspaceMenu({
               </button>
             ))}
           </div>
+          {/* Renaming, the workspace photo and new workspaces: administrators only. */}
+          {canManage && (
+            <>
           <label className="field">
             Nome do workspace atual
             <input
@@ -142,6 +147,8 @@ export function WorkspaceMenu({
               Criar workspace
             </button>
           </form>
+            </>
+          )}
           {error && <output aria-live="polite">{error}</output>}
         </DialogContent>
       </Dialog>

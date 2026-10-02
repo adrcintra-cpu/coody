@@ -17,12 +17,13 @@ import {
   storyAdaptationUrl,
 } from '@/lib/domain';
 import { isInactive } from '@/lib/brand-lifecycle';
+import { actionPermission, can, deniedMessage } from '@/lib/permissions';
 import { validateAttachments } from '@/lib/creative-materials';
 import { notifySlack } from '@/lib/slack-send';
 import type { SlackEvent } from '@/lib/slack';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   try {
     const profile = await database()
@@ -53,7 +54,7 @@ const conflictMessage =
   'Esta pauta mudou em outra aba. Atualize os dados e revise antes de tentar novamente.';
 class ConflictError extends Error {}
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   if (
     request.headers.get('origin') &&
@@ -87,6 +88,11 @@ export async function POST(request: Request) {
       data.expectedRevision !== (item.revision ?? 0)
     )
       throw new ConflictError(conflictMessage);
+    // Role: approvers comment and decide; editors create; admins manage.
+    {
+      const permission = actionPermission(action, data, item?.status);
+      if (!can(user.role, permission)) throw new Error(deniedMessage(permission));
+    }
     // An inactive brand keeps its data but takes part in no creation flow
     // until it is reactivated.
     const owner = brand || state.brands.find((b) => b.id === item?.brandId);

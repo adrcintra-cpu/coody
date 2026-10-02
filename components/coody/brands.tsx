@@ -27,6 +27,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Field, FormModal } from './forms';
 import { BrandOnboarding } from './brand-onboarding';
 import { BrandAssist } from './brand-assist';
+import { can } from '@/lib/permissions';
 import { LibraryView } from './library';
 import { Planning } from './planning';
 import { Contents } from './contents';
@@ -49,6 +50,8 @@ export function Brands({
   create: (date?: string, brandId?: string) => void;
 }) {
   const [onboarding, setOnboarding] = useState(false);
+  const canEdit = can(state.user?.role, 'edit');
+  const canManage = can(state.user?.role, 'manage');
   const route = () =>
     new URLSearchParams(
       typeof window === 'undefined'
@@ -144,7 +147,7 @@ export function Brands({
           </p>
         </div>
         <div className="brand-actions">
-          {b && (
+          {b && canManage && (
             <>
               <button
                 className="outline-btn"
@@ -165,13 +168,15 @@ export function Brands({
               </button>
             </>
           )}
-          <button
-            className="create-btn"
-            onClick={() => (b ? setEditing(b) : setOnboarding(true))}
-          >
-            <Plus size={17} />
-            {b ? 'Editar marca' : 'Adicionar marca'}
-          </button>
+          {canEdit && (
+            <button
+              className="create-btn"
+              onClick={() => (b ? setEditing(b) : setOnboarding(true))}
+            >
+              <Plus size={17} />
+              {b ? 'Editar marca' : 'Adicionar marca'}
+            </button>
+          )}
         </div>
       </div>
       {lifecycleError && !statusTarget && !deleteTarget && (

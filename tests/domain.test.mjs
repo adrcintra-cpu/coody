@@ -432,3 +432,18 @@ test('generation sends identity plus only the attached products', () => {
   // Stale ids are ignored.
   assert.equal(pieceMaterials('b', lib, ['gone']).attached.length, 0);
 });
+
+import { can, actionPermission, isRole } from '../lib/permissions.ts';
+test('roles: admin manages, editor creates, approver decides', () => {
+  assert.ok(can('ADMINISTRADOR', 'manage') && can('ADMINISTRADOR', 'approve'));
+  assert.ok(can('EDITOR', 'edit') && !can('EDITOR', 'approve') && !can('EDITOR', 'manage'));
+  assert.ok(can('APROVADOR', 'approve') && can('APROVADOR', 'comment') && !can('APROVADOR', 'edit'));
+  assert.ok(!can(undefined, 'comment') && !isRole('DONO'));
+  assert.equal(actionPermission('comment', {}), 'comment');
+  assert.equal(actionPermission('status', { status: 'APROVADO' }, 'APROVAÇÃO'), 'approve');
+  assert.equal(actionPermission('status', { status: 'ALTERAÇÃO' }, 'APROVAÇÃO'), 'approve');
+  assert.equal(actionPermission('status', { status: 'APROVAÇÃO' }, 'REVISÃO'), 'edit');
+  assert.equal(actionPermission('status', { status: 'PUBLICADO' }, 'APROVADO'), 'edit');
+  assert.equal(actionPermission('deleteBrand', {}), 'manage');
+  assert.equal(actionPermission('saveVersion', {}), 'edit');
+});

@@ -1,4 +1,4 @@
-import { activeWorkspace } from './workspaces';
+import { activeWorkspace, allowedWorkspaceIds } from './workspaces';
 import { env } from 'cloudflare:workers';
 import { canonicalCategory } from './brand-memory';
 import { isStoryAdaptation, storyAdaptationUrl } from './domain';
@@ -194,7 +194,11 @@ export async function readState(request?: Request): Promise<State> {
   );
   return {
     workspace,
-    workspaces: (await db.prepare('SELECT id,name,avatarUrl FROM workspaces ORDER BY createdAt,id').all()).results as {id:string;name:string;avatarUrl:string}[],
+    workspaces: await (async () => {
+      const all = (await db.prepare('SELECT id,name,avatarUrl FROM workspaces ORDER BY createdAt,id').all()).results as {id:string;name:string;avatarUrl:string}[];
+      const allowed = await allowedWorkspaceIds(request);
+      return allowed ? all.filter((w) => allowed.includes(w.id)) : all;
+    })(),
     brands: (
       results[0].results as unknown as (Omit<Brand, 'pillars'> & {
         pillars: string;
