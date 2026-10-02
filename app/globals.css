@@ -1061,6 +1061,8 @@ small {
 .back {
   margin-bottom: 24px;
 }
+.slack-events{display:flex;flex-direction:column;gap:6px;margin:12px 0;border:0;padding:0}
+.slack-events legend{font-weight:600;margin-bottom:6px}
 .brand-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
