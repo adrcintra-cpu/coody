@@ -26,6 +26,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Field, FormModal } from './forms';
 import { BrandOnboarding } from './brand-onboarding';
+import { BrandAssist } from './brand-assist';
 import { LibraryView } from './library';
 import { Planning } from './planning';
 import { Contents } from './contents';
@@ -622,6 +623,16 @@ function BrandEditor({
           }
         }}
       >
+        {brand.id && (
+          <BrandAssist
+            brand={b}
+            onChange={setB}
+            brandId={brand.id}
+            // Existing brands keep their pillars and goals.
+            defaults={{ pillars: [], monthlyGoal: -1, weeklyGoal: -1 }}
+            hint="Sugere os campos ainda vazios a partir dos dados da marca, do site e do manual e logos da Biblioteca. Os campos preenchidos e os pilares atuais são mantidos."
+          />
+        )}
         <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
           <TabsList variant="line">
             <TabsTrigger value="general">Marca</TabsTrigger>

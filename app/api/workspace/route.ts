@@ -18,6 +18,8 @@ import {
 } from '@/lib/domain';
 import { isInactive } from '@/lib/brand-lifecycle';
 import { validateAttachments } from '@/lib/creative-materials';
+import { notifySlack } from '@/lib/slack-send';
+import type { SlackEvent } from '@/lib/slack';
 import type { Brand, Content, Status, Plan } from '@/lib/types';
 export async function GET(request: Request) {
   const user = authorize(request);
@@ -603,6 +605,31 @@ export async function POST(request: Request) {
       }),
     );
     await db.batch(statements);
+    // Slack notice after the change is saved (never fails the action).
+    const slackEvent: SlackEvent | '' =
+      action === 'comment'
+        ? 'comment'
+        : action === 'status' &&
+            ['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO', 'PUBLICADO'].includes(
+              String(data.status),
+            )
+          ? (data.status as SlackEvent)
+          : '';
+    if (slackEvent && item && state.workspace)
+      await notifySlack(state.workspace.id, slackEvent, {
+        event: slackEvent,
+        title: item.title,
+        brand: state.brands.find((b) => b.id === item.brandId)?.name || '',
+        date: item.date,
+        user: user.name,
+        link:
+          new URL(request.url).origin +
+          '/#Studio?id=' +
+          encodeURIComponent(item.id) +
+          '&month=' +
+          item.date.slice(0, 7),
+        comment: str(action === 'comment' ? data.text : data.comment),
+      });
     return Response.json({ ok: true, id: entityId });
   } catch (error) {
     const message =
