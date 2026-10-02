@@ -25,7 +25,7 @@ import {
   canonicalCategory,
   categoryInfo,
 } from '@/lib/brand-memory';
-import { checkImageFile } from '@/lib/client-upload';
+import { checkImageFile, fitUpload } from '@/lib/client-upload';
 import type { State, Action, Asset } from '@/lib/types';
 export const categories = assetCategories.map((c) => c.label);
 export function LibraryView({
@@ -337,9 +337,11 @@ export function AssetEditor({
               });
             } else {
               if (!file) throw new Error('Selecione o arquivo.');
-              await checkImageFile(file);
+              // Large photos are reduced in the browser to fit the limit.
+              const fitted = await fitUpload(file, assetLimitMB);
+              await checkImageFile(fitted);
               const form = new FormData();
-              form.set('file', file);
+              form.set('file', fitted);
               form.set('brandId', brand);
               Object.entries(value).forEach(([k, v]) => form.set(k, String(v)));
               const response = await fetch('/api/assets', {
@@ -384,7 +386,7 @@ export function AssetEditor({
                 accept=".pdf,.svg,.png,.jpg,.jpeg,.webp"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f && f.size > assetLimitMB * 1024 * 1024) { setError(`Envie um arquivo de até ${assetLimitMB} MB.`); e.target.value = ''; setFile(null); return; }
+                  if (f && f.size > assetLimitMB * 1024 * 1024 && !['image/png','image/jpeg','image/webp'].includes(f.type)) { setError(`Envie um arquivo de até ${assetLimitMB} MB.`); e.target.value = ''; setFile(null); return; }
                   setError('');
                   setFile(f || null);
                   if (f && !value.name) setValue({ ...value, name: f.name });

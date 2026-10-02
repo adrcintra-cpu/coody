@@ -1,7 +1,8 @@
 'use client';
 import { useRef, useState } from 'react';
 import { Check, ImagePlus, LoaderCircle } from 'lucide-react';
-import { checkImageFile } from '@/lib/client-upload';
+import { checkImageFile, fitUpload } from '@/lib/client-upload';
+import { assetLimitMB } from '@/lib/upload-limits';
 import { MAX_ATTACHMENTS, isAttachable } from '@/lib/creative-materials';
 import type { Asset, State } from '@/lib/types';
 
@@ -88,9 +89,10 @@ export function AttachmentPicker({
             setBusy(true);
             setError('');
             try {
-              await checkImageFile(file);
+              const fitted = await fitUpload(file, assetLimitMB);
+              await checkImageFile(fitted);
               const form = new FormData();
-              form.set('file', file);
+              form.set('file', fitted);
               form.set('brandId', brandId);
               form.set('name', file.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 200));
               form.set('category', 'product_photo');
