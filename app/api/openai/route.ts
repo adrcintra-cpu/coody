@@ -9,7 +9,7 @@ import {
   parseCreative,
   creativeSchema,
 } from '@/lib/openai-client';
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { database, bucket, insert, readState } from '@/lib/repository';
 import { assetRecord, validateUpload } from '@/lib/asset-upload';
 const model = 'gpt-image-2';
@@ -28,7 +28,7 @@ function failure(status: number) {
   return 'A OpenAI não concluiu o pedido. Consulte a biblioteca antes de tentar novamente.';
 }
 export async function GET(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   if (!apiKey())
     return Response.json({
@@ -58,8 +58,9 @@ export async function GET(request: Request) {
   }
 }
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
+  { const denied = forbid(user, 'edit'); if (denied) return denied; }
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin

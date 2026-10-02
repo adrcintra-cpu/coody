@@ -3,7 +3,9 @@ export type CurrentUser = {
   id: string;
   name: string;
   email: string;
-  role: 'ADMINISTRADOR';
+  role: 'ADMINISTRADOR' | 'EDITOR' | 'APROVADOR';
+  /** Invited person (not the owner): access limited to released workspaces. */
+  member?: boolean;
 };
 export function identify(
   headers: Headers,

@@ -1,4 +1,4 @@
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { database } from '@/lib/repository';
 import expected from '@/lib/maintenance/legacy-snapshot.json';
 // Operational reference only: never seed these records into a workspace.
@@ -14,8 +14,9 @@ const emptyTables = [
   'trello_integrations',
 ];
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
+  { const denied = forbid(user, 'manage'); if (denied) return denied; }
   if (request.headers.get('origin') !== new URL(request.url).origin)
     return Response.json({ error: 'Origem inválida.' }, { status: 403 });
   const db = database();

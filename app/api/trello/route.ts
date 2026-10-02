@@ -1,12 +1,12 @@
 import { activeState } from '@/lib/brand-lifecycle';
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { activeWorkspace } from '@/lib/workspaces';
 import { database, readState } from '@/lib/repository';
 import { client, connection, secret, send } from '@/lib/trello';
 import type { Board, List } from '@/lib/trello';
 import { seal, trello, validCredentials } from '@/lib/trello-client';
 export async function GET(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   try {
     const config = await connection();
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
   }
 }
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   if (request.headers.get('origin') !== new URL(request.url).origin)
     return Response.json({ error: 'Origem inválida.' }, { status: 403 });
@@ -64,6 +64,11 @@ export async function POST(request: Request) {
     if (Number(request.headers.get('content-length') || 0) > 8192)
       throw new Error('Solicitação muito grande.');
     const data = (await request.json()) as Record<string, string>;
+    // Connecting and configuring the board is for administrators.
+    {
+      const denied = forbid(user, ['connect', 'disconnect', 'configure'].includes(data.action) ? 'manage' : 'edit');
+      if (denied) return denied;
+    }
     if (data.action === 'connect') {
       if (!validCredentials(data))
         throw new Error('Confira a chave e o token do Trello.');

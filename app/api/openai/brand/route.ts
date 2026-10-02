@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:workers';
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { apiAlert } from '@/lib/workspaces';
 import { activeState } from '@/lib/brand-lifecycle';
 import { readState } from '@/lib/repository';
@@ -89,8 +89,9 @@ async function readSite(raw: string): Promise<{ text: string; note: string }> {
  * form decides what to fill and the user saves.
  */
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
+  { const denied = forbid(user, 'edit'); if (denied) return denied; }
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin

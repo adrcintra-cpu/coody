@@ -1,5 +1,7 @@
 'use client';
 import { Login } from './login';
+import { AcceptInvite } from './invite';
+import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -78,6 +80,12 @@ export default function Workspace() {
     brandId?: string;
   } | null>(null);
   const [loginRequired, setLoginRequired] = useState(false);
+  // #convite?token=… opens the invite page instead of the workspace.
+  const [inviteToken] = useState(() =>
+    typeof window !== 'undefined' && window.location.hash.startsWith('#convite')
+      ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('token') || ''
+      : '',
+  );
   const [loading, setLoading] = useState(true);
   // Unsaved Studio text: navigation away asks before discarding it.
   const [studioDirty, setStudioDirty] = useState(false);
@@ -277,7 +285,9 @@ export default function Workspace() {
     navigate('Biblioteca', { brand: id });
   };
   const item = visible?.contents.find((c) => c.id === selected);
+  if (inviteToken) return <AcceptInvite token={inviteToken} />;
   if (loginRequired) return <Login />;
+  const role = state?.user?.role;
   return (
     <SidebarProvider>
       <Sidebar className="coody-sidebar">
@@ -291,18 +301,20 @@ export default function Workspace() {
             alt="COODY"
           />
           <WorkspaceMenu state={state} reload={reload}/>
-          <button
-            className="create-btn"
-            disabled={!state}
-            onClick={() => create(month + '-15')}
-          >
-            <Plus size={18} /> Criar conteúdo
-          </button>
+          {(!state || can(role, 'edit')) && (
+            <button
+              className="create-btn"
+              disabled={!state}
+              onClick={() => create(month + '-15')}
+            >
+              <Plus size={18} /> Criar conteúdo
+            </button>
+          )}
         </SidebarHeader>
         <SidebarContent>
           <p className="nav-label">WORKSPACE</p>
           <SidebarMenu>
-            {nav.map(([name, Icon]) => (
+            {nav.filter(([name]) => name !== 'Integrações' || !state || can(role, 'manage')).map(([name, Icon]) => (
               <SidebarMenuItem key={name}>
                 <SidebarMenuButton
                   isActive={
@@ -347,11 +359,11 @@ export default function Workspace() {
             </span>
             <span>
               {state?.user?.name || 'Minha conta'}
-              <small>Administrador</small>
+              <small>{role ? roleLabels[role] : 'Minha conta'}</small>
             </span>
             <ChevronDown size={15} />
           </button>
-          {state?.user?.id === 'owner' && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.reload(); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
+          {!!state?.user && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.reload(); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
@@ -385,6 +397,13 @@ export default function Workspace() {
           </div>
         </header>
         <main className="workspace-main">
+          {role === 'APROVADOR' && (
+            <p className="notice role-notice">
+              Seu acesso é de <strong>aprovador</strong>: você pode ver as peças,
+              comentar, aprovar ou pedir alteração. Abra uma peça em
+              Aprovações para decidir.
+            </p>
+          )}
           {error ? (
             <div className="notice error" role="alert">
               {error}

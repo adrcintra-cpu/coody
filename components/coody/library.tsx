@@ -1,5 +1,6 @@
 'use client';
 import { assetLimitMB } from '@/lib/upload-limits';
+import { can } from '@/lib/permissions';
 
 import { useState } from 'react';
 import {
@@ -83,14 +84,16 @@ export function LibraryView({
                 : 'Selecione uma marca para abrir sua memória visual.'}
           </p>
         </div>
-        <button
-          className="create-btn"
-          disabled={!state.brands.length}
-          onClick={() => setEditor('new')}
-        >
-          <Upload size={17} />
-          Adicionar arquivos
-        </button>
+        {can(state.user?.role, 'edit') && (
+          <button
+            className="create-btn"
+            disabled={!state.brands.length}
+            onClick={() => setEditor('new')}
+          >
+            <Upload size={17} />
+            Adicionar arquivos
+          </button>
+        )}
       </div>
       <div className="toolbar library-context">
         {brandId ? (

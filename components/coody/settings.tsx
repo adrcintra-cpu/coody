@@ -3,6 +3,8 @@ import { MagnificIntegration } from './magnific';
 import { SlackIntegration } from './slack';
 import { ProfilePhoto } from './profile-photo';
 import { useState } from 'react';
+import { Members } from './members';
+import { can, roleLabels } from '@/lib/permissions';
 import type { State } from '@/lib/types';
 import { OpenAIIntegration } from './openai';
 import { TrelloIntegration } from './trello';
@@ -78,16 +80,15 @@ export function Settings({
           <p>{state.user?.email}</p>
           <div className="detail-line">
             <span>Acesso</span>
-            <strong>Administrador · proprietário</strong>
+            <strong>
+              {state.user?.role ? roleLabels[state.user.role] : '—'}
+              {state.user?.member ? '' : ' · proprietário'}
+            </strong>
           </div>
           <div className="detail-line">
-            <span>Workspace</span>
-            <strong>COODY privado</strong>
+            <span>Workspace atual</span>
+            <strong>{state.workspace?.name || '—'}</strong>
           </div>
-          <p className="notice">
-            Acesso individual pela conta proprietária. Os cadastros, conteúdos e
-            arquivos são salvos no workspace.
-          </p>
         </section>
         <section className="panel">
           <h2>Seus dados</h2>
@@ -96,14 +97,14 @@ export function Settings({
             para guardar uma cópia. As imagens e documentos devem ser baixados
             pela biblioteca.
           </p>
-          <a className="outline-btn" href="/api/backup" download>
-            Exportar dados
-          </a>
-          <p className="notice">
-            Acessos separados para equipe e clientes ainda não estão
-            disponíveis.
-          </p>
-          {hasExamples && (
+          {can(state.user?.role, 'manage') ? (
+            <a className="outline-btn" href="/api/backup" download>
+              Exportar dados
+            </a>
+          ) : (
+            <p className="muted">Somente administradores exportam os dados.</p>
+          )}
+          {hasExamples && can(state.user?.role, 'manage') && (
             <>
               <h3>Remover exemplos iniciais</h3>
               <p>
@@ -122,6 +123,9 @@ export function Settings({
           {message && <output>{message}</output>}
         </section>
       </div>
+      {can(state.user?.role, 'manage') && (
+        <Members currentWorkspaceId={state.workspace?.id} />
+      )}
     </>
   );
 }

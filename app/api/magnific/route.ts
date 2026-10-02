@@ -1,5 +1,5 @@
 import { activeState } from '@/lib/brand-lifecycle';
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { database, bucket, readState } from '@/lib/repository';
 import { activeWorkspace, apiAlert } from '@/lib/workspaces';
 import { magnificRequest, MagnificError } from '@/lib/magnific-client';
@@ -10,7 +10,7 @@ import {
 } from '@/lib/magnific-jobs';
 import { base64 } from '@/lib/creative-materials';
 export async function GET(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   try {
     const w = await activeWorkspace(request);
@@ -51,8 +51,9 @@ export async function GET(request: Request) {
   }
 }
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
+  { const denied = forbid(user, 'edit'); if (denied) return denied; }
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin

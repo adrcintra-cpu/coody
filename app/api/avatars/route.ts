@@ -1,10 +1,10 @@
 import { avatarLimitMB } from '@/lib/upload-limits';
 import { assertBrandWorkspace, activeWorkspace } from '@/lib/workspaces';
-import { authorize, registerUser } from '@/lib/auth';
+import { authorize, registerUser, forbid } from '@/lib/auth';
 import { database, bucket } from '@/lib/repository';
 import { limitedForm, validateUpload } from '@/lib/asset-upload';
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   if (
     request.headers.get('origin') &&
@@ -27,6 +27,11 @@ export async function POST(request: Request) {
         .first())
     )
       throw new Error('Marca não encontrada.');
+    // Own photo: anyone. Brand photo: editors. Workspace photo: administrators.
+    if (kind !== 'user') {
+      const denied = forbid(user, kind === 'brand' ? 'edit' : 'manage');
+      if (denied) return denied;
+    }
     if(kind === 'brand') await assertBrandWorkspace(request,brandId);
     const workspace = kind === 'workspace' ? await activeWorkspace(request) : null;
     const input = form.get('file');

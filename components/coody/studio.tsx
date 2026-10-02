@@ -3,6 +3,7 @@ import { ArtViewer } from './art-viewer';
 import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
 import { AttachmentPicker } from './attachments';
+import { can } from '@/lib/permissions';
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
@@ -110,7 +111,10 @@ export function Studio({
   const locked =
     !!current.locked ||
     ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status);
-  const disabled = historic || locked || busy;
+  // Role: approvers only comment and decide; editors cannot approve.
+  const canEdit = can(state.user?.role, 'edit');
+  const canApprove = can(state.user?.role, 'approve');
+  const disabled = historic || locked || busy || !canEdit;
   // One entry per file: an approved-art record shares the URL of its source
   // file, so the picker keeps the first record of each URL.
   const images = state.assets.filter(
@@ -211,7 +215,7 @@ export function Studio({
         </div>
         <button
           className="outline-btn"
-          disabled={locked || busy}
+          disabled={locked || busy || !canEdit}
           onClick={() => edit(item)}
         >
           Editar pauta
@@ -507,7 +511,17 @@ export function Studio({
               : `Salvar nova versão · V${(latest?.number || 0) + 1}`}
           </button>
           <div className="workflow-actions">
-            {!historic &&
+            {!historic && !canEdit && item.status !== 'APROVAÇÃO' ? (
+              <p className="muted">
+                {item.status === 'APROVADO' || item.status === 'PUBLICADO'
+                  ? 'Peça aprovada.'
+                  : 'Esta peça ainda está em produção. Você poderá aprovar quando ela for enviada para aprovação.'}
+              </p>
+            ) : !historic && item.status === 'APROVAÇÃO' && !canApprove ? (
+              <p className="muted">
+                Aguardando a decisão de um aprovador ou administrador.
+              </p>
+            ) : !historic &&
               (['IDEIA', 'PLANEJADO'].includes(item.status) ? (
                 <button
                   className="create-btn full"

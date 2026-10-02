@@ -4,7 +4,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   const { id } = await params;
   if (!/^[a-f0-9-]{36}$/.test(id))

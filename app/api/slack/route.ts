@@ -1,4 +1,4 @@
-import { authorize } from '@/lib/auth';
+import { authorize, forbid } from '@/lib/auth';
 import { activeWorkspace } from '@/lib/workspaces';
 import { database } from '@/lib/repository';
 import {
@@ -11,7 +11,7 @@ import { postSlack, slackConnection, ensureSlackTable } from '@/lib/slack-send';
 
 /** Slack connection of the active workspace (the webhook is never returned). */
 export async function GET(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
   try {
     const workspace = await activeWorkspace(request);
@@ -36,8 +36,9 @@ export async function GET(request: Request) {
 
 /** save {webhookUrl?, events} · test · disconnect */
 export async function POST(request: Request) {
-  const user = authorize(request);
+  const user = await authorize(request);
   if (user instanceof Response) return user;
+  { const denied = forbid(user, 'manage'); if (denied) return denied; }
   if (
     request.headers.get('origin') &&
     request.headers.get('origin') !== new URL(request.url).origin
