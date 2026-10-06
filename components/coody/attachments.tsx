@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
-import { Check, ImagePlus, LoaderCircle } from 'lucide-react';
+import { Check, ImagePlus, LoaderCircle, X } from 'lucide-react';
+import { can } from '@/lib/permissions';
 import { checkImageFile, fitUpload } from '@/lib/client-upload';
 import { assetLimitMB } from '@/lib/upload-limits';
 import { MAX_ATTACHMENTS, isAttachable } from '@/lib/creative-materials';
@@ -32,8 +33,42 @@ export function AttachmentPicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showAll, setShowAll] = useState(false);
+  // Deleting an image from the brand Library, right from this panel.
+  const canDelete = can(state.user?.role, 'edit') && !disabled;
+  const [confirmId, setConfirmId] = useState('');
+  const [deleted, setDeleted] = useState<string[]>([]);
+  const removeImage = async (id: string) => {
+    setBusy(true);
+    setError('');
+    try {
+      const r = await fetch('/api/assets', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      const d = (await r.json()) as {
+        removed?: string[];
+        kept?: { name: string; reason: string }[];
+        error?: string;
+      };
+      if (!r.ok) throw new Error(d.error || 'Não foi possível excluir.');
+      if (d.kept?.length)
+        throw new Error(`Não foi excluída: ${d.kept[0].reason}.`);
+      setDeleted((old) => [...old, id]);
+      setUploaded((old) => old.filter((u) => u.id !== id));
+      if (value.includes(id)) await onChange(value.filter((x) => x !== id));
+      await onUploaded?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+      setConfirmId('');
+    }
+  };
   const input = useRef<HTMLInputElement>(null);
-  const library: Thumb[] = state.assets.filter((a) => isAttachable(a, brandId));
+  const library: Thumb[] = state.assets.filter(
+    (a) => isAttachable(a, brandId) && !deleted.includes(a.id),
+  );
   // Files uploaded here appear before the workspace reloads.
   const all = [
     ...uploaded.filter((u) => !library.some((a) => a.id === u.id)),
@@ -138,24 +173,37 @@ export function AttachmentPicker({
           {shown.map((a) => {
             const on = value.includes(a.id);
             return (
-              <button
-                type="button"
-                key={a.id}
-                className={'attachment' + (on ? ' selected' : '')}
-                aria-pressed={on}
-                title={a.name}
-                disabled={disabled || busy || (!on && full)}
-                onClick={() => toggle(a.id)}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.url} alt="" loading="lazy" />
-                <span>{a.name}</span>
-                {on && (
-                  <i aria-hidden>
-                    <Check size={13} />
-                  </i>
+              <div className="attachment-cell" key={a.id}>
+                <button
+                  type="button"
+                  className={'attachment' + (on ? ' selected' : '')}
+                  aria-pressed={on}
+                  title={a.name}
+                  disabled={disabled || busy || (!on && full)}
+                  onClick={() => toggle(a.id)}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={a.url} alt="" loading="lazy" />
+                  <span>{a.name}</span>
+                  {on && (
+                    <i aria-hidden>
+                      <Check size={13} />
+                    </i>
+                  )}
+                </button>
+                {canDelete && (
+                  <button
+                    type="button"
+                    className="attachment-delete"
+                    aria-label={'Excluir ' + a.name + ' da biblioteca'}
+                    title="Excluir da biblioteca"
+                    disabled={busy}
+                    onClick={() => setConfirmId(a.id)}
+                  >
+                    <X size={13} />
+                  </button>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
@@ -163,6 +211,33 @@ export function AttachmentPicker({
         <p className="muted">
           Nenhuma foto de produto na biblioteca desta marca. Use “Enviar foto”.
         </p>
+      )}
+      {confirmId && (
+        <div className="notice attachment-confirm" role="alertdialog">
+          <span>
+            Excluir “{all.find((a) => a.id === confirmId)?.name || 'imagem'}” da
+            biblioteca da marca? A imagem some de todas as pautas e não pode
+            ser recuperada.
+          </span>
+          <div>
+            <button
+              type="button"
+              className="outline-btn"
+              disabled={busy}
+              onClick={() => setConfirmId('')}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="create-btn danger-btn"
+              disabled={busy}
+              onClick={() => void removeImage(confirmId)}
+            >
+              {busy ? 'Excluindo…' : 'Excluir'}
+            </button>
+          </div>
+        </div>
       )}
       {others.some((a) => !value.includes(a.id)) && (
         <button
