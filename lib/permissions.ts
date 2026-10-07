@@ -41,7 +41,10 @@ export function actionPermission(
     return 'manage';
   if (action === 'status') {
     if (data.status === 'APROVADO') return 'approve';
-    if (data.status === 'ALTERAÇÃO' && currentStatus === 'APROVAÇÃO')
+    if (
+      (data.status === 'ALTERAÇÃO' || data.status === 'AJUSTE') &&
+      currentStatus === 'APROVAÇÃO'
+    )
       return 'approve';
   }
   return 'edit';

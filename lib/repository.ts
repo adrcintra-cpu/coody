@@ -14,6 +14,7 @@ import type {
   Comment,
   SpecialDate,
   DeletedBrand,
+  MediaItem,
 } from './types';
 export function database() {
   if (!env.DB) throw new Error('Banco de dados indisponível.');
@@ -68,6 +69,8 @@ const runtimeColumns: [table: string, column: string, ddl: string][] = [
   ['brands', 'status', "ALTER TABLE brands ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"],
   ['brands', 'deletedAt', 'ALTER TABLE brands ADD COLUMN deletedAt TEXT'],
   ['content_items', 'attachments', "ALTER TABLE content_items ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'"],
+  // Files of a version beyond the single art: carousel slides, video, PDF.
+  ['content_versions', 'media', "ALTER TABLE content_versions ADD COLUMN media TEXT NOT NULL DEFAULT '[]'"],
 ];
 let lifecycleReady: Promise<void> | null = null;
 export function ensureBrandLifecycle() {
@@ -228,6 +231,7 @@ export async function readState(request?: Request): Promise<State> {
       const story = storyAdaptationUrl(asset);
       return {
         ...v,
+        media: parseMedia((v as { media?: unknown }).media),
         hashtags: JSON.parse(v.hashtags),
         feedUrl: asset,
         storyUrl: story && recomposed.has(story) ? story : asset,
@@ -261,6 +265,19 @@ export async function readState(request?: Request): Promise<State> {
   };
 }
 
+function parseMedia(value: unknown): MediaItem[] {
+  try {
+    const list = JSON.parse(typeof value === 'string' ? value : '[]');
+    return Array.isArray(list)
+      ? list.filter(
+          (m): m is MediaItem =>
+            !!m && typeof m.url === 'string' && typeof m.mime === 'string',
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
 function parseIds(value: unknown): string[] {
   try {
     const list = JSON.parse(typeof value === 'string' ? value : '[]');

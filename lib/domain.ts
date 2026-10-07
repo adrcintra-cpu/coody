@@ -88,10 +88,12 @@ export function validateMonth(value: string) {
 export const transitions: Record<Status, Status[]> = {
   IDEIA: ['PLANEJADO', 'EM CRIAÇÃO'],
   PLANEJADO: ['IDEIA', 'EM CRIAÇÃO'],
-  'EM CRIAÇÃO': ['REVISÃO'],
+  'EM CRIAÇÃO': ['REVISÃO', 'APROVAÇÃO'],
   REVISÃO: ['EM CRIAÇÃO', 'APROVAÇÃO'],
-  APROVAÇÃO: ['ALTERAÇÃO', 'APROVADO'],
-  ALTERAÇÃO: ['EM CRIAÇÃO', 'REVISÃO'],
+  // Ajuste: fine tuning of the same art. Alteração: a new image.
+  APROVAÇÃO: ['AJUSTE', 'ALTERAÇÃO', 'APROVADO'],
+  AJUSTE: ['EM CRIAÇÃO', 'REVISÃO', 'APROVAÇÃO'],
+  ALTERAÇÃO: ['EM CRIAÇÃO', 'REVISÃO', 'APROVAÇÃO'],
   APROVADO: ['PUBLICADO'],
   PUBLICADO: [],
 };
@@ -313,3 +315,47 @@ export function isRelevantSegment(
     normalizeWords(segment).some((w) => brand.has(w)),
   );
 }
+
+/* Production board (kanban): columns over the statuses and drops. */
+
+export type ColumnId =
+  | 'fila'
+  | 'criacao'
+  | 'aprovacao'
+  | 'ajuste'
+  | 'alteracao'
+  | 'aprovado'
+  | 'publicado';
+export const columns: { id: ColumnId; title: string; hint: string; statuses: Status[] }[] = [
+  { id: 'fila', title: 'Na fila', hint: 'Pautas planejadas', statuses: ['IDEIA', 'PLANEJADO'] },
+  { id: 'criacao', title: 'Em criação', hint: 'Arte sendo feita ou revisada', statuses: ['EM CRIAÇÃO', 'REVISÃO'] },
+  { id: 'aprovacao', title: 'Para aprovação', hint: 'Aguardando o cliente', statuses: ['APROVAÇÃO'] },
+  { id: 'ajuste', title: 'Ajuste', hint: 'Mesma arte, ajustes finos', statuses: ['AJUSTE'] },
+  { id: 'alteracao', title: 'Alteração', hint: 'Nova imagem', statuses: ['ALTERAÇÃO'] },
+  { id: 'aprovado', title: 'Aprovado', hint: 'Pronto para publicar', statuses: ['APROVADO'] },
+  { id: 'publicado', title: 'Publicado', hint: 'No ar', statuses: ['PUBLICADO'] },
+];
+export function columnOf(status: Status): ColumnId {
+  return columns.find((c) => c.statuses.includes(status))?.id || 'fila';
+}
+/** Status a piece moves to when dropped on a column, or null if not allowed. */
+export function dropStatus(column: ColumnId, current: Status): Status | null {
+  if (columnOf(current) === column) return null;
+  const allowed = transitions[current] || [];
+  const wanted: Record<ColumnId, Status[]> = {
+    fila: ['PLANEJADO', 'IDEIA'],
+    criacao: ['EM CRIAÇÃO', 'REVISÃO'],
+    aprovacao: ['APROVAÇÃO'],
+    ajuste: ['AJUSTE'],
+    alteracao: ['ALTERAÇÃO'],
+    aprovado: ['APROVADO'],
+    publicado: ['PUBLICADO'],
+  };
+  return wanted[column].find((s) => allowed.includes(s)) || null;
+}
+/** The client only decides on pieces waiting for approval. */
+export function clientDrop(column: ColumnId, current: Status): Status | null {
+  if (current !== 'APROVAÇÃO') return null;
+  return column === 'aprovado' ? 'APROVADO' : column === 'ajuste' ? 'AJUSTE' : column === 'alteracao' ? 'ALTERAÇÃO' : null;
+}
+export const needsComment = (status: Status) => status === 'AJUSTE' || status === 'ALTERAÇÃO';

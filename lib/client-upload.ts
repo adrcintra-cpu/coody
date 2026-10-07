@@ -62,3 +62,39 @@ export async function fitUpload(file: File, maxMB: number): Promise<File> {
     `Não foi possível reduzir “${file.name}” para ${maxMB} MB. Exporte uma versão menor e envie de novo.`,
   );
 }
+
+/**
+ * Sends one file straight to the storage (no size limit of the server
+ * functions) and registers it in the brand Library. Returns the asset.
+ */
+export async function directUpload(
+  file: File,
+  brandId: string,
+  meta: { name?: string; category?: string; description?: string } = {},
+  onProgress?: (percent: number) => void,
+) {
+  const { upload } = await import('@vercel/blob/client');
+  const id = crypto.randomUUID();
+  const key = `brands/${brandId}/${id}`;
+  await upload(key, file, {
+    access: 'private',
+    handleUploadUrl: '/api/assets/upload',
+    contentType: file.type,
+    multipart: file.size > 8 * 1024 * 1024,
+    onUploadProgress: (e) => onProgress?.(Math.round(e.percentage)),
+  });
+  const r = await fetch('/api/assets/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'register',
+      key,
+      name: meta.name || file.name,
+      category: meta.category || 'delivery',
+      description: meta.description || '',
+    }),
+  });
+  const d = (await r.json()) as { id?: string; url?: string; mime?: string; error?: string };
+  if (!r.ok || !d.id) throw new Error(d.error || 'Falha ao registrar o arquivo.');
+  return { id: d.id, url: d.url!, mime: d.mime!, name: meta.name || file.name };
+}

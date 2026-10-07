@@ -4,6 +4,7 @@ import { MagnificGenerator } from './magnific';
 import { ImageGenerator } from './openai';
 import { AttachmentPicker } from './attachments';
 import { can } from '@/lib/permissions';
+import { ExternalPiece } from './production';
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
@@ -82,7 +83,49 @@ export function Studio({
   const [compare, setCompare] = useState(false);
   const [remove, setRemove] = useState(false);
   const [approveReference, setApproveReference] = useState(true);
-  const [changeModal, setChangeModal] = useState(false);
+  // Request after review: 'AJUSTE' (same art) or 'ALTERAÇÃO' (new image).
+  const [changeModal, setChangeModal] = useState<false | 'AJUSTE' | 'ALTERAÇÃO'>(false);
+  const [sendingFiles, setSendingFiles] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  // Ajuste: edit the same art (then the 9:16 Story again, when there is one).
+  // Alteração: a new art from the brief with the request as direction.
+  const aiRequest = async (kind: 'adjust' | 'regenerate') => {
+    setAiBusy(true);
+    setBusy(true);
+    setAiMessage(kind === 'adjust' ? 'Ajustando a mesma arte… pode levar até 1 minuto.' : 'Gerando a nova arte… pode levar alguns minutos.');
+    try {
+      const comment = state.comments
+        .filter((c) => c.contentId === item.id)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.text || '';
+      const r = await fetch(kind === 'adjust' ? '/api/openai/adjust' : '/api/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          kind === 'adjust'
+            ? { contentId: item.id, requestId: crypto.randomUUID(), instruction: comment }
+            : { id: crypto.randomUUID(), contentId: item.id, mode: 'creative', prompt: 'Alteração pedida pelo cliente: ' + comment },
+        ),
+      });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Falha na IA.');
+      if (kind === 'adjust' && item.format.includes('Story')) {
+        setAiMessage('Arte ajustada. Recompondo o Story 9:16…');
+        await fetch('/api/openai/story', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentId: item.id, requestId: crypto.randomUUID() }),
+        }).catch(() => null);
+      }
+      setAiMessage('Nova versão pronta. Revise antes de enviar para aprovação.');
+      await reload();
+    } catch (e) {
+      setAiMessage((e as Error).message);
+    } finally {
+      setAiBusy(false);
+      setBusy(false);
+    }
+  };
   const [confirmApproval, setConfirmApproval] = useState(false);
   const [recomposing, setRecomposing] = useState(false);
   const openai = useIntegrationStatus('/api/openai');
@@ -114,6 +157,10 @@ export function Studio({
   // Role: approvers only comment and decide; editors cannot approve.
   const canEdit = can(state.user?.role, 'edit');
   const canApprove = can(state.user?.role, 'approve');
+  // The last request (ajuste/alteração) left on this piece.
+  const lastRequest = state.comments
+    .filter((c) => c.contentId === item.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.text;
   const disabled = historic || locked || busy || !canEdit;
   // One entry per file: an approved-art record shares the URL of its source
   // file, so the picker keeps the first record of each URL.
@@ -267,6 +314,61 @@ export function Studio({
           </button>
         </div>
       </div>
+      {!!current.media?.length && (
+        <section className="panel studio-media">
+          <div className="section-head">
+            <h2>
+              Arquivos desta peça · V{current.number}
+              {current.media.length > 1 ? ` · ${current.media.length} lâminas` : ''}
+            </h2>
+            {canEdit && ['AJUSTE', 'ALTERAÇÃO', 'EM CRIAÇÃO', 'REVISÃO'].includes(item.status) && (
+              <button className="outline-btn" onClick={() => setSendingFiles(true)}>
+                Enviar nova versão
+              </button>
+            )}
+          </div>
+          <div className="client-media">
+            {current.media.map((m, i) =>
+              m.mime.startsWith('image/') ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={m.url} alt={m.name} loading="lazy" />
+              ) : m.mime.startsWith('video/') ? (
+                <video key={i} src={m.url} controls playsInline preload="metadata" />
+              ) : (
+                <a key={i} className="outline-btn" href={m.url} target="_blank" rel="noreferrer">
+                  {m.name}
+                </a>
+              ),
+            )}
+          </div>
+        </section>
+      )}
+      {(item.status === 'AJUSTE' || item.status === 'ALTERAÇÃO') && (
+        <section className="panel studio-request">
+          <h2>{item.status === 'AJUSTE' ? 'Ajuste pedido (mesma arte)' : 'Alteração pedida (nova imagem)'}</h2>
+          <p>{lastRequest || 'Sem comentário.'}</p>
+          {canEdit && !current.media?.length && (
+            <div className="form-actions">
+              {item.status === 'AJUSTE' ? (
+                <button className="create-btn" disabled={aiBusy || !latest?.feedUrl} onClick={() => void aiRequest('adjust')}>
+                  {aiBusy ? 'Ajustando a arte…' : 'Aplicar ajuste com IA'}
+                </button>
+              ) : (
+                <button className="create-btn" disabled={aiBusy} onClick={() => void aiRequest('regenerate')}>
+                  {aiBusy ? 'Gerando nova arte…' : 'Gerar nova arte com IA'}
+                </button>
+              )}
+            </div>
+          )}
+          {aiMessage && <p className="form-hint">{aiMessage}</p>}
+          <p className="form-hint">
+            Depois de revisar a nova versão, use “Levar para revisão” e envie para aprovação de novo.
+          </p>
+        </section>
+      )}
+      {sendingFiles && (
+        <ExternalPiece state={state} brandId={item.brandId} act={act} contentId={item.id} close={() => setSendingFiles(false)} />
+      )}
       <div className="studio-layout">
         <section>
           <div className="art-workspace">
@@ -531,7 +633,8 @@ export function Studio({
                   Iniciar criação <ArrowUpRight size={16} />
                 </button>
               ) : item.status === 'EM CRIAÇÃO' ||
-                item.status === 'ALTERAÇÃO' ? (
+                item.status === 'ALTERAÇÃO' ||
+                item.status === 'AJUSTE' ? (
                 <button
                   className="create-btn full"
                   disabled={busy}
@@ -573,9 +676,16 @@ export function Studio({
                   <button
                     className="outline-btn full"
                     disabled={busy}
-                    onClick={() => setChangeModal(true)}
+                    onClick={() => setChangeModal('AJUSTE')}
                   >
-                    Solicitar alteração
+                    Pedir ajuste (mesma arte)
+                  </button>
+                  <button
+                    className="outline-btn full"
+                    disabled={busy}
+                    onClick={() => setChangeModal('ALTERAÇÃO')}
+                  >
+                    Pedir alteração (nova imagem)
                   </button>
                 </>
               ) : item.status === 'APROVADO' ? (
@@ -669,12 +779,16 @@ export function Studio({
       )}
       {changeModal && (
         <FormModal
-          title="Solicitar alteração"
-          description="Dê uma orientação clara para a próxima versão."
+          title={changeModal === 'AJUSTE' ? 'Pedir ajuste' : 'Pedir alteração'}
+          description={
+            changeModal === 'AJUSTE'
+              ? 'Ajuste fino na mesma arte: texto, cor, posição, detalhe.'
+              : 'Uma nova imagem: outra composição, foto ou ideia visual.'
+          }
           open
           onClose={() => setChangeModal(false)}
         >
-          <Field label="O que precisa mudar?">
+          <Field label={changeModal === 'AJUSTE' ? 'O que ajustar?' : 'O que precisa mudar?'}>
             <Textarea
               value={feedback}
               onChange={(e) => setFeedback(e.target.value)}
@@ -684,7 +798,7 @@ export function Studio({
           <button
             className="create-btn"
             disabled={busy || !feedback.trim()}
-            onClick={() => void transition('ALTERAÇÃO')}
+            onClick={() => void transition(changeModal || 'ALTERAÇÃO')}
           >
             Enviar solicitação
           </button>

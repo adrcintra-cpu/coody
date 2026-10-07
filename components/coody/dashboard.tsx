@@ -35,7 +35,7 @@ export function Dashboard({
   const attention = state.contents
     .filter(
       (c) =>
-        c.status === 'ALTERAÇÃO' || c.status === 'APROVAÇÃO' || overdue(c),
+        c.status === 'ALTERAÇÃO' || c.status === 'AJUSTE' || c.status === 'APROVAÇÃO' || overdue(c),
     )
     .sort(
       (a, b) =>
@@ -49,6 +49,7 @@ export function Dashboard({
     'EM CRIAÇÃO',
     'REVISÃO',
     'APROVAÇÃO',
+    'AJUSTE',
     'ALTERAÇÃO',
     'APROVADO',
     'PUBLICADO',
@@ -87,8 +88,8 @@ export function Dashboard({
             key={s}
             onClick={() =>
               navigate(
-                s === 'APROVAÇÃO' || s === 'ALTERAÇÃO'
-                  ? 'Aprovações'
+                s === 'APROVAÇÃO' || s === 'ALTERAÇÃO' || s === 'AJUSTE'
+                  ? 'Produção'
                   : 'Conteúdos',
               )
             }
@@ -119,7 +120,7 @@ export function Dashboard({
                 <span className="count">{attention.length}</span>
               </h2>
               <button
-                onClick={() => navigate('Aprovações')}
+                onClick={() => navigate('Produção')}
                 className="text-btn"
               >
                 Ver tudo <ArrowRight size={16} />
@@ -144,7 +145,9 @@ export function Dashboard({
                           displayDate(c.date) +
                           ')'
                         : c.status === 'ALTERAÇÃO'
-                          ? 'Uma nova direção para esta peça'
+                          ? 'Uma nova imagem foi pedida'
+                          : c.status === 'AJUSTE'
+                            ? 'Ajuste fino na mesma arte'
                           : 'Pronto para seu olhar final'}
                     </small>
                   </span>

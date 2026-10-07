@@ -5,7 +5,8 @@
 /** Same wording as statusLabels in types.ts (kept local so Node can test it). */
 const statusLabels: Record<string, string> = {
   APROVAÇÃO: 'Aguardando aprovação',
-  ALTERAÇÃO: 'Em alteração',
+  AJUSTE: 'Ajuste solicitado',
+  ALTERAÇÃO: 'Alteração solicitada',
   APROVADO: 'Aprovado',
   PUBLICADO: 'Publicado',
 };
@@ -13,13 +14,14 @@ const statusLabels: Record<string, string> = {
 /** Events the workspace can turn on, with their labels in the UI. */
 export const slackEvents = [
   ['APROVAÇÃO', 'Peça enviada para aprovação'],
-  ['ALTERAÇÃO', 'Alteração solicitada'],
+  ['AJUSTE', 'Ajuste solicitado (mesma arte)'],
+  ['ALTERAÇÃO', 'Alteração solicitada (nova imagem)'],
   ['APROVADO', 'Peça aprovada'],
   ['PUBLICADO', 'Peça publicada'],
   ['comment', 'Novo comentário'],
 ] as const;
 export type SlackEvent = (typeof slackEvents)[number][0];
-export const defaultSlackEvents: SlackEvent[] = ['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO'];
+export const defaultSlackEvents: SlackEvent[] = ['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO', 'APROVADO'];
 
 /** Only Slack Incoming Webhook addresses are accepted. */
 export function validSlackWebhook(value: string) {
@@ -50,6 +52,7 @@ export function parseEvents(value: unknown): SlackEvent[] {
 
 const icons: Record<string, string> = {
   APROVAÇÃO: ':eyes:',
+  AJUSTE: ':wrench:',
   ALTERAÇÃO: ':pencil2:',
   APROVADO: ':white_check_mark:',
   PUBLICADO: ':rocket:',

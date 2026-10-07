@@ -6,6 +6,7 @@ export function creativeMaterials(brandId: string, assets: Asset[]) {
     .filter(
       (a) =>
         a.brandId === brandId &&
+        a.category !== 'delivery' &&
         (!/gerad[ao]|criativo gerado/i.test(a.aiNotes || '') ||
           a.approved === 1 ||
           a.priority === 1),
@@ -40,6 +41,7 @@ const attachableMimes = ['image/png', 'image/jpeg', 'image/webp'];
 export function isAttachable(asset: Asset, brandId: string) {
   return (
     asset.brandId === brandId &&
+    asset.category !== 'delivery' &&
     attachableMimes.includes(asset.mime) &&
     !asset.id.startsWith('story-')
   );

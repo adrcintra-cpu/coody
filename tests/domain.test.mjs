@@ -393,7 +393,7 @@ test('slack: only incoming webhooks, events and message', () => {
   assert.deepEqual(parseEvents('["APROVADO","x","comment"]'), ['APROVADO', 'comment']);
   assert.deepEqual(parseEvents('lixo'), []);
   const m = slackMessage({ event: 'ALTERAÇÃO', title: 'Lançamento <café>', brand: 'Aurora', date: '2026-10-20', user: 'André', link: 'https://x.app/#Studio?id=1', comment: 'Trocar a foto\nmais clara' });
-  assert.match(m.text, /\*Em alteração\* · Aurora/);
+  assert.match(m.text, /\*Alteração solicitada\* · Aurora/);
   assert.match(m.text, /<https:\/\/x\.app\/#Studio\?id=1\|Lançamento &lt;café&gt;> · publicação em 20\/10\/2026/);
   assert.match(m.text, /> Trocar a foto\n> mais clara/);
 });
@@ -446,4 +446,23 @@ test('roles: admin manages, editor creates, approver decides', () => {
   assert.equal(actionPermission('status', { status: 'PUBLICADO' }, 'APROVADO'), 'edit');
   assert.equal(actionPermission('deleteBrand', {}), 'manage');
   assert.equal(actionPermission('saveVersion', {}), 'edit');
+});
+
+import { columnOf, dropStatus, clientDrop, needsComment } from '../lib/domain.ts';
+test('kanban: columns and drops follow the flow', () => {
+  assert.equal(columnOf('REVISÃO'), 'criacao');
+  assert.equal(columnOf('AJUSTE'), 'ajuste');
+  assert.equal(dropStatus('aprovado', 'APROVAÇÃO'), 'APROVADO');
+  assert.equal(dropStatus('ajuste', 'APROVAÇÃO'), 'AJUSTE');
+  assert.equal(dropStatus('aprovado', 'EM CRIAÇÃO'), null);
+  assert.equal(dropStatus('aprovacao', 'EM CRIAÇÃO'), 'APROVAÇÃO');
+  assert.equal(dropStatus('aprovacao', 'AJUSTE'), 'APROVAÇÃO');
+  assert.equal(dropStatus('criacao', 'PLANEJADO'), 'EM CRIAÇÃO');
+  assert.equal(dropStatus('criacao', 'REVISÃO'), null);
+  assert.equal(dropStatus('publicado', 'APROVADO'), 'PUBLICADO');
+  assert.equal(clientDrop('aprovado', 'APROVAÇÃO'), 'APROVADO');
+  assert.equal(clientDrop('alteracao', 'APROVAÇÃO'), 'ALTERAÇÃO');
+  assert.equal(clientDrop('aprovado', 'AJUSTE'), null);
+  assert.equal(clientDrop('publicado', 'APROVAÇÃO'), null);
+  assert.ok(needsComment('AJUSTE') && !needsComment('APROVADO'));
 });
