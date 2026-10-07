@@ -1069,8 +1069,6 @@ small {
 .brand-assist-head .outline-btn{display:inline-flex;align-items:center;gap:6px}
 .brand-assist-result{margin-top:12px}
 .brand-assist-result p{margin:0 0 6px}
-.slack-events{display:flex;flex-direction:column;gap:6px;margin:12px 0;border:0;padding:0}
-.slack-events legend{font-weight:600;margin-bottom:6px}
 .pending-asset .section-head h3{display:flex;align-items:center;gap:10px;min-width:0}
 .pending-asset .section-head h3 span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pending-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none;background:#0f0c12}

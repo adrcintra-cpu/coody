@@ -63,7 +63,7 @@ export function Production({
           {can(role, 'edit') && (
             <>
               <button className="outline-btn" onClick={() => setSharing(true)}>
-                <Link2 size={16} /> Link do cliente
+                <Link2 size={16} /> Área do cliente
               </button>
               <button className="create-btn" onClick={() => setSending(true)}>
                 <Upload size={16} /> Enviar peça para aprovação
@@ -273,7 +273,7 @@ export function ExternalPiece({
 }
 
 /** The client link of a brand: create, copy, send by WhatsApp, revoke. */
-function ClientLink({ state, brandId, close }: { state: State; brandId: string; close: () => void }) {
+export function ClientLink({ state, brandId, close }: { state: State; brandId: string; close: () => void }) {
   const [brand, setBrand] = useState(brandId || state.brands[0]?.id || '');
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
@@ -311,13 +311,13 @@ function ClientLink({ state, brandId, close }: { state: State; brandId: string; 
   const whatsapp =
     'https://wa.me/?text=' +
     encodeURIComponent(
-      `Olá! Aqui está o quadro de produção da ${name} no COODY. Você vê o planejamento do mês e as peças, e pode aprovar ou pedir ajustes: ${link}`,
+      `Olá! Esta é a área da ${name} no COODY: você vê o planejamento do mês e as peças, e pode aprovar ou pedir ajustes por aqui: ${link}`,
     );
   return (
     <FormModal
       open
-      title="Link do cliente"
-      description="O cliente abre sem login, vê o planejamento e o quadro, e aprova ou pede ajuste/alteração."
+      title="Área do cliente"
+      description="Página pública e exclusiva desta marca: o cliente abre sem login, vê o planejamento e o quadro, e aprova ou pede ajuste/alteração."
       onClose={close}
     >
       <Field label="Marca">
@@ -362,7 +362,7 @@ function ClientLink({ state, brandId, close }: { state: State; brandId: string; 
       ) : (
         <div className="form-actions">
           <button type="button" className="create-btn" disabled={busy || !brand} onClick={() => void post('create')}>
-            <Link2 size={15} /> Criar link do cliente
+            <Link2 size={15} /> Criar área do cliente
           </button>
         </div>
       )}

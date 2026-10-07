@@ -1,6 +1,5 @@
 'use client';
 import { MagnificIntegration } from './magnific';
-import { SlackIntegration } from './slack';
 import { ProfilePhoto } from './profile-photo';
 import { useState } from 'react';
 import { Members } from './members';
@@ -22,7 +21,6 @@ export function Integrations({ state }: { state: State }) {
         <OpenAIIntegration />
         <MagnificIntegration />
         <TrelloIntegration state={state} />
-        <SlackIntegration />
       </div>
     </>
   );

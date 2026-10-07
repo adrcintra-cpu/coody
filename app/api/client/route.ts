@@ -1,7 +1,6 @@
 import { database, ensureBrandLifecycle } from '@/lib/repository';
 import { shareByToken } from '@/lib/share';
 import { assertTransition } from '@/lib/domain';
-import { notifySlack } from '@/lib/slack-send';
 import { statusLabels, type Status } from '@/lib/types';
 
 /**
@@ -143,16 +142,6 @@ export async function POST(request: Request) {
       );
     const results = await db.batch(statements);
     if (!results[0].meta.changes) throw new Error('Esta peça já foi decidida. Atualize a página.');
-    const brand = await db.prepare('SELECT name FROM brands WHERE id=?').bind(item.brandId).first<{ name: string }>();
-    await notifySlack(share.workspaceId, target as 'APROVADO' | 'AJUSTE' | 'ALTERAÇÃO', {
-      event: target as 'APROVADO' | 'AJUSTE' | 'ALTERAÇÃO',
-      title: item.title,
-      brand: brand?.name || '',
-      date: item.date,
-      user: 'Cliente · ' + name,
-      link: new URL(request.url).origin + '/#Studio?id=' + item.id + '&month=' + item.date.slice(0, 7),
-      comment,
-    });
     return Response.json({ ok: true });
   } catch (e) {
     return Response.json(

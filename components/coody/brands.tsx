@@ -10,6 +10,7 @@ import {
   Power,
   Trash2,
   RotateCcw,
+  Link2,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -28,6 +29,7 @@ import { Field, FormModal } from './forms';
 import { BrandOnboarding } from './brand-onboarding';
 import { BrandAssist } from './brand-assist';
 import { can } from '@/lib/permissions';
+import { ClientLink } from './production';
 import { LibraryView } from './library';
 import { Planning } from './planning';
 import { Contents } from './contents';
@@ -52,6 +54,7 @@ export function Brands({
   const [onboarding, setOnboarding] = useState(false);
   const canEdit = can(state.user?.role, 'edit');
   const canManage = can(state.user?.role, 'manage');
+  const [clientArea, setClientArea] = useState(false);
   const route = () =>
     new URLSearchParams(
       typeof window === 'undefined'
@@ -147,6 +150,11 @@ export function Brands({
           </p>
         </div>
         <div className="brand-actions">
+          {b && canEdit && (
+            <button className="outline-btn" onClick={() => setClientArea(true)}>
+              <Link2 size={16} /> Área do cliente
+            </button>
+          )}
           {b && canManage && (
             <>
               <button
@@ -575,6 +583,9 @@ export function Brands({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {clientArea && b && (
+        <ClientLink state={state} brandId={b.id} close={() => setClientArea(false)} />
+      )}
       {onboarding && (
         <BrandOnboarding
           close={() => setOnboarding(false)}
