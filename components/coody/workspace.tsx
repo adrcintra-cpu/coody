@@ -1,6 +1,8 @@
 'use client';
 import { Login } from './login';
 import { AcceptInvite } from './invite';
+import { ClientBoard } from './client-board';
+import { Production } from './production';
 import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
@@ -61,7 +63,7 @@ const nav = [
   ['Calendário', CalendarDays],
   ['Conteúdos', Layers],
   ['Marcas', Shapes],
-  ['Aprovações', CheckCheck],
+  ['Produção', CheckCheck],
   ['Biblioteca', Library],
   ['Integrações', Plug],
   ['Configurações', SettingsIcon],
@@ -83,6 +85,12 @@ export default function Workspace() {
   // #convite?token=… opens the invite page instead of the workspace.
   const [inviteToken] = useState(() =>
     typeof window !== 'undefined' && window.location.hash.startsWith('#convite')
+      ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('token') || ''
+      : '',
+  );
+  // #cliente?token=… is the client's board (no login).
+  const [clientToken] = useState(() =>
+    typeof window !== 'undefined' && window.location.hash.startsWith('#cliente')
       ? new URLSearchParams(window.location.hash.split('?')[1] || '').get('token') || ''
       : '',
   );
@@ -150,6 +158,7 @@ export default function Workspace() {
           params = new URLSearchParams(query || '');
         if (nav.some(([v]) => v === name) || name === 'Studio')
           setView(name as View);
+        else if (name === 'Aprovações') setView('Produção');
         else if (name) {
           setView('Dashboard');
           setMessage('Página não encontrada. Você voltou ao Dashboard.');
@@ -285,6 +294,7 @@ export default function Workspace() {
     navigate('Biblioteca', { brand: id });
   };
   const item = visible?.contents.find((c) => c.id === selected);
+  if (clientToken) return <ClientBoard token={clientToken} />;
   if (inviteToken) return <AcceptInvite token={inviteToken} />;
   if (loginRequired) return <Login />;
   const role = state?.user?.role;
@@ -324,7 +334,7 @@ export default function Workspace() {
                 >
                   <Icon />
                   <span>{name}</span>
-                  {name === 'Aprovações' &&
+                  {name === 'Produção' &&
                     !!visible?.contents.filter((c) => c.status === 'APROVAÇÃO')
                       .length && (
                       <span className="nav-badge">
@@ -494,7 +504,14 @@ export default function Workspace() {
               open={open}
               create={create}
             />
-          ) : view === 'Conteúdos' || view === 'Aprovações' ? (
+          ) : view === 'Produção' || view === 'Aprovações' ? (
+            <Production
+              state={visible}
+              month={month}
+              act={act}
+              open={(id) => navigate('Studio', { id })}
+            />
+          ) : view === 'Conteúdos' ? (
             <Contents
               act={act}
               reload={reload}

@@ -19,9 +19,7 @@ import {
 import { isInactive } from '@/lib/brand-lifecycle';
 import { actionPermission, can, deniedMessage } from '@/lib/permissions';
 import { validateAttachments } from '@/lib/creative-materials';
-import { notifySlack } from '@/lib/slack-send';
-import type { SlackEvent } from '@/lib/slack';
-import type { Brand, Content, Status, Plan } from '@/lib/types';
+import { formats, type Brand, type Content, type Status, type Plan, type MediaItem } from '@/lib/types';
 export async function GET(request: Request) {
   const user = await authorize(request);
   if (user instanceof Response) return user;
@@ -170,7 +168,7 @@ export async function POST(request: Request) {
       const date = str(data.date);
       validateDate(date);
       const format = str(data.format);
-      if (!['Feed', 'Story', 'Feed + Story'].includes(format))
+      if (!(formats as readonly string[]).includes(format))
         throw new Error('Selecione um formato válido.');
       if (!brand.pillars.some((p) => p.name === data.pillar))
         throw new Error('Selecione um pilar válido.');
@@ -301,7 +299,10 @@ export async function POST(request: Request) {
         .filter((v) => v.contentId === item.id)
         .sort((a, b) => b.number - a.number)[0];
       let sharedAsset = '';
-      if (['APROVAÇÃO', 'APROVADO'].includes(target)) {
+      // Pieces sent as files (video, carousel, external): only need the files.
+      if (['APROVAÇÃO', 'APROVADO'].includes(target) && version?.media?.length) {
+        sharedAsset = version.media.find((m) => m.mime.startsWith('image/'))?.url || '';
+      } else if (['APROVAÇÃO', 'APROVADO'].includes(target)) {
         if (!version?.headline || !version.caption)
           throw new Error('Complete headline e legenda no Studio.');
         validateHashtags(version.hashtags);
@@ -323,10 +324,12 @@ export async function POST(request: Request) {
       }
       if (target === 'ALTERAÇÃO' && !str(data.comment))
         throw new Error('Descreva a alteração solicitada.');
+      if (target === 'AJUSTE' && !str(data.comment))
+        throw new Error('Descreva o ajuste solicitado.');
       if (['REVISÃO', 'APROVAÇÃO'].includes(target)) {
         const changeRequest = await db
           .prepare(
-            "SELECT versionId FROM approvals WHERE contentId=? AND decision='ALTERAÇÃO' ORDER BY createdAt DESC LIMIT 1",
+            "SELECT versionId FROM approvals WHERE contentId=? AND decision IN ('ALTERAÇÃO','AJUSTE') ORDER BY createdAt DESC LIMIT 1",
           )
           .bind(item.id)
           .first<{ versionId: string }>();
@@ -357,7 +360,7 @@ export async function POST(request: Request) {
           if (approvedArt) statements.push(insert('brand_assets', approvedArt));
         }
       }
-      if (['APROVAÇÃO', 'APROVADO', 'ALTERAÇÃO'].includes(target))
+      if (['APROVAÇÃO', 'APROVADO', 'ALTERAÇÃO', 'AJUSTE'].includes(target))
         statements.push(
           insert('approvals', {
             id: id(),
@@ -491,6 +494,67 @@ export async function POST(request: Request) {
           );
         }
       }
+    } else if (action === 'createExternal' || action === 'mediaVersion') {
+      // A post, carousel, video or file made outside the COODY, sent for
+      // approval. createExternal makes the piece already in approval;
+      // mediaVersion adds a new version with new files (after a request).
+      const target =
+        action === 'createExternal' ? brand : state.brands.find((b) => b.id === item?.brandId);
+      if (!target) throw new Error('Selecione uma marca válida.');
+      if (action === 'mediaVersion' && !item) throw new Error('Conteúdo não encontrado.');
+      if (action === 'mediaVersion' && ['APROVADO', 'PUBLICADO'].includes(item!.status))
+        throw new Error('Esta peça já foi aprovada.');
+      const ids = Array.isArray(data.media) ? data.media.filter((x): x is string => typeof x === 'string') : [];
+      if (!ids.length || ids.length > 20) throw new Error('Envie de 1 a 20 arquivos.');
+      const media: MediaItem[] = ids.map((id) => {
+        const a = state.assets.find((x) => x.id === id && x.brandId === target.id);
+        if (!a) throw new Error('Arquivo não encontrado nesta marca.');
+        return { url: a.url, mime: a.mime, name: a.name };
+      });
+      const firstImage = media.find((m) => m.mime.startsWith('image/'))?.url || '';
+      const contentId = action === 'createExternal' ? entityId : item!.id;
+      if (action === 'createExternal') {
+        const title = str(data.title, 200);
+        if (!title) throw new Error('Informe o título da peça.');
+        const date = str(data.date);
+        validateDate(date);
+        const format = str(data.format) || (media.length > 1 ? 'Carrossel' : media[0].mime.startsWith('video/') ? 'Vídeo' : media[0].mime.startsWith('image/') ? 'Feed' : 'Arquivo');
+        if (!(formats as readonly string[]).includes(format)) throw new Error('Selecione um formato válido.');
+        statements.push(
+          insert('content_items', {
+            id: contentId,
+            brandId: target.id,
+            title,
+            brief: str(data.brief),
+            objective: 'Aprovação de peça',
+            pillar: target.pillars[0]?.name || 'Institucional',
+            date,
+            format,
+            status: 'APROVAÇÃO',
+            createdAt: now,
+            attachments: [],
+          }),
+        );
+      }
+      const versions = state.versions.filter((v) => v.contentId === contentId);
+      const last = versions.sort((a, b) => b.number - a.number)[0];
+      statements.push(
+        insert('content_versions', {
+          id: id(),
+          contentId,
+          number: (last?.number || 0) + 1,
+          headline: last?.headline || str(data.title, 300) || 'Peça enviada',
+          copy: last?.copy || '',
+          caption: str(data.caption) || last?.caption || '',
+          hashtags: last?.hashtags || [],
+          feedUrl: firstImage,
+          storyUrl: firstImage,
+          change: str(data.change) || (action === 'createExternal' ? 'Peça enviada para aprovação' : 'Nova versão enviada'),
+          createdAt: now,
+          locked: 0,
+          media,
+        }),
+      );
     } else if (action === 'setAttachments') {
       if (!item) throw new Error('Conteúdo não encontrado.');
       if (['APROVADO', 'PUBLICADO', 'APROVAÇÃO'].includes(item.status))
@@ -611,31 +675,6 @@ export async function POST(request: Request) {
       }),
     );
     await db.batch(statements);
-    // Slack notice after the change is saved (never fails the action).
-    const slackEvent: SlackEvent | '' =
-      action === 'comment'
-        ? 'comment'
-        : action === 'status' &&
-            ['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO', 'PUBLICADO'].includes(
-              String(data.status),
-            )
-          ? (data.status as SlackEvent)
-          : '';
-    if (slackEvent && item && state.workspace)
-      await notifySlack(state.workspace.id, slackEvent, {
-        event: slackEvent,
-        title: item.title,
-        brand: state.brands.find((b) => b.id === item.brandId)?.name || '',
-        date: item.date,
-        user: user.name,
-        link:
-          new URL(request.url).origin +
-          '/#Studio?id=' +
-          encodeURIComponent(item.id) +
-          '&month=' +
-          item.date.slice(0, 7),
-        comment: str(action === 'comment' ? data.text : data.comment),
-      });
     return Response.json({ ok: true, id: entityId });
   } catch (error) {
     const message =

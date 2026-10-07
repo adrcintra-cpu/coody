@@ -30,6 +30,11 @@ export const assetCategories = [
     label: 'Materiais',
     role: 'Fonte adicional de informação e contexto',
   },
+  {
+    value: 'delivery',
+    label: 'Peças enviadas',
+    role: 'Posts, vídeos, carrosséis e arquivos enviados para aprovação (a IA não usa)',
+  },
 ] as const;
 export type AssetCategory = (typeof assetCategories)[number]['value'];
 const legacyCategories: Record<string, AssetCategory> = {

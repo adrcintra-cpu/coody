@@ -4,6 +4,7 @@ export const statuses = [
   'EM CRIAÇÃO',
   'REVISÃO',
   'APROVAÇÃO',
+  'AJUSTE',
   'ALTERAÇÃO',
   'APROVADO',
   'PUBLICADO',
@@ -15,6 +16,7 @@ export const statusLabels: Record<Status, string> = {
   'EM CRIAÇÃO': 'Em criação',
   REVISÃO: 'Em revisão',
   APROVAÇÃO: 'Aguardando aprovação',
+  AJUSTE: 'Em ajuste',
   ALTERAÇÃO: 'Em alteração',
   APROVADO: 'Aprovado',
   PUBLICADO: 'Publicado',
@@ -84,7 +86,13 @@ export type Version = {
   change: string;
   createdAt: string;
   locked: number;
+  /** Files of this version beyond the single art: carousel slides, a video
+   *  or an external file sent for approval. Empty for single-image pieces. */
+  media?: MediaItem[];
 };
+export type MediaItem = { url: string; mime: string; name: string };
+/** Piece formats: AI art (Feed/Story), carousel, video or an external file. */
+export const formats = ['Feed + Story', 'Feed', 'Story', 'Carrossel', 'Vídeo', 'Arquivo'] as const;
 export type Asset = {
   description: string;
   aiNotes: string;
@@ -149,6 +157,7 @@ export type View =
   | 'Conteúdos'
   | 'Marcas'
   | 'Aprovações'
+  | 'Produção'
   | 'Biblioteca'
   | 'Integrações'
   | 'Configurações'

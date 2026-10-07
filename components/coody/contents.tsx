@@ -80,7 +80,7 @@ export function Contents({
         (brand === 'all' || c.brandId === brand) &&
         (status === 'all' || c.status === status) &&
         (!approvals ||
-          ['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO'].includes(c.status)) &&
+          ['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO', 'APROVADO'].includes(c.status)) &&
         (!q ||
           normalize(c.title + ' ' + c.brief + ' ' + brandName(c.brandId)).includes(q)),
     )
@@ -196,7 +196,7 @@ export function Contents({
           options={[
             { value: 'all', label: 'Todos os status' },
             ...(approvals
-              ? (['APROVAÇÃO', 'ALTERAÇÃO', 'APROVADO'] as Status[])
+              ? (['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO', 'APROVADO'] as Status[])
               : statuses
             ).map((s) => ({ value: s, label: statusLabels[s] })),
           ]}
