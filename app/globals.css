@@ -2104,3 +2104,34 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
 .attachment i{position:absolute;top:10px;right:10px;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#a879c4;color:#fff}
 .attachment:disabled{opacity:.45;cursor:not-allowed}
 .attachment.selected:disabled{opacity:.8}
+
+/* Plano do mês em texto (equipe e cliente) */
+.plan-sheet { display: grid; gap: 14px; }
+.plan-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.plan-approval { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--muted, #f1f1f1); }
+.plan-approval.enviado { background: #fff4d6; color: #7a5200; }
+.plan-approval.ajustes { background: #ffe3e0; color: #8a1f12; }
+.plan-approval.aprovado { background: #dcf5e4; color: #14622f; }
+.plan-approval.rascunho { background: #eceef2; color: #4a5160; }
+.plan-note p { white-space: pre-wrap; margin: 4px 0 0; }
+.plan-focus { margin: 0; }
+.plan-lines { list-style: none; margin: 0; padding: 0; display: grid; }
+.plan-lines li + li { border-top: 1px solid var(--border, #e6e6e6); }
+.plan-lines li > button, .plan-lines li > div {
+  all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 112px 1fr auto;
+  gap: 14px; padding: 12px 4px; align-items: start; cursor: default;
+}
+.plan-lines li > button { cursor: pointer; }
+.plan-lines li > button:hover { background: var(--hover, rgba(0, 0, 0, .03)); }
+.plan-lines li > button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.plan-day { font-weight: 700; font-variant-numeric: tabular-nums; }
+.plan-what { display: grid; gap: 3px; min-width: 0; }
+.plan-what small { opacity: .7; }
+.plan-brief { opacity: .8; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.plan-lines em { font-style: normal; font-size: 12px; opacity: .75; white-space: nowrap; }
+.plan-decision { display: grid; gap: 10px; }
+.plan-waiting { display: grid; gap: 4px; margin-bottom: 14px; }
+.client-plan-title { margin: 8px 0 12px; }
+@media (max-width: 640px) {
+  .plan-lines li > button, .plan-lines li > div { grid-template-columns: 1fr; gap: 4px; }
+}
