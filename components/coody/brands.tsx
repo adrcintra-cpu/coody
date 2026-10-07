@@ -261,6 +261,12 @@ export function Brands({
                     <strong>{b.monthlyGoal} conteúdos</strong>
                   </div>
                   <div className="detail-line">
+                    <span>Horas contratadas</span>
+                    <strong>
+                      {b.contractedHours ? `${String(b.contractedHours).replace('.', ',')} h por mês` : 'Não informado'}
+                    </strong>
+                  </div>
+                  <div className="detail-line">
                     <span>Produtos</span>
                     <strong>{b.products || 'Não informado'}</strong>
                   </div>
@@ -654,7 +660,23 @@ function BrandEditor({
             <TabsTrigger value="general">Marca</TabsTrigger>
             <TabsTrigger value="identity">Identidade</TabsTrigger>
             <TabsTrigger value="pillars">Pilares e frequência</TabsTrigger>
+            <TabsTrigger value="contract">Contrato</TabsTrigger>
           </TabsList>
+          <TabsContent value="contract">
+            <Field label="Horas de desenvolvimento contratadas por mês">
+              <Input
+                type="number"
+                min={0}
+                max={1000}
+                step={0.5}
+                value={b.contractedHours ?? 0}
+                onChange={(e) => update('contractedHours', Number(e.target.value))}
+              />
+            </Field>
+            <p className="form-hint">
+              Quantas horas de criação este cliente contratou por mês. Use 0 se ainda não houver contrato definido.
+            </p>
+          </TabsContent>
           <TabsContent value="general">
             {[
               ['name', 'Nome'],
@@ -670,7 +692,7 @@ function BrandEditor({
                     b[
                       k as Exclude<
                         keyof Brand,
-                        'pillars' | 'monthlyGoal' | 'weeklyGoal'
+                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours'
                       >
                     ]
                   }
@@ -690,7 +712,7 @@ function BrandEditor({
                     b[
                       k as Exclude<
                         keyof Brand,
-                        'pillars' | 'monthlyGoal' | 'weeklyGoal'
+                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours'
                       >
                     ]
                   }
@@ -717,7 +739,7 @@ function BrandEditor({
                     b[
                       k as Exclude<
                         keyof Brand,
-                        'pillars' | 'monthlyGoal' | 'weeklyGoal'
+                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours'
                       >
                     ]
                   }

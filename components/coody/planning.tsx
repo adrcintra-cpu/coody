@@ -1,10 +1,14 @@
 'use client';
 import { useState } from 'react';
-import { CalendarRange, Plus, Sparkles, Check, Save } from 'lucide-react';
+import { CalendarRange, Plus, Sparkles, Check, Save, Send, Undo2, Link2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Picker, ContentRow, NoData, Meter } from './shared';
+import { Picker, NoData, Meter } from './shared';
+import { PlanSheet } from './plan-sheet';
+import { ClientLink } from './production';
+import { can } from '@/lib/permissions';
+import { planApprovalOf } from '@/lib/domain';
 import { Field, FormModal } from './forms';
 import { planProposal, dateAvailableToBrand, isRelevantSegment } from '@/lib/domain';
 import type { State, Action, Content, Plan } from '@/lib/types';
@@ -39,6 +43,21 @@ export function Planning({
   const [addDate, setAddDate] = useState(false);
   const [editingPlan, setEditingPlan] = useState(false);
   const [legacyDate, setLegacyDate] = useState('');
+  const [sharing, setSharing] = useState(false);
+  const role = state.user?.role;
+  const planAction = async (status: 'enviado' | 'rascunho' | 'aprovado') => {
+    if (!saved) return;
+    setBusy(true);
+    setError('');
+    try {
+      await act('planApproval', { id: saved.id, status });
+      if (status === 'enviado') setSharing(true);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const items = state.contents.filter(
     (c) => c.brandId === brandId && c.date.startsWith(month),
   );
@@ -475,16 +494,59 @@ export function Planning({
               </button>
             </>
           ) : items.length ? (
-            items
-              .sort((a, b) => a.date.localeCompare(b.date))
-              .map((c) => (
-                <ContentRow
-                  key={c.id}
-                  item={c}
-                  brand={b}
-                  onOpen={() => open(c)}
-                />
-              ))
+            <PlanSheet
+              brand={b?.name || ''}
+              month={month}
+              items={items}
+              plan={saved || null}
+              onOpen={(id) => {
+                const c = items.find((x) => x.id === id);
+                if (c) open(c);
+              }}
+              actions={
+                saved && (
+                  <>
+                    {planApprovalOf(saved) !== 'aprovado' && (
+                      <p className="form-hint">
+                        As pautas entram no quadro de Produção quando o cliente aprovar este planejamento.
+                      </p>
+                    )}
+                    {error && (
+                      <p className="error" role="alert">
+                        {error}
+                      </p>
+                    )}
+                    <div className="form-actions">
+                      {planApprovalOf(saved) === 'enviado' && can(role, 'edit') && (
+                        <button className="outline-btn" disabled={busy} onClick={() => void planAction('rascunho')}>
+                          <Undo2 size={15} /> Voltar para rascunho
+                        </button>
+                      )}
+                      {planApprovalOf(saved) === 'enviado' && can(role, 'approve') && (
+                        <button className="outline-btn" disabled={busy} onClick={() => void planAction('aprovado')}>
+                          <Check size={15} /> Cliente aprovou por fora
+                        </button>
+                      )}
+                      {planApprovalOf(saved) === 'enviado' && can(role, 'edit') && (
+                        <button className="outline-btn" disabled={busy} onClick={() => setSharing(true)}>
+                          <Link2 size={15} /> Link do cliente
+                        </button>
+                      )}
+                      {['rascunho', 'ajustes'].includes(planApprovalOf(saved)) && can(role, 'edit') && (
+                        <button className="create-btn" disabled={busy} onClick={() => void planAction('enviado')}>
+                          <Send size={15} />{' '}
+                          {busy
+                            ? 'Enviando…'
+                            : planApprovalOf(saved) === 'ajustes'
+                              ? 'Reenviar para o cliente'
+                              : 'Enviar para o cliente aprovar'}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )
+              }
+            />
           ) : (
             <NoData
               title="Um mês pronto para ganhar ideias"
@@ -521,6 +583,7 @@ export function Planning({
           )}
         </section>
       </div>
+      {sharing && <ClientLink state={state} brandId={brandId} close={() => setSharing(false)} />}
       {addDate && (
         <DateForm
           month={month}

@@ -31,6 +31,7 @@ export function parseBrand(
     services: textValue(data.services),
     monthlyGoal: Number(data.monthlyGoal ?? 12),
     weeklyGoal: Number(data.weeklyGoal ?? 3),
+    contractedHours: Number(data.contractedHours ?? 0),
     pillars: (data.pillars ?? [
       { name: 'Institucional', percent: 50 },
       { name: 'Produtos', percent: 50 },
@@ -46,6 +47,13 @@ export function parseBrand(
     row.weeklyGoal > 30
   )
     throw new Error('Revise as metas mensal e semanal.');
+  if (
+    !Number.isFinite(row.contractedHours) ||
+    row.contractedHours! < 0 ||
+    row.contractedHours! > 1000
+  )
+    throw new Error('Revise as horas contratadas (0 a 1000 por mês).');
+  row.contractedHours = Math.round(row.contractedHours! * 2) / 2;
   validatePillars(row.pillars);
   return row;
 }
