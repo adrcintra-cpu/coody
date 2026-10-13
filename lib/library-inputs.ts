@@ -20,8 +20,11 @@ export async function libraryInputs(materials: Asset[]) {
       'A biblioteca supera 16 imagens por geração. Organize as referências da marca antes de continuar.',
     );
   for (const asset of materials) {
+    // "Arte aprovada" records point to the approved art's own file
+    // (url /api/assets/<source id>); the file is stored under that id.
+    const fileId = /^\/api\/assets\/([A-Za-z0-9-]+)$/.exec(asset.url || '')?.[1] || asset.id;
     const object = await bucket().get(
-      'brands/' + asset.brandId + '/' + asset.id,
+      'brands/' + asset.brandId + '/' + fileId,
     );
     if (!object)
       throw new Error('Arquivo da biblioteca indisponível: ' + asset.name);
