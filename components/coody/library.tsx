@@ -38,6 +38,8 @@ import {
 } from '@/lib/brand-memory';
 import { checkImageFile, fitUpload } from '@/lib/client-upload';
 import type { State, Action, Asset } from '@/lib/types';
+import { ReferenceSheet } from './art-direction';
+import { parseReferenceMeta, referenceCategories, type ReferenceMeta } from '@/lib/art-direction';
 export const categories = assetCategories.map((c) => c.label);
 export function LibraryView({
   state,
@@ -519,6 +521,9 @@ export function AssetEditor({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Ficha da referência (only for references and approved art).
+  const [meta, setMeta] = useState<ReferenceMeta>(asset?.meta || parseReferenceMeta({}));
+  const isReference = !!asset && referenceCategories.includes(value.category);
   return (
     <FormModal
       open
@@ -541,6 +546,7 @@ export function AssetEditor({
                 id: asset.id,
                 brandId: brand,
                 ...value,
+                ...(isReference ? { meta } : {}),
               });
             } else {
               if (!files.length) throw new Error('Selecione ao menos um arquivo.');
@@ -699,6 +705,17 @@ export function AssetEditor({
           <p className="form-hint">
             Papel no contexto: {categoryInfo(value.category).role}.
           </p>
+          {isReference && asset && (
+            <ReferenceSheet
+              assetId={asset.id}
+              value={meta}
+              onChange={setMeta}
+              analysis={asset.meta?.analysis}
+              analyzedAt={asset.meta?.analyzedAt}
+              canAnalyze={can(state.user?.role, 'edit') && /^image\/(png|jpeg|webp)$/.test(asset.mime)}
+              onAnalyzed={() => {}}
+            />
+          )}
         </fieldset>
         {error && (
           <p role="alert" className="error">

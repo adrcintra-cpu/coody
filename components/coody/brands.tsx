@@ -32,6 +32,8 @@ import { can } from '@/lib/permissions';
 import { ClientLink } from './production';
 import { LibraryView } from './library';
 import { Planning } from './planning';
+import { DNAEditor, LinesEditor } from './art-direction';
+import { dnaFields, dnaFilled, parseDNA } from '@/lib/art-direction';
 import { Contents } from './contents';
 import { identityCompleteness } from '@/lib/brand-memory';
 import { BrandMark } from './shared';
@@ -259,6 +261,13 @@ export function Brands({
                   <div className="detail-line">
                     <span>Meta mensal</span>
                     <strong>{b.monthlyGoal} conteúdos</strong>
+                  </div>
+                  <div className="detail-line">
+                    <span>DNA criativo</span>
+                    <strong>
+                      {dnaFilled(parseDNA(b.artDNA))} de {dnaFields.length + 1} itens ·{' '}
+                      {(b.creativeLines || []).length} linha(s) criativa(s)
+                    </strong>
                   </div>
                   <div className="detail-line">
                     <span>Horas contratadas</span>
@@ -660,8 +669,16 @@ function BrandEditor({
             <TabsTrigger value="general">Marca</TabsTrigger>
             <TabsTrigger value="identity">Identidade</TabsTrigger>
             <TabsTrigger value="pillars">Pilares e frequência</TabsTrigger>
+            <TabsTrigger value="dna">DNA criativo</TabsTrigger>
+            <TabsTrigger value="lines">Linhas criativas</TabsTrigger>
             <TabsTrigger value="contract">Contrato</TabsTrigger>
           </TabsList>
+          <TabsContent value="dna">
+            <DNAEditor value={b.artDNA} onChange={(v) => update('artDNA', v)} />
+          </TabsContent>
+          <TabsContent value="lines">
+            <LinesEditor value={b.creativeLines} onChange={(v) => update('creativeLines', v)} />
+          </TabsContent>
           <TabsContent value="contract">
             <Field label="Horas de desenvolvimento contratadas por mês">
               <Input
@@ -692,7 +709,7 @@ function BrandEditor({
                     b[
                       k as Exclude<
                         keyof Brand,
-                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours'
+                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours' | 'artDNA' | 'creativeLines'
                       >
                     ]
                   }
@@ -712,7 +729,7 @@ function BrandEditor({
                     b[
                       k as Exclude<
                         keyof Brand,
-                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours'
+                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours' | 'artDNA' | 'creativeLines'
                       >
                     ]
                   }
@@ -739,7 +756,7 @@ function BrandEditor({
                     b[
                       k as Exclude<
                         keyof Brand,
-                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours'
+                        'pillars' | 'monthlyGoal' | 'weeklyGoal' | 'contractedHours' | 'artDNA' | 'creativeLines'
                       >
                     ]
                   }

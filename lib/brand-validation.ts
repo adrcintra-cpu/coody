@@ -1,5 +1,6 @@
 import type { Brand } from './types';
 import { validatePillars } from './domain';
+import { parseDNA, validateLines } from './art-direction';
 export const textValue = (v: unknown, max = 6000) =>
   typeof v === 'string' ? v.trim().slice(0, max) : '';
 export function parseBrand(
@@ -32,6 +33,8 @@ export function parseBrand(
     monthlyGoal: Number(data.monthlyGoal ?? 12),
     weeklyGoal: Number(data.weeklyGoal ?? 3),
     contractedHours: Number(data.contractedHours ?? 0),
+    artDNA: parseDNA(data.artDNA ?? {}),
+    creativeLines: validateLines(data.creativeLines ?? []),
     pillars: (data.pillars ?? [
       { name: 'Institucional', percent: 50 },
       { name: 'Produtos', percent: 50 },

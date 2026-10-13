@@ -2135,3 +2135,46 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
 @media (max-width: 640px) {
   .plan-lines li > button, .plan-lines li > div { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* Direção de arte: DNA, linhas, ficha de referência, conceitos e validação */
+.dna-generic { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 14px; }
+.lines-editor { display: grid; gap: 12px; }
+.line-edit { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--border, #e6e6e6); border-radius: 10px; }
+.line-edit-head { display: flex; gap: 8px; }
+.line-edit-head input { flex: 1; }
+.line-suggestions { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.reference-sheet { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border, #e6e6e6); }
+.reference-sheet h3 { margin: 0; }
+.reference-analysis { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--hover, rgba(127, 127, 127, .08)); }
+.reference-analysis-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.reference-analysis dl, .direction-reading dl, .concept dl, .validation-report dl { display: grid; gap: 6px; margin: 6px 0 0; }
+.reference-analysis dt, .direction-reading dt, .concept dt, .validation-report dt { font-size: 12px; font-weight: 600; opacity: .7; }
+.reference-analysis dd, .direction-reading dd, .concept dd, .validation-report dd { margin: 0; }
+.creative-direction h2 { display: flex; align-items: center; gap: 8px; }
+.direction-lines { display: flex; flex-wrap: wrap; gap: 6px 16px; border: 0; padding: 0; margin: 0 0 10px; }
+.direction-lines legend { font-size: 13px; opacity: .75; margin-bottom: 6px; }
+.direction-actions { justify-content: space-between; }
+.direction-message { display: block; margin-top: 8px; }
+.direction-result { display: grid; gap: 12px; margin-top: 16px; }
+.direction-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.direction-head select { max-width: 100%; }
+.concepts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.concept { display: grid; gap: 8px; align-content: start; padding: 14px; border: 1px solid var(--border, #e6e6e6); border-radius: 12px; }
+.concept.chosen { border-color: #8b3fd9; box-shadow: 0 0 0 1px #8b3fd9; }
+.concept header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.concept h3 { margin: 0; }
+.concept p { margin: 0; }
+.concept-kind { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .8; }
+.concept-kind.autoral { color: #8b3fd9; opacity: 1; }
+.concept-kind.experimental { color: #d9622b; opacity: 1; }
+.concept-chosen { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: #14622f; }
+.concept-tags { font-size: 13px; opacity: .85; }
+.concept .form-actions { flex-wrap: wrap; margin-top: auto; }
+.validation-report { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border, #e6e6e6); }
+.validation-head { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.validation-head strong { display: inline-flex; gap: 6px; align-items: center; }
+.validation-score { font-weight: 700; font-size: 18px; }
+.validation-score.good { color: #1f9d55; }
+.validation-score.ok { color: #c08400; }
+.validation-score.bad { color: #d13b2b; }
+.validation-report ul { margin: 4px 0 0; padding-left: 18px; }

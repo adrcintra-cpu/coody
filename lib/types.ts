@@ -48,6 +48,9 @@ export type Brand = {
   pillars: { name: string; percent: number }[];
   /** Development hours the client contracted per month (0 = not set). */
   contractedHours?: number;
+  /** Direção de arte: DNA criativo e linhas criativas (lib/art-direction). */
+  artDNA?: import('./art-direction').ArtDNA;
+  creativeLines?: import('./art-direction').CreativeLine[];
   /** 'inactive' hides the brand from every screen except Marcas. */
   status?: 'active' | 'inactive';
 };
@@ -91,6 +94,10 @@ export type Version = {
   /** Files of this version beyond the single art: carousel slides, a video
    *  or an external file sent for approval. Empty for single-image pieces. */
   media?: MediaItem[];
+  /** JSON: the approved concept this version was created from. */
+  direction?: string;
+  /** JSON: the AI check of the art against the brand (ArtValidation). */
+  validation?: string;
 };
 export type MediaItem = { url: string; mime: string; name: string };
 /** Piece formats: AI art (Feed/Story), carousel, video or an external file. */
@@ -108,6 +115,8 @@ export type Asset = {
   priority: number;
   approved: number;
   createdAt: string;
+  /** Ficha de referência (campanha, estilo, análise visual da IA…). */
+  meta?: import('./art-direction').ReferenceMeta;
 };
 export type Comment = {
   id: string;
