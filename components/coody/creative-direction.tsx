@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Check, Compass, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useIntegrationStatus, IntegrationMissing } from './integration-status';
@@ -24,6 +24,27 @@ type Direction = {
   createdBy: string;
   createdAt: string;
 };
+/* The Studio remounts when a new version arrives; the progress and the last
+ * message of each piece live here so they survive it (and a second paid
+ * request cannot start while one is running). */
+type Progress = { busy: '' | 'concepts' | 'generate' | 'validate'; message: string };
+const progress = new Map<string, Progress>();
+const listeners = new Set<() => void>();
+const idle: Progress = { busy: '', message: '' };
+function setProgress(id: string, patch: Partial<Progress>) {
+  progress.set(id, { ...(progress.get(id) || idle), ...patch });
+  listeners.forEach((l) => l());
+}
+function useProgress(id: string) {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    () => progress.get(id) || idle,
+    () => idle,
+  );
+}
 const post = async <T,>(url: string, body: unknown): Promise<T> => {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = (await r.json().catch(() => ({}))) as T & { error?: string };
@@ -59,8 +80,8 @@ export function CreativeDirection({
   const [instructions, setInstructions] = useState('');
   const [history, setHistory] = useState<Direction[]>([]);
   const [shownId, setShownId] = useState('');
-  const [busy, setBusy] = useState<'' | 'concepts' | 'generate' | 'validate'>('');
-  const [message, setMessage] = useState('');
+  const { busy, message } = useProgress(item.id);
+  const setMessage = (m: string) => setProgress(item.id, { message: m });
   const [variation, setVariation] = useState<{ index: number; text: string } | null>(null);
   const load = useCallback(async () => {
     const r = await fetch('/api/openai/direction?contentId=' + item.id, { cache: 'no-store' });
@@ -72,17 +93,21 @@ export function CreativeDirection({
   }, [load]);
   const shown = history.find((h) => h.id === shownId) || history[0];
   const working = !!busy;
-  const run = async (kind: typeof busy, fn: () => Promise<void>) => {
-    setBusy(kind);
-    onBusy(true);
-    setMessage('');
+  // Keeps the Studio locked while this piece's request runs, also after the
+  // Studio remounts with the new version.
+  useEffect(() => {
+    onBusy(!!busy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy]);
+  const run = async (kind: Progress['busy'], fn: () => Promise<void>) => {
+    if (progress.get(item.id)?.busy) return;
+    setProgress(item.id, { busy: kind, message: '' });
     try {
       await fn();
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
-      setBusy('');
-      onBusy(false);
+      setProgress(item.id, { busy: '' });
     }
   };
   const propose = (base?: { id: string; index: number }, extra = '') =>
