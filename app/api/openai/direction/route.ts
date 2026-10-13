@@ -132,7 +132,7 @@ export async function POST(request: Request) {
       .filter((a) => a.category === 'logo' && /^image\//.test(a.mime))
       .slice(0, 2);
     const files: Asset[] = [...logos, ...references, ...products].filter(
-      (a, i, all) => all.findIndex((x) => x.id === a.id) === i,
+      (a, i, all) => all.findIndex((x) => x.id === a.id || (!!x.url && x.url === a.url)) === i,
     );
     const inputs = await libraryInputs(files);
     // Recent decisions of this brand, so concepts do not repeat themselves.
