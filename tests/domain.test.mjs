@@ -452,3 +452,22 @@ test('kanban: columns and drops follow the flow', () => {
   assert.equal(clientDrop('publicado', 'APROVAÇÃO'), null);
   assert.ok(needsComment('AJUSTE') && !needsComment('APROVADO'));
 });
+
+test('plano do mês: retenção até a aprovação do cliente e texto', async () => {
+  const { heldByPlan, planApprovalOf, planText } = await import('../lib/domain.ts');
+  const piece = { brandId: 'b', date: '2026-10-07', status: 'PLANEJADO' };
+  assert.equal(planApprovalOf(null), 'aprovado');
+  assert.equal(planApprovalOf({ approval: null }), 'aprovado');
+  assert.equal(heldByPlan(piece, []), false);
+  assert.equal(heldByPlan(piece, [{ brandId: 'b', month: '2026-10', approval: null }]), false);
+  assert.equal(heldByPlan(piece, [{ brandId: 'b', month: '2026-10', approval: 'enviado' }]), true);
+  assert.equal(heldByPlan(piece, [{ brandId: 'b', month: '2026-10', approval: 'aprovado' }]), false);
+  assert.equal(heldByPlan({ ...piece, status: 'APROVAÇÃO' }, [{ brandId: 'b', month: '2026-10', approval: 'enviado' }]), false);
+  const text = planText('Aurora', '2026-10', [
+    { date: '2026-10-09', title: 'B', format: 'Feed' },
+    { date: '2026-10-07', title: 'A', format: 'Story', brief: 'x'.repeat(400) },
+  ]);
+  assert.match(text, /^Planejamento de outubro de 2026 · Aurora/);
+  assert.ok(text.indexOf('07/10 (qua) · Story') < text.indexOf('09/10 (sex) · Feed'));
+  assert.ok(text.includes('x'.repeat(277) + '…'));
+});

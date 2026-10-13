@@ -46,6 +46,8 @@ export type Brand = {
   monthlyGoal: number;
   weeklyGoal: number;
   pillars: { name: string; percent: number }[];
+  /** Development hours the client contracted per month (0 = not set). */
+  contractedHours?: number;
   /** 'inactive' hides the brand from every screen except Marcas. */
   status?: 'active' | 'inactive';
 };
@@ -132,6 +134,19 @@ export type Plan = {
   days: number[];
   campaign: string;
   selectedDates: string[];
+  /** Client approval of the month plan. NULL (plans made before this
+   *  existed) counts as approved. */
+  approval?: PlanApproval | null;
+  approvalNote?: string;
+  approvedAt?: string | null;
+  approvedBy?: string;
+};
+export type PlanApproval = 'rascunho' | 'enviado' | 'ajustes' | 'aprovado';
+export const planApprovalLabels: Record<PlanApproval, string> = {
+  rascunho: 'Rascunho · não enviado ao cliente',
+  enviado: 'Aguardando aprovação do cliente',
+  ajustes: 'Cliente pediu mudanças',
+  aprovado: 'Aprovado pelo cliente',
 };
 export type WorkspaceInfo = {id:string;name:string;avatarUrl:string};
 export type State = {

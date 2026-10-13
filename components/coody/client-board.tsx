@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Kanban, boardItem } from './kanban';
 import { FormModal } from './forms';
 import { displayDate, statusLabels, type Status } from '@/lib/types';
+import { planApprovalOf } from '@/lib/domain';
+import { PlanSheet, type PlanSheetPlan } from './plan-sheet';
 
 type Item = {
   id: string;
@@ -27,7 +29,7 @@ type Item = {
 type Board = {
   brand: { name: string; segment: string };
   month: string;
-  plan: { campaign?: string; monthlyGoal?: number } | null;
+  plan: (PlanSheetPlan & { monthlyGoal?: number }) | null;
   items: Item[];
 };
 const shiftMonth = (month: string, delta: number) => {
@@ -89,6 +91,21 @@ export function ClientBoard({ token }: { token: string }) {
     );
   const item = board.items.find((i) => i.id === openId);
   const monthItems = board.items.filter((i) => i.date.startsWith(board.month));
+  const approval = board.plan ? planApprovalOf(board.plan) : 'aprovado';
+  // Until the month plan is approved, its pieces stay out of the board.
+  const boardItems = board.items.filter(
+    (i) => !(approval !== 'aprovado' && i.date.startsWith(board.month) && ['IDEIA', 'PLANEJADO'].includes(i.status)),
+  );
+  const decidePlan = async (status: 'aprovado' | 'ajustes', comment = '') => {
+    const r = await fetch('/api/client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, month: board.month, status, comment, name }),
+    });
+    const d = (await r.json()) as { error?: string };
+    if (!r.ok) throw new Error(d.error || 'Não foi possível registrar.');
+    await load();
+  };
   return (
     <main className="client-page">
       <header className="client-header">
@@ -112,7 +129,7 @@ export function ClientBoard({ token }: { token: string }) {
           Quadro de produção
         </button>
         <button className={tab === 'planejamento' ? 'active' : ''} onClick={() => setTab('planejamento')}>
-          Planejamento do mês
+          Planejamento do mês{approval === 'enviado' ? ' · aprovar' : ''}
         </button>
         <label className="client-name">
           Seu nome
@@ -135,36 +152,39 @@ export function ClientBoard({ token }: { token: string }) {
             Arraste uma peça de “Para aprovação” para Aprovado, Ajuste ou Alteração, ou abra a peça e use os botões.
             Ajuste é um retoque na mesma arte; Alteração pede uma nova imagem.
           </p>
+          {approval === 'enviado' && (
+            <p className="notice">
+              O planejamento deste mês está esperando sua aprovação.{' '}
+              <button className="text-btn" onClick={() => setTab('planejamento')}>
+                Ver planejamento
+              </button>
+            </p>
+          )}
           <Kanban
-            items={board.items.map((i) => boardItem(i, board.brand.name, i))}
+            items={boardItems.map((i) => boardItem(i, board.brand.name, i))}
             mode="client"
             onOpen={setOpenId}
             onMove={decide}
           />
         </>
       ) : (
-        <section className="panel">
-          <h2>Planejamento de {monthName(board.month)}</h2>
-          {board.plan?.campaign && <p>{board.plan.campaign}</p>}
-          <p className="muted">
-            {monthItems.length} peça(s){board.plan?.monthlyGoal ? ` · meta de ${board.plan.monthlyGoal}` : ''}
-          </p>
-          <div className="client-plan">
-            {monthItems.map((i) => (
-              <button key={i.id} className="client-plan-row" onClick={() => setOpenId(i.id)}>
-                <strong>{displayDate(i.date)}</strong>
-                <span>
-                  {i.title}
-                  <small className="muted">
-                    {i.pillar} · {i.format}
-                  </small>
-                </span>
-                <em>{statusLabels[i.status]}</em>
-              </button>
-            ))}
-            {!monthItems.length && <p className="muted">Nenhuma peça planejada neste mês.</p>}
-          </div>
-        </section>
+        <>
+          <h2 className="client-plan-title">Planejamento de {monthName(board.month)}</h2>
+          <PlanSheet
+            brand={board.brand.name}
+            month={board.month}
+            items={monthItems}
+            plan={board.plan}
+            onOpen={setOpenId}
+            actions={
+              approval === 'enviado' ? (
+                <PlanDecision decide={decidePlan} />
+              ) : approval === 'ajustes' ? (
+                <p className="form-hint">A agência está revisando o planejamento com as suas observações.</p>
+              ) : null
+            }
+          />
+        </>
       )}
       {item && <PieceView item={item} close={() => setOpenId('')} decide={decide} />}
     </main>
@@ -278,5 +298,70 @@ function PieceView({
         </p>
       )}
     </FormModal>
+  );
+}
+
+function PlanDecision({ decide }: { decide: (status: 'aprovado' | 'ajustes', comment?: string) => Promise<void> }) {
+  const [asking, setAsking] = useState(false);
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const send = async (status: 'aprovado' | 'ajustes') => {
+    setBusy(true);
+    setError('');
+    try {
+      await decide(status, comment);
+      setAsking(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="plan-decision">
+      <p className="form-hint">
+        Confira as datas e os temas. Ao aprovar, as publicações entram na produção com estas datas.
+      </p>
+      {asking ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send('ajustes');
+          }}
+        >
+          <Textarea
+            autoFocus
+            rows={3}
+            maxLength={2000}
+            placeholder="O que mudar? Datas, temas, formatos…"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+          <div className="form-actions">
+            <button type="button" className="outline-btn" disabled={busy} onClick={() => setAsking(false)}>
+              Voltar
+            </button>
+            <button className="create-btn" disabled={busy || !comment.trim()}>
+              {busy ? 'Enviando…' : 'Enviar pedido'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="form-actions">
+          <button className="outline-btn" disabled={busy} onClick={() => setAsking(true)}>
+            Pedir mudanças
+          </button>
+          <button className="create-btn" disabled={busy} onClick={() => void send('aprovado')}>
+            {busy ? 'Aprovando…' : 'Aprovar planejamento'}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

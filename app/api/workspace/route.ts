@@ -457,7 +457,7 @@ export async function POST(request: Request) {
       } else if (action === 'savePlanConfig') {
         if (existing)
           throw new Error('Este mês já possui planejamento. Use Salvar revisão.');
-        statements.push(insert('monthly_plans', plan));
+        statements.push(insert('monthly_plans', { ...plan, approval: 'rascunho' }));
       } else {
         const slots = planProposal(
           brand,
@@ -470,7 +470,7 @@ export async function POST(request: Request) {
           throw new Error(
             'Este mês já foi planejado. Edite as pautas existentes ou crie novas pautas.',
           );
-        statements.push(insert('monthly_plans', plan));
+        statements.push(insert('monthly_plans', { ...plan, approval: 'rascunho' }));
         for (const p of proposal) {
           const contentId = id();
           statements.push(
@@ -494,6 +494,31 @@ export async function POST(request: Request) {
           );
         }
       }
+    } else if (action === 'planApproval') {
+      // The month plan: sent to the client, back to draft, or marked as
+      // approved by the team (when the client approved outside the link).
+      const plan = state.plans.find((p) => p.id === data.id);
+      if (!plan || !state.brands.some((b) => b.id === plan.brandId))
+        throw new Error('Planejamento não encontrado.');
+      const status = data.status;
+      if (status !== 'enviado' && status !== 'rascunho' && status !== 'aprovado')
+        throw new Error('Situação inválida.');
+      if (
+        status === 'enviado' &&
+        !state.contents.some((c) => c.brandId === plan.brandId && c.date.startsWith(plan.month))
+      )
+        throw new Error('Inclua ao menos uma pauta antes de enviar o planejamento.');
+      statements.push(
+        status === 'aprovado'
+          ? db
+              .prepare('UPDATE monthly_plans SET approval=?,approvedAt=?,approvedBy=? WHERE id=?')
+              .bind(status, now, (user.name || user.email) + ' (pela equipe)', plan.id)
+          : db
+              .prepare(
+                "UPDATE monthly_plans SET approval=?,approvedAt=NULL,approvedBy='',approvalNote=CASE WHEN ?='enviado' THEN approvalNote ELSE '' END WHERE id=?",
+              )
+              .bind(status, status, plan.id),
+      );
     } else if (action === 'createExternal' || action === 'mediaVersion') {
       // A post, carousel, video or file made outside the COODY, sent for
       // approval. createExternal makes the piece already in approval;

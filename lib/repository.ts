@@ -71,6 +71,13 @@ const runtimeColumns: [table: string, column: string, ddl: string][] = [
   ['content_items', 'attachments', "ALTER TABLE content_items ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'"],
   // Files of a version beyond the single art: carousel slides, video, PDF.
   ['content_versions', 'media', "ALTER TABLE content_versions ADD COLUMN media TEXT NOT NULL DEFAULT '[]'"],
+  // Development hours contracted per month.
+  ['brands', 'contractedHours', 'ALTER TABLE brands ADD COLUMN contractedHours REAL NOT NULL DEFAULT 0'],
+  // Client approval of the month plan (NULL = older plan, counts as approved).
+  ['monthly_plans', 'approval', 'ALTER TABLE monthly_plans ADD COLUMN approval TEXT'],
+  ['monthly_plans', 'approvalNote', "ALTER TABLE monthly_plans ADD COLUMN approvalNote TEXT NOT NULL DEFAULT ''"],
+  ['monthly_plans', 'approvedAt', 'ALTER TABLE monthly_plans ADD COLUMN approvedAt TEXT'],
+  ['monthly_plans', 'approvedBy', "ALTER TABLE monthly_plans ADD COLUMN approvedBy TEXT NOT NULL DEFAULT ''"],
 ];
 let lifecycleReady: Promise<void> | null = null;
 export function ensureBrandLifecycle() {

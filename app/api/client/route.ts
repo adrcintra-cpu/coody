@@ -1,6 +1,6 @@
 import { database, ensureBrandLifecycle } from '@/lib/repository';
 import { shareByToken } from '@/lib/share';
-import { assertTransition } from '@/lib/domain';
+import { assertTransition, planApprovalOf } from '@/lib/domain';
 import { statusLabels, type Status } from '@/lib/types';
 
 /**
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const [versions, comments, plan, stories] = await db.batch([
       db.prepare(`SELECT * FROM content_versions WHERE contentId IN (${marks})`).bind(...ids),
       db.prepare(`SELECT contentId,text,createdAt,user FROM comments WHERE contentId IN (${marks}) ORDER BY createdAt`).bind(...ids),
-      db.prepare('SELECT month,monthlyGoal,campaign FROM monthly_plans WHERE brandId=? AND month=?').bind(brand.id, month),
+      db.prepare('SELECT month,monthlyGoal,campaign,approval,approvalNote,approvedAt,approvedBy FROM monthly_plans WHERE brandId=? AND month=?').bind(brand.id, month),
       db.prepare("SELECT id FROM brand_assets WHERE brandId=? AND id LIKE 'story-%'").bind(brand.id),
     ]);
     const storyIds = new Set((stories.results as { id: string }[]).map((s) => s.id));
@@ -85,7 +85,11 @@ export async function GET(request: Request) {
       {
         brand: { name: brand.name, segment: brand.segment, colors: brand.colors },
         month,
-        plan: (plan.results[0] as Record<string, unknown> | undefined) || null,
+        plan: (() => {
+          const p = plan.results[0] as Record<string, unknown> | undefined;
+          // Older plans have no approval state and count as approved.
+          return p ? { ...p, approval: planApprovalOf(p as { approval?: string }) } : null;
+        })(),
         items,
       },
       { headers: { 'Cache-Control': 'no-store' } },
@@ -101,10 +105,11 @@ export async function POST(request: Request) {
   try {
     const raw = await request.text();
     if (raw.length > 8000) throw new Error('Mensagem muito grande.');
-    const data = JSON.parse(raw) as { token?: string; id?: string; status?: string; comment?: string; name?: string };
+    const data = JSON.parse(raw) as { token?: string; id?: string; status?: string; comment?: string; name?: string; month?: string };
     const share = await shareByToken(String(data.token || ''));
     if (!share) throw new Error('Este link não está mais ativo.');
     const db = database();
+    if (data.month !== undefined) return await planDecision(db, share.brandId, data);
     const item = await db
       .prepare('SELECT id,title,date,status,brandId FROM content_items WHERE id=? AND brandId=? AND deletedAt IS NULL')
       .bind(String(data.id || ''), share.brandId)
@@ -149,4 +154,36 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+}
+
+/** The client approves the month plan (its pieces then enter the production
+ *  board with the dates confirmed) or asks for changes. */
+async function planDecision(
+  db: ReturnType<typeof database>,
+  brandId: string,
+  data: { month?: string; status?: string; comment?: string; name?: string },
+) {
+  const month = String(data.month);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Mês inválido.');
+  if (data.status !== 'aprovado' && data.status !== 'ajustes') throw new Error('Decisão inválida.');
+  const comment = typeof data.comment === 'string' ? data.comment.trim().slice(0, 2000) : '';
+  if (data.status === 'ajustes' && !comment) throw new Error('Conte o que precisa mudar no planejamento.');
+  const name = (typeof data.name === 'string' && data.name.trim() ? data.name.trim() : 'Cliente').slice(0, 80);
+  const now = new Date().toISOString();
+  const result =
+    data.status === 'aprovado'
+      ? await db
+          .prepare(
+            "UPDATE monthly_plans SET approval='aprovado',approvedAt=?,approvedBy=? WHERE brandId=? AND month=? AND approval IN ('enviado','ajustes')",
+          )
+          .bind(now, 'Cliente · ' + name, brandId, month)
+          .run()
+      : await db
+          .prepare(
+            "UPDATE monthly_plans SET approval='ajustes',approvalNote=? WHERE brandId=? AND month=? AND approval='enviado'",
+          )
+          .bind(`${comment}\n— Cliente · ${name}`, brandId, month)
+          .run();
+  if (!result.meta.changes) throw new Error('Este planejamento não está aguardando sua aprovação. Atualize a página.');
+  return Response.json({ ok: true });
 }

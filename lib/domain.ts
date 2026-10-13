@@ -359,3 +359,50 @@ export function clientDrop(column: ColumnId, current: Status): Status | null {
   return column === 'aprovado' ? 'APROVADO' : column === 'ajuste' ? 'AJUSTE' : column === 'alteracao' ? 'ALTERAÇÃO' : null;
 }
 export const needsComment = (status: Status) => status === 'AJUSTE' || status === 'ALTERAÇÃO';
+
+/* ---------- Plano do mês: texto e aprovação do cliente ---------- */
+
+/** A plan without an approval state (made before this existed) counts as approved. */
+export function planApprovalOf(plan?: { approval?: string | null } | null) {
+  const value = plan?.approval;
+  return value === 'rascunho' || value === 'enviado' || value === 'ajustes'
+    ? value
+    : 'aprovado';
+}
+/** A planned piece whose month plan the client has not approved yet stays
+ *  out of the production board. */
+export function heldByPlan(
+  content: { brandId: string; date: string; status: Status },
+  plans: { brandId: string; month: string; approval?: string | null }[],
+) {
+  if (content.status !== 'IDEIA' && content.status !== 'PLANEJADO') return false;
+  const plan = plans.find(
+    (p) => p.brandId === content.brandId && p.month === content.date.slice(0, 7),
+  );
+  return !!plan && planApprovalOf(plan) !== 'aprovado';
+}
+const weekdays = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+export function planDay(date: string) {
+  const d = new Date(date + 'T12:00:00');
+  return `${date.slice(8, 10)}/${date.slice(5, 7)} (${weekdays[d.getDay()]})`;
+}
+/** The month plan as plain text: one block per date with what goes out. */
+export function planText(
+  brand: string,
+  month: string,
+  items: { date: string; title: string; format: string; brief?: string; pillar?: string }[],
+  campaign = '',
+) {
+  const name = new Date(month + '-15T12:00:00').toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const lines = [`Planejamento de ${name} · ${brand}`, `${items.length} publicação(ões)`];
+  if (campaign.trim()) lines.push('', 'Foco do mês: ' + campaign.trim());
+  for (const i of [...items].sort((a, b) => a.date.localeCompare(b.date))) {
+    lines.push('', `${planDay(i.date)} · ${i.format}`, i.title);
+    const brief = (i.brief || '').replace(/\s+/g, ' ').trim();
+    if (brief) lines.push(brief.length > 280 ? brief.slice(0, 277) + '…' : brief);
+  }
+  return lines.join('\n');
+}

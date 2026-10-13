@@ -8,6 +8,7 @@ import { Picker } from './shared';
 import { Kanban, boardItem } from './kanban';
 import { directUpload } from '@/lib/client-upload';
 import { can } from '@/lib/permissions';
+import { heldByPlan, planApprovalOf } from '@/lib/domain';
 import { formats, today, type Action, type State, type Status } from '@/lib/types';
 
 /**
@@ -37,6 +38,8 @@ export function Production({
         .filter(
           (c) =>
             (brandId === 'all' || c.brandId === brandId) &&
+            // Planned pieces wait for the client to approve the month plan.
+            !heldByPlan(c, state.plans) &&
             (allMonths ||
               c.date.startsWith(month) ||
               // Pending decisions always show up, whatever the month.
@@ -51,6 +54,19 @@ export function Production({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, brandId, allMonths, month],
   );
+  // Month plans not approved yet, with the pieces they hold back.
+  const waiting = state.plans
+    .filter(
+      (p) =>
+        (brandId === 'all' || p.brandId === brandId) &&
+        planApprovalOf(p) !== 'aprovado' &&
+        (allMonths || p.month >= month.slice(0, 7)),
+    )
+    .map((p) => ({
+      plan: p,
+      count: state.contents.filter((c) => heldByPlan(c, [p])).length,
+    }))
+    .filter((w) => w.count);
   return (
     <>
       <div className="page-heading">
@@ -87,6 +103,24 @@ export function Production({
           Todos os meses
         </label>
       </div>
+      {waiting.length > 0 && (
+        <div className="notice plan-waiting">
+          <strong>Planejamentos aguardando o cliente</strong>
+          {waiting.map(({ plan, count }) => (
+            <span key={plan.id}>
+              {brandName(plan.brandId)} ·{' '}
+              {new Date(plan.month + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} ·{' '}
+              {count} pauta(s) ·{' '}
+              {planApprovalOf(plan) === 'rascunho'
+                ? 'ainda não enviado'
+                : planApprovalOf(plan) === 'ajustes'
+                  ? 'cliente pediu mudanças'
+                  : 'enviado'}
+            </span>
+          ))}
+          <small>As pautas entram no quadro quando o planejamento do mês for aprovado.</small>
+        </div>
+      )}
       <Kanban
         items={items}
         mode="team"

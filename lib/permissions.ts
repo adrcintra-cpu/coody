@@ -39,6 +39,7 @@ export function actionPermission(
   if (action === 'comment') return 'comment';
   if (['setBrandStatus', 'deleteBrand', 'restoreBrand'].includes(action))
     return 'manage';
+  if (action === 'planApproval' && data.status === 'aprovado') return 'approve';
   if (action === 'status') {
     if (data.status === 'APROVADO') return 'approve';
     if (
