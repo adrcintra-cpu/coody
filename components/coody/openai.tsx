@@ -1,11 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { IntegrationMissing, useIntegrationStatus } from './integration-status';
+import { IntegrationMissing, IntegrationTitle, integrationState, useIntegrationStatus } from './integration-status';
 export function OpenAIIntegration() {
   const status = useIntegrationStatus('/api/openai');
   return (
     <section className="panel">
-      <h2>OpenAI · criativos</h2>
+      <IntegrationTitle title="OpenAI · criativos" state={integrationState(status)} />
       <output aria-live="polite">{status.message}</output>
       {status.checkedAt && !status.checking && (
         <p className="form-hint">

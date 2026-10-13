@@ -1,4 +1,5 @@
 'use client';
+import { IntegrationTitle } from './integration-status';
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import type { State } from '@/lib/types';
@@ -119,7 +120,7 @@ export function TrelloIntegration({ state }: { state: State }) {
   );
   return (
     <section className="panel">
-      <h2>Trello</h2>
+      <IntegrationTitle title="Trello" state={!model ? 'checking' : model.connected ? 'connected' : 'missing'} />
       {model?.connected && model.config?.boardId && (
         <p>
           <a

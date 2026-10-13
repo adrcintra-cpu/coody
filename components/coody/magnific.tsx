@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
 import type { State, Content } from '@/lib/types';
-import { IntegrationMissing, useIntegrationStatus } from './integration-status';
+import { IntegrationMissing, IntegrationTitle, integrationState, useIntegrationStatus } from './integration-status';
 type Job = { id: string; status: string; message: string; format: string };
 export function MagnificIntegration() {
   const status = useIntegrationStatus('/api/magnific');
   return (
     <section className="panel">
-      <h2>Magnific · novas artes</h2>
+      <IntegrationTitle title="Magnific · novas artes" state={integrationState(status)} />
       <output aria-live="polite">{status.message}</output>
       {status.checkedAt && !status.checking && (
         <p className="form-hint">
