@@ -373,9 +373,9 @@ export function parseValidation(value: unknown): ArtValidation {
   if (!Number.isFinite(nota)) throw new Error('A validação não devolveu uma nota.');
   return {
     nota: Math.max(0, Math.min(100, Math.round(nota))),
-    identidade: text(v.identidade, 800),
-    briefing: text(v.briefing, 800),
-    referencias: text(v.referencias, 800),
+    identidade: text(v.identidade, 2000),
+    briefing: text(v.briefing, 2000),
+    referencias: text(v.referencias, 2000),
     cliches: list(v.cliches, 8),
     problemas: list(v.problemas, 8),
     sugestoes: list(v.sugestoes, 8),
