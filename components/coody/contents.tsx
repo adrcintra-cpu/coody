@@ -84,7 +84,12 @@ export function Contents({
         (!q ||
           normalize(c.title + ' ' + c.brief + ' ' + brandName(c.brandId)).includes(q)),
     )
-    .sort((a, b) => (q ? b.date.localeCompare(a.date) : 0));
+    // Newest first: the last piece added is at the top of the list.
+    .sort(
+      (a, b) =>
+        (b.createdAt || '').localeCompare(a.createdAt || '') ||
+        b.date.localeCompare(a.date),
+    );
   return (
     <>
       <div className="page-heading">
