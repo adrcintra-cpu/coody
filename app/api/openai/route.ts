@@ -41,13 +41,31 @@ export async function GET(request: Request) {
       redirect: 'manual',
       signal: AbortSignal.timeout(15000),
     });
+    // OpenAI's own reason (wrong key, missing scopes, other project), with
+    // the key masked, so the cause is visible without opening server logs.
+    let detail = '';
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as {
+        error?: { message?: string; code?: string };
+      } | null;
+      detail = (body?.error?.message || '')
+        .replaceAll(apiKey(), '[chave]')
+        .replace(/sk-[A-Za-z0-9_-]{8,}/g, '[chave]')
+        .slice(0, 300);
+    }
+    const key = apiKey().trim();
     return Response.json({
       configured: true,
       connected: response.ok,
       model,
+      status: response.status,
+      // Last 4 characters only, to compare with the key in the OpenAI panel.
+      keyEnd: key.length > 12 ? key.slice(-4) : '',
+      keyHasSpaces: key !== apiKey(),
+      detail,
       message: response.ok
         ? 'Chave aceita. O teste de conexão não verifica créditos nem garante geração. Crie o criativo completo no Studio.'
-        : failure(response.status),
+        : failure(response.status) + (detail ? ' OpenAI: ' + detail : ''),
     });
   } catch {
     return Response.json({
