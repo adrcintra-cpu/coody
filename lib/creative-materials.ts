@@ -7,6 +7,8 @@ export function creativeMaterials(brandId: string, assets: Asset[]) {
       (a) =>
         a.brandId === brandId &&
         a.category !== 'delivery' &&
+        // Ficha marked "não usar": kept in the Library, out of every creation.
+        a.meta?.status !== 'não usar' &&
         (!/gerad[ao]|criativo gerado/i.test(a.aiNotes || '') ||
           a.approved === 1 ||
           a.priority === 1),

@@ -1,7 +1,7 @@
 'use client';
 import { ArtViewer } from './art-viewer';
 import { MagnificGenerator } from './magnific';
-import { ImageGenerator } from './openai';
+import { CreativeDirection } from './creative-direction';
 import { AttachmentPicker } from './attachments';
 import { can } from '@/lib/permissions';
 import { ExternalPiece } from './production';
@@ -519,9 +519,10 @@ export function Studio({
               onChange={(ids) => act('setAttachments', { id: item.id, attachments: ids })}
             />
           </section>
-          <ImageGenerator
-            contentId={item.id}
-            formats={item.format}
+          <CreativeDirection
+            item={item}
+            brand={brand}
+            version={current}
             disabled={disabled || dirty}
             onBusy={setBusy}
             reload={reload}

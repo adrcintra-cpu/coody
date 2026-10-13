@@ -3,6 +3,7 @@ import { validatePlanning } from '@/lib/ai-planning';
 import { authorize, registerUser } from '@/lib/auth';
 import { parseBrand, guidelineRules } from '@/lib/brand-validation';
 import { assetCategories, canonicalCategory } from '@/lib/brand-memory';
+import { parseReferenceMeta } from '@/lib/art-direction';
 import { database, insert, readState, saveGuidelines } from '@/lib/repository';
 import {
   validateDate,
@@ -620,10 +621,19 @@ export async function POST(request: Request) {
         throw new Error('Categoria inválida.');
       const name = action === 'saveAsset' ? str(data.name, 200) : asset.name;
       if (!name) throw new Error('Informe o nome do arquivo.');
+      // Ficha da referência: the AI analysis is kept; only the team's fields change.
+      const meta =
+        action === 'saveAsset' && data.meta && typeof data.meta === 'object'
+          ? parseReferenceMeta({
+              ...(data.meta as Record<string, unknown>),
+              analysis: asset.meta?.analysis,
+              analyzedAt: asset.meta?.analyzedAt,
+            })
+          : asset.meta || parseReferenceMeta({});
       statements.push(
         db
           .prepare(
-            'UPDATE brand_assets SET name=?,category=?,description=?,aiNotes=?,priority=?,approved=?,updatedAt=? WHERE id=? AND brandId=?',
+            'UPDATE brand_assets SET name=?,category=?,description=?,aiNotes=?,priority=?,approved=?,updatedAt=?,meta=? WHERE id=? AND brandId=?',
           )
           .bind(
             name,
@@ -633,6 +643,7 @@ export async function POST(request: Request) {
             data.priority ? 1 : 0,
             category === 'approved_art' ? 1 : 0,
             now,
+            JSON.stringify(meta),
             asset.id,
             asset.brandId,
           ),

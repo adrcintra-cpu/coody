@@ -4,6 +4,7 @@ import { canonicalCategory } from './brand-memory';
 import { isStoryAdaptation, storyAdaptationUrl } from './domain';
 import { isRecomposedStory } from './story-recompose';
 import { purgeCutoff } from './brand-lifecycle';
+import { parseDNA, parseLines, parseReferenceMeta } from './art-direction';
 import type {
   State,
   Brand,
@@ -78,11 +79,26 @@ const runtimeColumns: [table: string, column: string, ddl: string][] = [
   ['monthly_plans', 'approvalNote', "ALTER TABLE monthly_plans ADD COLUMN approvalNote TEXT NOT NULL DEFAULT ''"],
   ['monthly_plans', 'approvedAt', 'ALTER TABLE monthly_plans ADD COLUMN approvedAt TEXT'],
   ['monthly_plans', 'approvedBy', "ALTER TABLE monthly_plans ADD COLUMN approvedBy TEXT NOT NULL DEFAULT ''"],
+  // Direção de arte: DNA criativo e linhas criativas da marca, ficha das
+  // referências, direção e validação de cada versão.
+  ['brands', 'artDNA', "ALTER TABLE brands ADD COLUMN artDNA TEXT NOT NULL DEFAULT '{}'"],
+  ['brands', 'creativeLines', "ALTER TABLE brands ADD COLUMN creativeLines TEXT NOT NULL DEFAULT '[]'"],
+  ['brand_assets', 'meta', "ALTER TABLE brand_assets ADD COLUMN meta TEXT NOT NULL DEFAULT '{}'"],
+  ['content_versions', 'direction', "ALTER TABLE content_versions ADD COLUMN direction TEXT NOT NULL DEFAULT ''"],
+  ['content_versions', 'validation', "ALTER TABLE content_versions ADD COLUMN validation TEXT NOT NULL DEFAULT ''"],
+];
+/** Tables created at runtime (IF NOT EXISTS), like the columns above. */
+const runtimeTables = [
+  // Histórico de direção criativa: os três conceitos de cada pedido e a
+  // escolha registrada.
+  'CREATE TABLE IF NOT EXISTS creative_directions (id TEXT PRIMARY KEY NOT NULL, contentId TEXT NOT NULL, brandId TEXT NOT NULL, reading TEXT NOT NULL, concepts TEXT NOT NULL, lines TEXT NOT NULL DEFAULT \'[]\', instructions TEXT NOT NULL DEFAULT \'\', chosen INTEGER NOT NULL DEFAULT -1, chosenAt TEXT, createdBy TEXT NOT NULL, createdAt TEXT NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS creative_directions_content ON creative_directions (contentId, createdAt)',
 ];
 let lifecycleReady: Promise<void> | null = null;
 export function ensureBrandLifecycle() {
   lifecycleReady ??= (async () => {
     const db = database();
+    for (const ddl of runtimeTables) await db.prepare(ddl).run();
     const columns = new Map<string, string[]>();
     for (const [table, name, ddl] of runtimeColumns) {
       if (!columns.has(table))
@@ -217,6 +233,8 @@ export async function readState(request?: Request): Promise<State> {
       ...b,
       status: b.status === 'inactive' ? 'inactive' : 'active',
       pillars: JSON.parse(b.pillars),
+      artDNA: parseDNA((b as { artDNA?: unknown }).artDNA),
+      creativeLines: parseLines((b as { creativeLines?: unknown }).creativeLines),
     })),
     deletedBrands: results[7].results as unknown as DeletedBrand[],
     contents: (
@@ -239,6 +257,8 @@ export async function readState(request?: Request): Promise<State> {
       return {
         ...v,
         media: parseMedia((v as { media?: unknown }).media),
+        direction: (v as { direction?: string }).direction || '',
+        validation: (v as { validation?: string }).validation || '',
         hashtags: JSON.parse(v.hashtags),
         feedUrl: asset,
         storyUrl: story && recomposed.has(story) ? story : asset,
@@ -253,6 +273,7 @@ export async function readState(request?: Request): Promise<State> {
       description: a.description || '',
       aiNotes: a.aiNotes || '',
       updatedAt: a.updatedAt || a.createdAt,
+      meta: parseReferenceMeta((a as { meta?: unknown }).meta),
     })),
     comments: results[4].results as unknown as Comment[],
     dates: (results[5].results as unknown as SpecialDate[]).map((d) => ({
