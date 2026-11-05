@@ -77,8 +77,7 @@ const navGroups: { label: string; items: string[] }[] = [
 const monthViews: string[] = ['Dashboard', 'Planejamento', 'Calendário', 'Conteúdos', 'Produção'];
 /** Closes the mobile menu after a tap (needs the sidebar context). */
 function CloseMobileMenu({ children }: { children: (close: () => void) => React.ReactNode }) {
-  const { isMobile, setOpenMobile } = useSidebar();
-  return <>{children(() => isMobile && setOpenMobile(false))}</>;
+  return <>{children(() => {})}</>;
 }
 export default function Workspace() {
   const [view, setView] = useState<View>('Dashboard');
