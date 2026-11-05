@@ -6,7 +6,7 @@ import { Production } from './production';
 import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   LayoutDashboard,
   CalendarRange,
@@ -76,7 +76,7 @@ const navGroups: { label: string; items: string[] }[] = [
 /** Views where the workspace month changes what is shown. */
 const monthViews: string[] = ['Dashboard', 'Planejamento', 'Calendário', 'Conteúdos', 'Produção'];
 /** Closes the mobile menu after a tap (needs the sidebar context). */
-function CloseMobileMenu({ children }: { children: (close: () => void) => React.ReactNode }) {
+function CloseMobileMenu({ children }: { children: (close: () => void) => ReactNode }) {
   const { isMobile, setOpenMobile } = useSidebar();
   return <>{children(() => isMobile && setOpenMobile(false))}</>;
 }
