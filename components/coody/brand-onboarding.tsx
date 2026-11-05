@@ -326,7 +326,7 @@ export function BrandOnboarding({
                   {upload('Logo principal', 'logo', false)}
                   {upload('Variações do logo', 'logo')}
                   {upload('Brandbook', 'brandbook')}
-                  {upload('Elementos gráficos', 'logo')}
+                  {upload('Elementos gráficos', 'material')}
                 </div>
                 <Field label="Paleta de cores">
                   <Input

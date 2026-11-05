@@ -58,6 +58,7 @@ export function Brands({
   const canEdit = can(state.user?.role, 'edit');
   const canManage = can(state.user?.role, 'manage');
   const [clientArea, setClientArea] = useState(false);
+  const [editingTab, setEditingTab] = useState('general');
   const route = () =>
     new URLSearchParams(
       typeof window === 'undefined'
@@ -131,6 +132,49 @@ export function Brands({
   const b = state.brands.find((b) => b.id === selected);
   const inactive = !!b && isInactive(b);
   const completeness = b ? identityCompleteness(b, state.assets) : null;
+  const canEditBrand = can(state.user?.role, 'edit');
+  // What still keeps the AI from creating in this brand's style.
+  const brandRefs = b
+    ? state.assets.filter((a) => a.brandId === b.id && ['visual_reference', 'approved_art'].includes(a.category))
+    : [];
+  const nextSteps = b
+    ? [
+        {
+          label: 'DNA criativo',
+          hint: 'Posicionamento, estilo de foto, elementos próprios e o que é proibido.',
+          done: dnaFilled(parseDNA(b.artDNA)) >= 4,
+          action: 'Preencher DNA',
+          go: () => {
+            setEditingTab('dna');
+            setEditing(b);
+          },
+        },
+        {
+          label: 'Linhas criativas',
+          hint: 'Caminhos visuais da marca (Editorial, Produto…) para escolher nos conceitos.',
+          done: (b.creativeLines || []).length > 0,
+          action: 'Criar linhas',
+          go: () => {
+            setEditingTab('lines');
+            setEditing(b);
+          },
+        },
+        {
+          label: 'Referências na Biblioteca',
+          hint: 'Ao menos 3 peças ou referências que representem a marca.',
+          done: brandRefs.length >= 3,
+          action: 'Enviar referências',
+          go: () => choose(b.id, 'library'),
+        },
+        {
+          label: 'Referências analisadas pela IA',
+          hint: 'Abra uma referência e use “Analisar com IA” para virar repertório.',
+          done: brandRefs.some((a) => a.meta?.analysis),
+          action: 'Abrir Biblioteca',
+          go: () => choose(b.id, 'library'),
+        },
+      ]
+    : [];
   const scoped = b
     ? {
         ...state,
@@ -235,7 +279,7 @@ export function Brands({
                   <TabsTrigger value="library">Biblioteca</TabsTrigger>
                 </>
               )}
-              <TabsTrigger value="settings">Configurações</TabsTrigger>
+              <TabsTrigger value="settings">Identidade</TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
               <div className="brand-overview">
@@ -320,6 +364,26 @@ export function Brands({
                       </span>
                     ))}
                   </div>
+                  {nextSteps.some((n) => !n.done) && (
+                    <>
+                      <h2 className="section-space">Próximos passos para a IA criar no estilo da marca</h2>
+                      <ol className="next-steps">
+                        {nextSteps.map((n) => (
+                          <li key={n.label} className={n.done ? 'complete' : ''}>
+                            <span>
+                              {n.done ? '✓' : '○'} <strong>{n.label}</strong>
+                              <small className="muted">{n.hint}</small>
+                            </span>
+                            {!n.done && !inactive && canEditBrand && (
+                              <button type="button" className="outline-btn" onClick={n.go}>
+                                {n.action}
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </>
+                  )}
                   <h2 className="section-space">Pilares de conteúdo</h2>
                   {b.pillars.map((p) => (
                     <div className="detail-line" key={p.name}>
@@ -613,7 +677,15 @@ export function Brands({
         />
       )}
       {editing && (
-        <BrandEditor brand={editing} act={act} close={() => setEditing(null)} />
+        <BrandEditor
+          brand={editing}
+          act={act}
+          initialTab={editingTab}
+          close={() => {
+            setEditing(null);
+            setEditingTab('general');
+          }}
+        />
       )}
     </>
   );
@@ -622,13 +694,15 @@ function BrandEditor({
   brand,
   act,
   close,
+  initialTab = 'general',
 }: {
   brand: Brand;
   act: Action;
   close: () => void;
+  initialTab?: string;
 }) {
   const [b, setB] = useState(structuredClone(brand));
-  const [tab, setTab] = useState('general');
+  const [tab, setTab] = useState(initialTab);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const update = (k: keyof Brand, v: unknown) => setB({ ...b, [k]: v });
