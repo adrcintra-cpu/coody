@@ -1,9 +1,13 @@
 "use client";
 import Image from 'next/image';
-import { useState, type SyntheticEvent } from 'react';
+import { useEffect, useState, type SyntheticEvent } from 'react';
+import { goToHubLogin, HUB_URL } from '@/lib/oxyhub';
 export function Login() {
   const [busy,setBusy] = useState(false);
   const [error,setError] = useState('');
+  // Login único: o login acontece no Oxyhub, que devolve a pessoa aqui já logada
+  const [toHub,setToHub] = useState(true);
+  useEffect(() => { setToHub(goToHubLogin()); }, []);
   async function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError('');
     const form = new FormData(event.currentTarget);
@@ -15,5 +19,6 @@ export function Login() {
     } catch(error) { setError(error instanceof Error?error.message:'Não foi possível entrar.'); }
     finally { setBusy(false); }
   }
-  return <main className="min-h-screen flex items-center justify-center p-6"><form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5"><Image unoptimized width={469} height={172} src="/coody-logo.svg" alt="COODY" className="w-32 mb-8"/><h1 className="text-xl">Acesse seu workspace</h1><label className="block">E-mail<input name="email" type="email" autoComplete="username" required className="mt-2 w-full rounded-lg border p-3"/></label><label className="block">Senha<input name="password" type="password" autoComplete="current-password" maxLength={256} required className="mt-2 w-full rounded-lg border p-3"/></label>{error&&<p role="alert">{error}</p>}<button disabled={busy} className="w-full rounded-lg bg-purple-600 p-3 font-medium disabled:opacity-50">{busy?'Entrando…':'Entrar'}</button></form></main>;
+  if (toHub) return <main className="min-h-screen flex items-center justify-center p-6 text-sm opacity-70">Abrindo o login do Oxyhub…</main>;
+  return <main className="min-h-screen flex items-center justify-center p-6"><form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5"><Image unoptimized width={469} height={172} src="/coody-logo.svg" alt="COODY" className="w-32 mb-8"/><h1 className="text-xl">Acesse seu workspace</h1><label className="block">E-mail<input name="email" type="email" autoComplete="username" required className="mt-2 w-full rounded-lg border p-3"/></label><label className="block">Senha<input name="password" type="password" autoComplete="current-password" maxLength={256} required className="mt-2 w-full rounded-lg border p-3"/></label>{error&&<p role="alert">{error}</p>}<button disabled={busy} className="w-full rounded-lg bg-purple-600 p-3 font-medium disabled:opacity-50">{busy?'Entrando…':'Entrar'}</button><a href={HUB_URL + '/abrir/coody'} className="block text-center text-sm underline opacity-80">Entrar pelo Oxyhub (acesso único)</a></form></main>;
 }

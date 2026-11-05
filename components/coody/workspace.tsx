@@ -7,6 +7,7 @@ import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
 import { OxyhubSwitcher } from './oxyhub-switcher';
+import { clearHubLoginAttempt, HUB_SIGN_OUT } from '@/lib/oxyhub';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
@@ -83,6 +84,7 @@ export default function Workspace() {
     brandId?: string;
   } | null>(null);
   const [loginRequired, setLoginRequired] = useState(false);
+  useEffect(() => { if (state?.user) clearHubLoginAttempt(); }, [state?.user]);
   // #convite?token=… opens the invite page instead of the workspace.
   const [inviteToken] = useState(() =>
     typeof window !== 'undefined' && window.location.hash.startsWith('#convite')
@@ -374,7 +376,7 @@ export default function Workspace() {
             </span>
             <ChevronDown size={15} />
           </button>
-          {!!state?.user && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.reload(); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
+          {!!state?.user && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.assign(HUB_SIGN_OUT); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
