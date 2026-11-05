@@ -128,7 +128,7 @@ export function Production({
         onOpen={open}
         onMove={async (id, status: Status, comment) => {
           const c = state.contents.find((x) => x.id === id);
-          await act('status', { id, status, comment, expectedRevision: c?.revision ?? 0 });
+          await act('status', { id, status, comment, expectedRevision: c?.revision ?? 0, addReference: status === 'APROVADO' });
         }}
       />
       {sending && (

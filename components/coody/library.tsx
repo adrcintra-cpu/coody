@@ -108,6 +108,8 @@ export function LibraryView({
           a.name,
           a.description,
           a.aiNotes,
+          a.meta?.campaign,
+          a.meta?.style,
           state.brands.find((b) => b.id === a.brandId)?.name,
         ]
           .join(' ')
@@ -329,13 +331,16 @@ export function LibraryView({
               <div className="asset-info">
                 <div className="asset-title">
                   <h3>{a.name}</h3>
-                  <button
-                    className="text-btn"
-                    aria-label={'Editar ' + a.name}
-                    onClick={() => setEditor(a)}
-                  >
-                    <Pencil size={14} />
-                  </button>
+                  {canEdit && (
+                    <button
+                      className="text-btn"
+                      aria-label={'Editar ' + a.name}
+                      title="Editar detalhes e ficha"
+                      onClick={() => setEditor(a)}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                  )}
                   {canEdit && (
                     <button
                       className="text-btn danger"
@@ -374,6 +379,15 @@ export function LibraryView({
                       <Check size={13} />
                       Arte aprovada
                     </span>
+                  )}
+                  {referenceCategories.includes(a.category) && a.meta?.status === 'não usar' && (
+                    <span className="flag-off">Não usar na criação</span>
+                  )}
+                  {referenceCategories.includes(a.category) && a.meta?.status === 'em análise' && (
+                    <span>Em análise</span>
+                  )}
+                  {referenceCategories.includes(a.category) && a.meta?.analysis && (
+                    <span>Analisada pela IA</span>
                   )}
                 </div>
               </div>
@@ -431,6 +445,7 @@ export function LibraryView({
           brandId={editor === 'new' ? selectedBrand?.id || '' : editor.brandId}
           fixedBrand={!!selectedBrand || !!brandId || editor !== 'new'}
           close={() => setEditor(null)}
+          onAnalyzed={reload}
           saved={async (id) => {
             await reload();
             if (!brandId && !brand) setSelection(id);
@@ -451,6 +466,7 @@ export function AssetEditor({
   close,
   saved,
   act,
+  onAnalyzed,
 }: {
   state: State;
   initialCategory: string;
@@ -460,6 +476,8 @@ export function AssetEditor({
   close: () => void;
   saved: (brandId: string) => Promise<void>;
   act: Action;
+  /** Reloads the library after the AI analysis of a reference. */
+  onAnalyzed?: () => Promise<void>;
 }) {
   const [brand, setBrand] = useState(brandId);
   // New files: several at once, each with its own name and thumbnail.
@@ -713,7 +731,7 @@ export function AssetEditor({
               analysis={asset.meta?.analysis}
               analyzedAt={asset.meta?.analyzedAt}
               canAnalyze={can(state.user?.role, 'edit') && /^image\/(png|jpeg|webp)$/.test(asset.mime)}
-              onAnalyzed={() => {}}
+              onAnalyzed={() => onAnalyzed?.()}
             />
           )}
         </fieldset>

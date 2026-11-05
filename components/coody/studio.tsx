@@ -582,7 +582,7 @@ export function Studio({
           <details className="panel section-space studio-more">
             <summary>Contexto da marca</summary>
             <p className="muted">
-              {brand.voice || 'Defina o tom de voz no Brand Space.'}
+              {brand.voice || 'Defina o tom de voz em Marcas › Editar marca.'}
             </p>
             <div className="context-stats">
               <span>

@@ -14,11 +14,15 @@ export function Integrations({ state }: { state: State }) {
         <div>
           <p className="eyebrow">SERVIÇOS EXTERNOS</p>
           <h1>Integrações</h1>
-          <p>Status dos recursos conectados ao COODY.</p>
+          <p>O que está conectado ao COODY e funcionando.</p>
         </div>
       </div>
       <div className="integration-grid">
         <OpenAIIntegration />
+      </div>
+      <h2 className="section-space">Opcionais</h2>
+      <p className="muted">Ferramentas extras. O fluxo principal do COODY funciona só com a OpenAI.</p>
+      <div className="integration-grid">
         <MagnificIntegration />
         <TrelloIntegration state={state} />
       </div>

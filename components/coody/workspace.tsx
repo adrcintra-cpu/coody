@@ -444,7 +444,7 @@ export default function Workspace() {
               }}
             />
             )}
-            {state && <Notifications/>}
+            {state && <Notifications onUpdate={() => void reload().catch(() => {})} />}
           </div>
         </header>
         <main className="workspace-main">

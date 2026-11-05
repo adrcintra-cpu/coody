@@ -53,8 +53,9 @@ export function Kanban({
   const [error, setError] = useState('');
   const target = (column: ColumnId, current: Status) =>
     mode === 'client' ? clientDrop(column, current) : dropStatus(column, current);
-  const move = async (id: string, status: Status, text = '') => {
-    if (needsComment(status) && !text.trim()) {
+  const move = async (id: string, status: Status, text = '', confirmed = false) => {
+    // Ajuste/Alteração ask what to change; approving is final, so confirm it.
+    if ((needsComment(status) && !text.trim()) || (status === 'APROVADO' && !confirmed)) {
       setComment('');
       setPending({ id, status });
       return;
@@ -196,14 +197,38 @@ export function Kanban({
       {pending && (
         <FormModal
           open
-          title={pending.status === 'AJUSTE' ? 'Pedir ajuste' : 'Pedir alteração'}
+          title={
+            pending.status === 'APROVADO'
+              ? 'Aprovar a peça?'
+              : pending.status === 'AJUSTE'
+                ? 'Pedir ajuste'
+                : 'Pedir alteração'
+          }
           description={
-            pending.status === 'AJUSTE'
-              ? 'Ajuste fino na mesma arte: texto, cor, posição, detalhe.'
-              : 'Uma nova imagem: outra composição, foto ou ideia visual.'
+            pending.status === 'APROVADO'
+              ? (items.find((i) => i.id === pending.id)?.title || '') +
+                ' · A versão atual fica aprovada e protegida contra alterações.'
+              : pending.status === 'AJUSTE'
+                ? 'Ajuste fino na mesma arte: texto, cor, posição, detalhe.'
+                : 'Uma nova imagem: outra composição, foto ou ideia visual.'
           }
           onClose={() => !busy && setPending(null)}
         >
+          {pending.status === 'APROVADO' ? (
+            <div className="form-actions">
+              <button type="button" className="outline-btn" disabled={busy} onClick={() => setPending(null)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="create-btn"
+                disabled={busy}
+                onClick={() => void move(pending.id, 'APROVADO', '', true)}
+              >
+                {busy ? 'Aprovando…' : 'Aprovar'}
+              </button>
+            </div>
+          ) : (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -228,6 +253,7 @@ export function Kanban({
               </button>
             </div>
           </form>
+          )}
         </FormModal>
       )}
     </>

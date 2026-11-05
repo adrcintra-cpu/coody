@@ -7,23 +7,40 @@ type Notice = {
   message: string;
   href: string;
   read: boolean;
+  createdAt?: string;
 };
-export function Notifications() {
+const ago = (iso?: string) => {
+  if (!iso) return '';
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `há ${h} h`;
+  return new Date(iso).toLocaleDateString('pt-BR');
+};
+/** onUpdate: called when a new decision arrives (the client acted), so the
+ *  workspace reloads and the board is never stale. */
+export function Notifications({ onUpdate }: { onUpdate?: () => void } = {}) {
   const [open, setOpen] = useState(false),
     [items, setItems] = useState<Notice[]>([]),
     [error, setError] = useState('');
   const wrap = useRef<HTMLDivElement>(null);
+  const known = useRef<Set<string> | null>(null);
   const load = useCallback(async (signal?: AbortSignal) => {
     try {
       const r = await fetch('/api/notifications', { cache: 'no-store', signal });
       if (!r.ok) throw new Error('Não foi possível carregar as notificações.');
       const data = (await r.json()) as { items: Notice[] };
+      const fresh = data.items.some((i) => known.current && !known.current.has(i.id));
+      known.current = new Set(data.items.map((i) => i.id));
       setItems(data.items);
+      if (fresh) onUpdate?.();
       setError('');
     } catch (e) {
       if (!signal?.aborted)
         setError(e instanceof Error ? e.message : 'Falha ao carregar.');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     const controller = new AbortController();
@@ -123,12 +140,12 @@ export function Notifications() {
               >
                 <strong>{i.title}</strong>
                 <span>{i.message}</span>
+                {i.createdAt && <small className="muted">{ago(i.createdAt)}</small>}
               </a>
             ))}
           </div>
           <small>
-            Fases atuais e avisos recebidos das APIs. Atualização a cada 30
-            segundos.
+            Decisões do cliente e da equipe, planejamentos aprovados e avisos das integrações.
           </small>
         </section>
       )}

@@ -40,6 +40,7 @@ export function Members({ currentWorkspaceId }: { currentWorkspaceId?: string })
     workspaceIds: string[];
   }>({ name: '', email: '', role: 'EDITOR', workspaceIds: currentWorkspaceId ? [currentWorkspaceId] : [] });
   const [editing, setEditing] = useState<Member | null>(null);
+  const [confirm, setConfirm] = useState<{ id: string; action: 'remove' | 'disable' } | null>(null);
   async function load() {
     const r = await fetch('/api/members', { cache: 'no-store' });
     const d = (await r.json()) as Model & { error?: string };
@@ -134,7 +135,7 @@ export function Members({ currentWorkspaceId }: { currentWorkspaceId?: string })
                   await navigator.clipboard.writeText(link.url);
                   setMessage('Link copiado.');
                 } catch {
-                  setMessage('Selecione o link e copie com Cmd+C.');
+                  setMessage('Selecione o link e copie.');
                 }
               }}
             >
@@ -146,7 +147,7 @@ export function Members({ currentWorkspaceId }: { currentWorkspaceId?: string })
       <div className="member-list">
         <div className="member-row owner">
           <div>
-            <strong>Você (administrador principal)</strong>
+            <strong>Administrador principal</strong>
             <small className="muted">{model?.owner}</small>
           </div>
           <span className="member-badge">Administrador · todos os workspaces</span>
@@ -187,7 +188,7 @@ export function Members({ currentWorkspaceId }: { currentWorkspaceId?: string })
                   Reativar
                 </button>
               ) : (
-                <button type="button" className="text-btn" disabled={busy} onClick={() => post({ action: 'disable', id: m.id })}>
+                <button type="button" className="text-btn" disabled={busy} onClick={() => setConfirm({ id: m.id, action: 'disable' })}>
                   Suspender
                 </button>
               )}
@@ -195,14 +196,36 @@ export function Members({ currentWorkspaceId }: { currentWorkspaceId?: string })
                 type="button"
                 className="text-btn danger"
                 disabled={busy}
-                onClick={() => {
-                  if (window.confirm(`Remover ${m.name} do COODY? O acesso termina na hora.`))
-                    void post({ action: 'remove', id: m.id });
-                }}
+                onClick={() => setConfirm({ id: m.id, action: 'remove' })}
               >
                 Remover
               </button>
             </div>
+            {confirm?.id === m.id && (
+              <div className="notice member-confirm" role="alertdialog">
+                <p>
+                  {confirm.action === 'remove'
+                    ? `Remover ${m.name} do COODY? O acesso termina na hora e não pode ser desfeito.`
+                    : `Suspender ${m.name}? A pessoa perde o acesso até você reativar.`}
+                </p>
+                <div className="form-actions">
+                  <button type="button" className="outline-btn" disabled={busy} onClick={() => setConfirm(null)}>
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className="create-btn danger-btn"
+                    disabled={busy}
+                    onClick={async () => {
+                      await post({ action: confirm.action, id: m.id });
+                      setConfirm(null);
+                    }}
+                  >
+                    {confirm.action === 'remove' ? 'Remover' : 'Suspender'}
+                  </button>
+                </div>
+              </div>
+            )}
             {editing?.id === m.id && (
               <form
                 className="member-edit"

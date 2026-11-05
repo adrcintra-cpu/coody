@@ -49,7 +49,8 @@ export function AssetFields({
             label="Categoria do arquivo"
             value={value.category}
             onChange={(v) => onChange({ ...value, category: v })}
-            options={[...assetCategories]}
+            // "Peças enviadas" is filled by the approval flow, not by hand.
+            options={assetCategories.filter((c) => c.value !== 'delivery' || value.category === 'delivery')}
           />
         </Field>
       </div>
@@ -68,14 +69,16 @@ export function AssetFields({
           placeholder="O que preservar, observar ou evitar ao usar este arquivo?"
         />
       </Field>
-      <label htmlFor={prefix + '-priority'} className="check-label">
-        <Checkbox
-          id={prefix + '-priority'}
-          checked={value.priority}
-          onCheckedChange={(v) => onChange({ ...value, priority: !!v })}
-        />{' '}
-        Referência prioritária
-      </label>
+      {['visual_reference', 'approved_art'].includes(value.category) && (
+        <label htmlFor={prefix + '-priority'} className="check-label">
+          <Checkbox
+            id={prefix + '-priority'}
+            checked={value.priority}
+            onCheckedChange={(v) => onChange({ ...value, priority: !!v })}
+          />{' '}
+          Referência prioritária (a IA olha esta primeiro)
+        </label>
+      )}
     </>
   );
 }

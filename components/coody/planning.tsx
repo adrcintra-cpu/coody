@@ -76,6 +76,21 @@ export function Planning({
   };
   const planContext=JSON.stringify(plan);
   const currentProposal=proposalContext===planContext?proposal:[];
+  // A paid proposal is never thrown away silently: when the settings change
+  // after it, offer to go back to them (or generate again).
+  const staleProposal = proposal.length > 0 && proposalContext !== planContext;
+  const restoreProposalSettings = () => {
+    try {
+      const p = JSON.parse(proposalContext) as Plan;
+      setMonthly(p.monthlyGoal);
+      setWeekly(p.weeklyGoal);
+      setDays(p.days);
+      setCampaign(p.campaign);
+      setSelected(p.selectedDates);
+    } catch {
+      setProposal([]);
+    }
+  };
   const saved = state.plans.find(
     (p) => p.brandId === brandId && p.month === month,
   );
@@ -147,7 +162,6 @@ export function Planning({
               const brand = state.brands.find((b) => b.id === v);
               setMonthly(brand?.monthlyGoal || 12);
               setWeekly(brand?.weeklyGoal || 3);
-              setProposal([]);
               setSelected([]);
             }}
             options={state.brands.map((b) => ({ value: b.id, label: b.name }))}
@@ -274,7 +288,6 @@ export function Planning({
                 value={activeSaved?.monthlyGoal ?? monthly}
                 onChange={(e) => {
                   setMonthly(Number(e.target.value));
-                  setProposal([]);
                 }}
               />
             </Field>
@@ -303,7 +316,6 @@ export function Planning({
                     checked={(activeSaved?.days || days).includes(i)}
                     onCheckedChange={(v) => {
                       setDays(v ? [...days, i] : days.filter((d) => d !== i));
-                      setProposal([]);
                     }}
                   />
                   {d}
@@ -317,7 +329,6 @@ export function Planning({
               value={activeSaved?.campaign ?? campaign}
               onChange={(e) => {
                 setCampaign(e.target.value);
-                setProposal([]);
               }}
               placeholder="O que merece destaque neste mês?"
             />
@@ -347,7 +358,6 @@ export function Planning({
                       ? [...selected, d.id]
                       : selected.filter((s) => s !== d.id),
                   );
-                  setProposal([]);
                 }}
               />
               <span>
@@ -456,6 +466,21 @@ export function Planning({
               {currentProposal.length || items.length} conteúdos
             </span>
           </div>
+          {staleProposal && (
+            <div className="notice" role="status">
+              <p>
+                Você mudou a configuração depois de gerar a proposta ({proposal.length} pautas). Ela continua guardada.
+              </p>
+              <div className="form-actions">
+                <button type="button" className="outline-btn" onClick={() => setProposal([])}>
+                  Descartar proposta
+                </button>
+                <button type="button" className="create-btn" onClick={restoreProposalSettings}>
+                  Voltar à configuração da proposta
+                </button>
+              </div>
+            </div>
+          )}
           {currentProposal.length ? (
             <>
               <p className="notice">

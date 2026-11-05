@@ -33,6 +33,7 @@ import { ClientLink } from './production';
 import { LibraryView } from './library';
 import { Planning } from './planning';
 import { DNAEditor, LinesEditor } from './art-direction';
+import { useDiscardGuard } from './discard-guard';
 import { dnaFields, dnaFilled, parseDNA } from '@/lib/art-direction';
 import { Contents } from './contents';
 import { identityCompleteness } from '@/lib/brand-memory';
@@ -413,7 +414,7 @@ export function Brands({
               <p className="brand-segment">{b.segment}</p>
               <p className="muted">
                 {b.description ||
-                  'Um novo Brand Space, pronto para suas ideias.'}
+                  'Uma nova marca, pronta para suas ideias.'}
               </p>
               <div className="brand-card-footer">
                 <span>
@@ -632,12 +633,17 @@ function BrandEditor({
   const [error, setError] = useState('');
   const update = (k: keyof Brand, v: unknown) => setB({ ...b, [k]: v });
   const total = b.pillars.reduce((s, p) => s + p.percent, 0);
+  // Closing with Esc, a click outside or Cancelar asks before losing edits.
+  const dirty = JSON.stringify(b) !== JSON.stringify(brand);
+  const guard = useDiscardGuard(dirty, busy, close);
   return (
+    <>
+    {guard.dialog}
     <FormModal
       open
-      title={brand.id ? 'Editar Brand Space' : 'Nova marca'}
+      title={brand.id ? 'Editar marca' : 'Nova marca'}
       description="Estas informações serão reutilizadas no planejamento e na criação."
-      onClose={close}
+      onClose={guard.requestClose}
     >
       <form
         onSubmit={async (e) => {
@@ -648,7 +654,12 @@ function BrandEditor({
             await act('saveBrand', { ...b });
             close();
           } catch (e) {
-            setError((e as Error).message);
+            const message = (e as Error).message;
+            setError(message);
+            // Take the person to the tab where the problem is.
+            if (/linha/i.test(message)) setTab('lines');
+            else if (/pilar|meta/i.test(message)) setTab('pillars');
+            else if (/hora/i.test(message)) setTab('contract');
           } finally {
             setBusy(false);
           }
@@ -665,7 +676,7 @@ function BrandEditor({
           />
         )}
         <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-          <TabsList variant="line">
+          <TabsList variant="line" className="brand-tabs">
             <TabsTrigger value="general">Marca</TabsTrigger>
             <TabsTrigger value="identity">Identidade</TabsTrigger>
             <TabsTrigger value="pillars">Pilares e frequência</TabsTrigger>
@@ -852,14 +863,20 @@ function BrandEditor({
           </p>
         )}
         <div className="form-actions">
-          <button type="button" className="outline-btn" onClick={close}>
+          <button type="button" className="outline-btn" onClick={guard.requestClose}>
             Cancelar
           </button>
           <button className="create-btn" disabled={busy || total !== 100}>
             {busy ? 'Salvando…' : 'Salvar marca'}
           </button>
         </div>
+        {total !== 100 && (
+          <p className="form-hint">
+            Para salvar, os pilares (aba Pilares e frequência) precisam somar 100%. Hoje somam {total}%.
+          </p>
+        )}
       </form>
     </FormModal>
+    </>
   );
 }

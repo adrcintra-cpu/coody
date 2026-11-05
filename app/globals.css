@@ -2217,3 +2217,6 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
   .client-pending-row { grid-template-columns: 56px 1fr; }
   .client-pending-row em { grid-column: 2; }
 }
+.asset-flags .flag-off { color: #ef4444; }
+.member-confirm { grid-column: 1 / -1; display: grid; gap: 8px; margin-top: 8px; }
+.notification-list a small { display: block; font-size: 11px; margin-top: 2px; }

@@ -1,6 +1,5 @@
 'use client';
-import { useState } from 'react';
-import { IntegrationMissing, IntegrationTitle, integrationState, useIntegrationStatus } from './integration-status';
+import { IntegrationTitle, integrationState, useIntegrationStatus } from './integration-status';
 export function OpenAIIntegration() {
   const status = useIntegrationStatus('/api/openai');
   return (
@@ -18,9 +17,8 @@ export function OpenAIIntegration() {
         </p>
       )}
       <p>
-        Criação de headline, legenda, hashtags e arte a partir da pauta. O Story é recomposto em 9:16 a partir desta arte, no Studio. A nova versão aparece no
-        Studio em revisão, antes da aprovação. Cobrança pela conta da API
-        OpenAI.
+        Motor de todo o fluxo: planejamento do mês, “Preencher com IA” na marca, análise das referências, os 3 conceitos
+        da Direção Criativa, a arte (Feed e Story 9:16), os ajustes e a validação. Cobrança pela conta da API OpenAI.
       </p>
       <button
         className="outline-btn"
@@ -29,91 +27,6 @@ export function OpenAIIntegration() {
       >
         {status.checking ? 'Verificando…' : 'Verificar conexão'}
       </button>
-    </section>
-  );
-}
-export function ImageGenerator({
-  contentId,
-  formats,
-  onBusy,
-  disabled,
-  reload,
-}: {
-  contentId: string;
-  formats: string;
-  onBusy: (value: boolean) => void;
-  disabled: boolean;
-  reload: () => Promise<void>;
-}) {
-  const [prompt, setPrompt] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
-  const status = useIntegrationStatus('/api/openai');
-  const unavailable = status.configured === false;
-  return (
-    <section className="panel section-space">
-      <h2>Criar criativo com IA</h2>
-      {unavailable && <IntegrationMissing name="OpenAI" />}
-      <label htmlFor="image-description">Orientação adicional (opcional)</label>
-      <textarea
-        id="image-description"
-        className="full"
-        rows={4}
-        maxLength={3000}
-        value={prompt}
-        disabled={busy || disabled || unavailable}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="O briefing e as regras da marca já serão usados. Acrescente uma direção, se desejar."
-      />
-      <p className="form-hint">
-        Gera textos e uma arte para {formats} (o Story é recomposto em 9:16 a partir dela, no Studio) e salva uma nova versão em revisão. Revise a escrita nas artes antes de
-        aprovar. Usa o logo e o manual da marca e os produtos anexados à peça
-        (sem anexos, usa toda a biblioteca da marca), enviados à OpenAI para
-        orientar a criação. Confira a fidelidade do logo
-        antes de aprovar. Cobrança pela API OpenAI.
-      </p>
-      <button
-        className="create-btn"
-        disabled={disabled || busy || unavailable || status.checking}
-        onClick={async () => {
-          setBusy(true);
-          onBusy(true);
-          setMessage(
-            'Criando textos e artes. Aguarde a conclusão; isso pode levar alguns minutos…',
-          );
-          try {
-            const response = await fetch('/api/openai', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: crypto.randomUUID(),
-                contentId,
-                mode: 'creative',
-                prompt,
-              }),
-            });
-            const result = (await response.json()) as { error?: string };
-            if (!response.ok)
-              throw new Error(result.error || 'Falha na geração.');
-            setMessage(
-              'Criativo salvo em uma nova versão. Revise os textos e as artes e envie para aprovação.',
-            );
-            await reload();
-          } catch (error) {
-            setMessage(
-              error instanceof Error
-                ? error.message
-                : 'Conexão interrompida. Confira a biblioteca antes de gerar novamente.',
-            );
-          } finally {
-            setBusy(false);
-            onBusy(false);
-          }
-        }}
-      >
-        {busy ? 'Gerando…' : 'Criar criativo completo · ' + formats}
-      </button>
-      <output>{message}</output>
     </section>
   );
 }
