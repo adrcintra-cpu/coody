@@ -6,6 +6,7 @@ import { Production } from './production';
 import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
+import { OxyhubSwitcher } from './oxyhub-switcher';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
@@ -403,6 +404,7 @@ export default function Workspace() {
                 );
               }}
             />
+            {state && role !== 'APROVADOR' && <OxyhubSwitcher/>}
             {state && <Notifications/>}
           </div>
         </header>
