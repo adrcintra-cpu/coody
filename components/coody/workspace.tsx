@@ -6,9 +6,10 @@ import { Production } from './production';
 import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
+  CalendarDays,
   CalendarRange,
   Layers,
   Shapes,
@@ -19,6 +20,7 @@ import {
   Plus,
   X,
   LoaderCircle,
+  ChevronDown,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -31,7 +33,6 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
-  useSidebar,
 } from '@/components/ui/sidebar';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -56,30 +57,17 @@ import { ContentForm } from './forms';
 import { today } from '@/lib/types';
 import { activeState } from '@/lib/brand-lifecycle';
 import type { View, State, Content, Action } from '@/lib/types';
-// Menu in the order of the work: the flow first, then the resources, then
-// the account. Calendário lives inside Conteúdos (still reachable by URL).
 const nav = [
   ['Dashboard', LayoutDashboard],
-  ['Marcas', Shapes],
   ['Planejamento', CalendarRange],
-  ['Produção', CheckCheck],
+  ['Calendário', CalendarDays],
   ['Conteúdos', Layers],
+  ['Marcas', Shapes],
+  ['Produção', CheckCheck],
   ['Biblioteca', Library],
   ['Integrações', Plug],
   ['Configurações', SettingsIcon],
 ] as const;
-const navGroups: { label: string; items: string[] }[] = [
-  { label: 'FLUXO', items: ['Dashboard', 'Marcas', 'Planejamento', 'Produção'] },
-  { label: 'RECURSOS', items: ['Conteúdos', 'Biblioteca'] },
-  { label: 'CONTA', items: ['Integrações', 'Configurações'] },
-];
-/** Views where the workspace month changes what is shown. */
-const monthViews: string[] = ['Dashboard', 'Planejamento', 'Calendário', 'Conteúdos', 'Produção'];
-/** Closes the mobile menu after a tap (needs the sidebar context). */
-function CloseMobileMenu({ children }: { children: (close: () => void) => React.ReactNode }) {
-  const { isMobile, setOpenMobile } = useSidebar();
-  return <>{children(() => isMobile && setOpenMobile(false))}</>;
-}
 export default function Workspace() {
   const [view, setView] = useState<View>('Dashboard');
   const [month, setMonth] = useState(() => today().slice(0, 7));
@@ -115,18 +103,6 @@ export default function Workspace() {
   } | null>(null);
   // Every screen except Marcas works without inactive brands and their data.
   const visible = useMemo(() => (state ? activeState(state) : null), [state]);
-  // Badge on Produção: pieces waiting on a decision or on the team's fix.
-  const pendingCount = useMemo(
-    () =>
-      visible?.contents.filter((c) => ['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO'].includes(c.status)).length || 0,
-    [visible],
-  );
-  // Integrações is for administrators only, also when opened by URL.
-  useEffect(() => {
-    if (view === 'Integrações' && state && !can(role, 'manage')) setView('Dashboard');
-  }, [view, state, role]);
-  // Where Studio's "Voltar" goes: the screen the piece was opened from.
-  const [returnView, setReturnView] = useState<View>('Produção');
   const reload = useCallback(async () => {
     const response = await fetch('/api/workspace', { cache: 'no-store' });
     const result = (await response.json()) as State & { error?: string };
@@ -152,7 +128,6 @@ export default function Workspace() {
   }, []);
   const go = useCallback(
     (v: View, details: Record<string, string> = {}) => {
-      if (v === 'Studio' && view !== 'Studio') setReturnView(view);
       setView(v);
       if (v === 'Biblioteca') setLibraryBrand(details.brand || '');
       if (v === 'Studio' && details.id) setSelected(details.id);
@@ -163,7 +138,7 @@ export default function Workspace() {
         '#' + encodeURIComponent(v) + '?' + params.toString(),
       );
     },
-    [month, view],
+    [month],
   );
   const navigate = useCallback(
     (v: View, details: Record<string, string> = {}) => {
@@ -181,7 +156,7 @@ export default function Workspace() {
         const [raw, query] = window.location.hash.slice(1).split('?');
         const name = decodeURIComponent(raw),
           params = new URLSearchParams(query || '');
-        if (nav.some(([v]) => v === name) || name === 'Studio' || name === 'Calendário')
+        if (nav.some(([v]) => v === name) || name === 'Studio')
           setView(name as View);
         else if (name === 'Aprovações') setView('Produção');
         else if (name) {
@@ -342,52 +317,37 @@ export default function Workspace() {
               disabled={!state}
               onClick={() => create(month + '-15')}
             >
-              <Plus size={18} /> Nova pauta
+              <Plus size={18} /> Criar conteúdo
             </button>
           )}
         </SidebarHeader>
         <SidebarContent>
-          <CloseMobileMenu>
-            {(closeMobile) =>
-              navGroups.map((group) => (
-                <div key={group.label} className="nav-group">
-                  <p className="nav-label">{group.label}</p>
-                  <SidebarMenu>
-                    {nav
-                      .filter(([name]) => group.items.includes(name))
-                      .filter(([name]) => name !== 'Integrações' || !state || can(role, 'manage'))
-                      .map(([name, Icon]) => (
-                        <SidebarMenuItem key={name}>
-                          <SidebarMenuButton
-                            isActive={
-                              view === name ||
-                              (view === 'Studio' && name === 'Produção') ||
-                              (view === 'Calendário' && name === 'Conteúdos')
-                            }
-                            onClick={() => {
-                              navigate(name);
-                              closeMobile();
-                            }}
-                          >
-                            <Icon />
-                            <span>{name}</span>
-                            {name === 'Produção' && pendingCount > 0 && (
-                              <span
-                                className="nav-badge"
-                                aria-label={pendingCount + ' peça(s) aguardando decisão ou ajuste'}
-                                title="Para aprovação, ajuste ou alteração"
-                              >
-                                {pendingCount}
-                              </span>
-                            )}
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                  </SidebarMenu>
-                </div>
-              ))
-            }
-          </CloseMobileMenu>
+          <p className="nav-label">WORKSPACE</p>
+          <SidebarMenu>
+            {nav.filter(([name]) => name !== 'Integrações' || !state || can(role, 'manage')).map(([name, Icon]) => (
+              <SidebarMenuItem key={name}>
+                <SidebarMenuButton
+                  isActive={
+                    view === name || (view === 'Studio' && name === 'Conteúdos')
+                  }
+                  onClick={() => navigate(name)}
+                >
+                  <Icon />
+                  <span>{name}</span>
+                  {name === 'Produção' &&
+                    !!visible?.contents.filter((c) => c.status === 'APROVAÇÃO')
+                      .length && (
+                      <span className="nav-badge">
+                        {
+                          visible.contents.filter((c) => c.status === 'APROVAÇÃO')
+                            .length
+                        }
+                      </span>
+                    )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
           <div className="demo-note">
@@ -411,6 +371,7 @@ export default function Workspace() {
               {state?.user?.name || 'Minha conta'}
               <small>{role ? roleLabels[role] : 'Minha conta'}</small>
             </span>
+            <ChevronDown size={15} />
           </button>
           {!!state?.user && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.reload(); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
         </SidebarFooter>
@@ -424,7 +385,6 @@ export default function Workspace() {
             <strong>{view}</strong>
           </div>
           <div className="top-actions">
-            {monthViews.includes(view) && (
             <Input
               type="month"
               aria-label="Mês do workspace"
@@ -443,16 +403,15 @@ export default function Workspace() {
                 );
               }}
             />
-            )}
-            {state && <Notifications onUpdate={() => void reload().catch(() => {})} />}
+            {state && <Notifications/>}
           </div>
         </header>
         <main className="workspace-main">
           {role === 'APROVADOR' && (
             <p className="notice role-notice">
               Seu acesso é de <strong>aprovador</strong>: você pode ver as peças,
-              comentar, aprovar ou pedir ajuste e alteração. Abra uma peça em
-              Produção › Para aprovação para decidir.
+              comentar, aprovar ou pedir alteração. Abra uma peça em
+              Aprovações para decidir.
             </p>
           )}
           {error ? (
@@ -544,9 +503,8 @@ export default function Workspace() {
               month={month}
               open={open}
               create={create}
-              showList={() => navigate('Conteúdos')}
             />
-          ) : view === 'Produção' ? (
+          ) : view === 'Produção' || view === 'Aprovações' ? (
             <Production
               state={visible}
               month={month}
@@ -562,7 +520,7 @@ export default function Workspace() {
               month={month}
               open={open}
               create={create}
-              showCalendar={() => navigate('Calendário')}
+              approvals={view === 'Aprovações'}
             />
           ) : view === 'Studio' && !item && selected ? (
             <section className="panel" role="alert">
@@ -578,11 +536,17 @@ export default function Workspace() {
           ) : view === 'Studio' && item ? (
             <Studio
               reload={reload}
-              key={item.id}
+              key={
+                item.id +
+                '-' +
+                visible.versions.filter((v) => v.contentId === item.id).length
+              }
               state={visible}
               item={item}
               act={act}
-              back={() => navigate(returnView)}
+              back={() =>
+                navigate('Marcas', { brand: item.brandId, tab: 'contents' })
+              }
               edit={(c) => setForm({ initial: c })}
               library={library}
               onDirtyChange={setStudioDirty}
