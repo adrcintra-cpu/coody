@@ -4,17 +4,15 @@ import {
   ArrowUpRight,
   Clock3,
   SlidersHorizontal,
-  CornerDownRight,
 } from 'lucide-react';
 import { ContentRow, BrandMark, Meter, StatusBadge, NoData } from './shared';
+import { columnOf, columns, heldByPlan, planApprovalOf } from '@/lib/domain';
 import {
   displayDate,
   today,
-  statusLabels,
   type State,
   type Content,
   type View,
-  type Status,
 } from '@/lib/types';
 export function Dashboard({
   state,
@@ -29,50 +27,69 @@ export function Dashboard({
 }) {
   const items = state.contents.filter((c) => c.date.startsWith(month));
   const now = today();
+  const brandOf = (id: string) => state.brands.find((b) => b.id === id);
   // Overdue: publication date already passed and the piece is not approved.
   const overdue = (c: Content) =>
-    c.date < now && !['APROVADO', 'PUBLICADO'].includes(c.status);
-  const attention = state.contents
-    .filter(
-      (c) =>
-        c.status === 'ALTERAÇÃO' || c.status === 'AJUSTE' || c.status === 'APROVAÇÃO' || overdue(c),
-    )
-    .sort(
-      (a, b) =>
-        Number(overdue(b)) - Number(overdue(a)) || a.date.localeCompare(b.date),
-    );
+    c.date < now && !['APROVADO', 'PUBLICADO'].includes(c.status) && !heldByPlan(c, state.plans);
+  const byDate = (a: Content, b: Content) => a.date.localeCompare(b.date);
+  // Same numbers as the Produção board: its columns, pieces held by a month
+  // plan left out, and decisions pending from any month.
+  const boardItems = state.contents.filter(
+    (c) =>
+      !heldByPlan(c, state.plans) &&
+      (c.date.startsWith(month) || ['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO'].includes(c.status)),
+  );
+  const soon = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+  const waitingPlans = state.plans
+    .filter((p) => planApprovalOf(p) !== 'aprovado' && p.month >= now.slice(0, 7))
+    .map((p) => ({ plan: p, count: state.contents.filter((c) => heldByPlan(c, [p])).length }))
+    .filter((w) => w.count);
+  const groups: { title: string; hint: (c: Content) => string; items: Content[] }[] = [
+    {
+      title: 'O cliente pediu mudança',
+      hint: (c) => (c.status === 'AJUSTE' ? 'Ajuste fino na mesma arte' : 'Uma nova imagem foi pedida'),
+      items: state.contents.filter((c) => c.status === 'AJUSTE' || c.status === 'ALTERAÇÃO').sort(byDate),
+    },
+    {
+      title: 'Atrasadas',
+      hint: (c) => 'Data de publicação já passou (' + displayDate(c.date) + ')',
+      items: state.contents.filter((c) => overdue(c) && !['AJUSTE', 'ALTERAÇÃO', 'APROVAÇÃO'].includes(c.status)).sort(byDate),
+    },
+    {
+      title: 'Aguardando o cliente',
+      hint: (c) => 'Enviada para aprovação · publica em ' + displayDate(c.date),
+      items: state.contents.filter((c) => c.status === 'APROVAÇÃO').sort(byDate),
+    },
+    {
+      title: 'Aprovadas para publicar',
+      hint: (c) => 'Publicar até ' + displayDate(c.date),
+      items: state.contents.filter((c) => c.status === 'APROVADO' && c.date <= soon).sort(byDate),
+    },
+  ].filter((g) => g.items.length);
+  const attentionCount = groups.reduce((n, g) => n + g.items.length, 0) + waitingPlans.length;
   const upcoming = state.contents
     .filter((c) => c.status !== 'PUBLICADO' && c.date >= now)
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .sort(byDate)
     .slice(0, 4);
-  const metrics: Status[] = [
-    'EM CRIAÇÃO',
-    'REVISÃO',
-    'APROVAÇÃO',
-    'AJUSTE',
-    'ALTERAÇÃO',
-    'APROVADO',
-    'PUBLICADO',
-  ];
   return (
     <>
       <div className="page-heading">
         <div>
           <p className="eyebrow">SEU WORKSPACE CRIATIVO</p>
           <h1>Visão geral</h1>
-          <p>A clareza que sua produção precisa.</p>
+          <p>O que está em produção e o que precisa de você hoje.</p>
         </div>
         <button
           className="outline-btn"
-          onClick={() => navigate('Planejamento')}
+          onClick={() => navigate('Produção')}
         >
-          <SlidersHorizontal size={16} /> Ver planejamento{' '}
+          <SlidersHorizontal size={16} /> Abrir produção{' '}
           <ArrowUpRight size={15} />
         </button>
       </div>
       <section className="metrics">
         <div className="metric total">
-          <span>Conteúdos do mês</span>
+          <span>Pautas do mês</span>
           <strong>
             {String(items.length).padStart(2, '0')}
             <small>
@@ -80,32 +97,24 @@ export function Dashboard({
               / {state.brands.reduce((a, b) => a + b.monthlyGoal, 0)}
             </small>
           </strong>
-          <span className="muted">planejados no período</span>
+          <span className="muted">meta somada das marcas</span>
         </div>
-        {metrics.map((s) => (
+        {columns.map((col) => (
           <button
             className="metric"
-            key={s}
-            onClick={() =>
-              navigate(
-                s === 'APROVAÇÃO' || s === 'ALTERAÇÃO' || s === 'AJUSTE'
-                  ? 'Produção'
-                  : 'Conteúdos',
-              )
-            }
+            key={col.id}
+            onClick={() => navigate('Produção')}
+            title={col.hint}
           >
             <span>
-              <i className={'dot dot-' + s.replaceAll(' ', '-')} />
-              {s === 'APROVAÇÃO' ? 'Em aprovação' : statusLabels[s]}
+              <i className={'dot dot-' + col.statuses[0].replaceAll(' ', '-')} />
+              {col.title}
             </span>
             <strong>
-              {String(items.filter((c) => c.status === s).length).padStart(
-                2,
-                '0',
-              )}
+              {String(boardItems.filter((c) => columnOf(c.status) === col.id).length).padStart(2, '0')}
             </strong>
             <span className="metric-link">
-              Ver conteúdos <ArrowUpRight size={13} />
+              Ver na produção <ArrowUpRight size={13} />
             </span>
           </button>
         ))}
@@ -117,47 +126,66 @@ export function Dashboard({
               <h2>
                 <span className="attention-dot" />
                 Precisa da sua atenção{' '}
-                <span className="count">{attention.length}</span>
+                <span className="count">{attentionCount}</span>
               </h2>
               <button
                 onClick={() => navigate('Produção')}
                 className="text-btn"
               >
-                Ver tudo <ArrowRight size={16} />
+                Abrir produção <ArrowRight size={16} />
               </button>
             </div>
-            {attention.length ? (
-              attention.slice(0, 3).map((c) => (
-                <button
-                  className="attention-row"
-                  key={c.id}
-                  onClick={() => open(c)}
-                >
-                  <BrandMark
-                    brand={state.brands.find((b) => b.id === c.brandId)}
-                  />
-                  <span className="row-title">
-                    <strong>{c.title}</strong>
-                    <small>
-                      {state.brands.find((b) => b.id === c.brandId)?.name} ·{' '}
-                      {overdue(c)
-                        ? 'Data de publicação já passou (' +
-                          displayDate(c.date) +
-                          ')'
-                        : c.status === 'ALTERAÇÃO'
-                          ? 'Uma nova imagem foi pedida'
-                          : c.status === 'AJUSTE'
-                            ? 'Ajuste fino na mesma arte'
-                          : 'Pronto para seu olhar final'}
-                    </small>
-                  </span>
-                  <StatusBadge status={c.status} />
-                  <ArrowUpRight size={17} />
-                </button>
-              ))
-            ) : (
-              <p className="muted">Tudo em dia. Sua equipe está no ritmo.</p>
+            {waitingPlans.length > 0 && (
+              <div className="attention-group">
+                <h3>Planejamentos sem aprovação do cliente</h3>
+                {waitingPlans.map(({ plan, count }) => (
+                  <button className="attention-row" key={plan.id} onClick={() => navigate('Planejamento')}>
+                    <BrandMark brand={brandOf(plan.brandId)} />
+                    <span className="row-title">
+                      <strong>
+                        {brandOf(plan.brandId)?.name} ·{' '}
+                        {new Date(plan.month + '-15T12:00:00').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                      </strong>
+                      <small>
+                        {count} pauta(s) ·{' '}
+                        {planApprovalOf(plan) === 'rascunho'
+                          ? 'ainda não enviado ao cliente'
+                          : planApprovalOf(plan) === 'ajustes'
+                            ? 'o cliente pediu mudanças'
+                            : 'aguardando o cliente'}
+                      </small>
+                    </span>
+                    <ArrowUpRight size={17} />
+                  </button>
+                ))}
+              </div>
             )}
+            {groups.map((g) => (
+              <div className="attention-group" key={g.title}>
+                <h3>
+                  {g.title} <span className="muted">{g.items.length}</span>
+                </h3>
+                {g.items.slice(0, 4).map((c) => (
+                  <button className="attention-row" key={c.id} onClick={() => open(c)}>
+                    <BrandMark brand={brandOf(c.brandId)} />
+                    <span className="row-title">
+                      <strong>{c.title}</strong>
+                      <small>
+                        {brandOf(c.brandId)?.name} · {g.hint(c)}
+                      </small>
+                    </span>
+                    <StatusBadge status={c.status} />
+                    <ArrowUpRight size={17} />
+                  </button>
+                ))}
+                {g.items.length > 4 && (
+                  <button className="text-btn" onClick={() => navigate('Produção')}>
+                    + {g.items.length - 4} na produção
+                  </button>
+                )}
+              </div>
+            ))}
+            {!attentionCount && <p className="muted">Tudo em dia. Nada esperando por você.</p>}
           </section>
           <section className="recent section-space">
             <div className="section-head">
@@ -166,7 +194,7 @@ export function Dashboard({
                 className="text-btn"
                 onClick={() => navigate('Conteúdos')}
               >
-                Todos os conteúdos <ArrowRight size={16} />
+                Todas as pautas <ArrowRight size={16} />
               </button>
             </div>
             <div className="table-caption">
@@ -250,9 +278,6 @@ export function Dashboard({
                 </button>
               );
             })}
-            <p className="footnote">
-              <CornerDownRight size={14} /> Cada ideia, um passo à frente.
-            </p>
           </section>
         </aside>
       </div>

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { State, Content } from '@/lib/types';
 import { IntegrationMissing, IntegrationTitle, integrationState, useIntegrationStatus } from './integration-status';
 type Job = { id: string; status: string; message: string; format: string };
@@ -250,5 +250,18 @@ export function MagnificGenerator({
         </p>
       ))}
     </section>
+  );
+}
+
+/** Magnific in the Studio: only when configured, closed by default (the main
+ *  path is the Direção Criativa). */
+export function MagnificPanel({ children }: { children: React.ReactNode }) {
+  const status = useIntegrationStatus('/api/magnific');
+  if (status.configured !== true) return null;
+  return (
+    <details className="panel section-space studio-more">
+      <summary>Outros geradores · Magnific</summary>
+      {children}
+    </details>
   );
 }

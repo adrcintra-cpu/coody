@@ -143,15 +143,28 @@ export function CreativeDirection({
       });
       await load();
       await reload();
+      const notes: string[] = [];
+      // "Feed + Story": the Story 9:16 is recomposed from the same art.
+      if (item.format.includes('Story')) {
+        setMessage('Feed criado. Recompondo o Story 9:16 a partir da mesma arte…');
+        try {
+          await post('/api/openai/story', { contentId: item.id, requestId: crypto.randomUUID() });
+          await reload();
+        } catch (e) {
+          notes.push('O Story não foi recomposto (' + (e as Error).message + '); use “Recompor Story com IA”.');
+        }
+      }
       // Etapa 6: check the new art before it goes to the client.
       setMessage('Arte criada. Validando aderência à marca…');
       try {
         await post('/api/openai/validate', { versionId: d.versionId });
         await reload();
-        setMessage('Criativo salvo em uma nova versão e validado. Revise e envie para aprovação.');
       } catch (e) {
-        setMessage('Criativo salvo em uma nova versão. A validação automática falhou: ' + (e as Error).message);
+        notes.push('A validação automática falhou: ' + (e as Error).message);
       }
+      setMessage(
+        ['Criativo pronto numa nova versão, em revisão. Confira e use “Enviar para aprovação”.', ...notes].join(' '),
+      );
     });
   const block = disabled || working || unavailable || status.checking;
   return (

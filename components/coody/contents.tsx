@@ -10,7 +10,8 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Layers, Plus, Trash2 } from 'lucide-react';
+import { can } from '@/lib/permissions';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentRow, Picker, NoData, StatusBadge } from './shared';
@@ -29,7 +30,7 @@ export function Contents({
   month,
   open,
   create,
-  approvals = false,
+  showCalendar,
   fixedBrandId,
 }: {
   act: Action;
@@ -39,8 +40,10 @@ export function Contents({
   month: string;
   open: (c: Content) => void;
   create: (date?: string, brandId?: string) => void;
-  approvals?: boolean;
+  /** Switches to the calendar view of the same pieces. */
+  showCalendar?: () => void;
 }) {
+  const canEdit = can(state.user?.role, 'edit');
   const [removing, setRemoving] = useState<Content | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -79,8 +82,6 @@ export function Contents({
         (q ? true : c.date.startsWith(month)) &&
         (brand === 'all' || c.brandId === brand) &&
         (status === 'all' || c.status === status) &&
-        (!approvals ||
-          ['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO', 'APROVADO'].includes(c.status)) &&
         (!q ||
           normalize(c.title + ' ' + c.brief + ' ' + brandName(c.brandId)).includes(q)),
     )
@@ -94,38 +95,31 @@ export function Contents({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {approvals ? 'O OLHAR QUE REFINA' : 'DA IDEIA À PUBLICAÇÃO'}
-          </p>
-          <h1>{approvals ? 'Aprovações' : 'Conteúdos'}</h1>
-          <p>
-            {approvals
-              ? 'Feedback claro. Próximos passos definidos.'
-              : 'Toda a produção, no mesmo espaço.'}
-          </p>
+          <p className="eyebrow">DA IDEIA À PUBLICAÇÃO</p>
+          <h1>Conteúdos</h1>
+          <p>Todas as pautas do mês. Busque por tema, briefing ou marca.</p>
         </div>
-        {!approvals && (
-          <button
-            className="create-btn"
-            onClick={() =>
-              create(
-                month + '-15',
-                fixedBrandId || (brand === 'all' ? undefined : brand),
-              )
-            }
-          >
-            <Plus size={17} /> Criar conteúdo
-          </button>
-        )}
+        <div className="heading-actions">
+          {showCalendar && (
+            <button className="outline-btn" onClick={showCalendar}>
+              <CalendarDays size={16} /> Ver calendário
+            </button>
+          )}
+          {canEdit && (
+            <button
+              className="create-btn"
+              onClick={() =>
+                create(
+                  month + '-15',
+                  fixedBrandId || (brand === 'all' ? undefined : brand),
+                )
+              }
+            >
+              <Plus size={17} /> Nova pauta
+            </button>
+          )}
+        </div>
       </div>
-      <button
-        className="outline-btn"
-        disabled={busy}
-        onClick={() => (trash === null ? void loadTrash() : setTrash(null))}
-      >
-        <Trash2 size={16} />
-        {trash === null ? 'Lixeira' : 'Voltar aos conteúdos'}
-      </button>
       {error && (
         <p className="error" role="alert">
           {error}
@@ -200,10 +194,7 @@ export function Contents({
           onChange={setStatus}
           options={[
             { value: 'all', label: 'Todos os status' },
-            ...(approvals
-              ? (['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO', 'APROVADO'] as Status[])
-              : statuses
-            ).map((s) => ({ value: s, label: statusLabels[s] })),
+            ...statuses.map((s) => ({ value: s, label: statusLabels[s] })),
           ]}
         />
         <Input
@@ -218,10 +209,15 @@ export function Contents({
           {items.length} {items.length === 1 ? 'conteúdo' : 'conteúdos'}
           {q ? ' · buscando em todos os meses' : ''}
         </span>
-        {approvals && (
-          <span className="form-hint">
-            Aprovação interna · Trello ainda não conectado
-          </span>
+        {canEdit && (
+          <button
+            className="text-btn"
+            disabled={busy}
+            onClick={() => (trash === null ? void loadTrash() : setTrash(null))}
+          >
+            <Trash2 size={15} />
+            {trash === null ? 'Lixeira' : 'Voltar aos conteúdos'}
+          </button>
         )}
       </div>
       {trash === null &&
@@ -233,13 +229,16 @@ export function Contents({
                 brand={state.brands.find((b) => b.id === c.brandId)}
                 onOpen={() => open(c)}
               />
-              <button
-                className="text-btn danger"
-                aria-label={'Excluir ' + c.title}
-                onClick={() => setRemoving(c)}
-              >
-                <Trash2 size={17} />
-              </button>
+              {canEdit && (
+                <button
+                  className="text-btn danger"
+                  aria-label={'Mover para a lixeira: ' + c.title}
+                  title="Mover para a lixeira"
+                  onClick={() => setRemoving(c)}
+                >
+                  <Trash2 size={17} />
+                </button>
+              )}
             </div>
           ))
         ) : (
@@ -259,8 +258,7 @@ export function Contents({
             <AlertDialogTitle>Mover conteúdo para a lixeira?</AlertDialogTitle>
             <AlertDialogDescription>
               {removing?.title}. Ele sairá dos conteúdos e do calendário. Você
-              poderá restaurá-lo com todas as versões. Cartões já enviados ao
-              Trello permanecem lá.
+              poderá restaurá-lo com todas as versões.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {error && <p className="error">{error}</p>}
@@ -298,12 +296,15 @@ export function Calendar({
   month,
   open,
   create,
+  showList,
 }: {
   state: State;
   month: string;
   open: (c: Content) => void;
   create: (date?: string, brandId?: string) => void;
+  showList?: () => void;
 }) {
+  const canEdit = can(state.user?.role, 'edit');
   // On phones the 7-column month grid does not fit; start in the list view.
   const narrow =
     typeof window !== 'undefined' &&
@@ -330,18 +331,27 @@ export function Calendar({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">VISÃO EDITORIAL</p>
+          <p className="eyebrow">CONTEÚDOS · CALENDÁRIO</p>
           <h1>Calendário</h1>
-          <p>Encontre o equilíbrio entre frequência e intenção.</p>
+          <p>As pautas do mês por dia. Clique num dia para criar uma pauta.</p>
         </div>
-        <button
-          className="create-btn"
-          onClick={() =>
-            create(month + '-15', brand === 'all' ? undefined : brand)
-          }
-        >
-          <Plus size={17} /> Nova pauta
-        </button>
+        <div className="heading-actions">
+          {showList && (
+            <button className="outline-btn" onClick={showList}>
+              <Layers size={16} /> Ver lista
+            </button>
+          )}
+          {canEdit && (
+            <button
+              className="create-btn"
+              onClick={() =>
+                create(month + '-15', brand === 'all' ? undefined : brand)
+              }
+            >
+              <Plus size={17} /> Nova pauta
+            </button>
+          )}
+        </div>
       </div>
       <div className="toolbar">
         <Picker
@@ -414,13 +424,14 @@ export function Calendar({
                     <>
                       <button
                         className="calendar-day"
-                        aria-label={'Criar conteúdo em ' + date}
+                        aria-label={canEdit ? 'Nova pauta em ' + date : 'Dia ' + d}
+                        disabled={!canEdit}
                         onClick={() =>
                           create(date, brand === 'all' ? undefined : brand)
                         }
                       >
                         <span>{d}</span>
-                        <Plus size={13} />
+                        {canEdit && <Plus size={13} />}
                       </button>
                       {items
                         .filter((c) => c.date === date)

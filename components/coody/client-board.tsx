@@ -54,6 +54,12 @@ export function ClientBoard({ token }: { token: string }) {
       return '';
     }
   });
+  const saveName = (value: string) => {
+    setName(value);
+    try {
+      localStorage.setItem('coody-client-name', value);
+    } catch {}
+  };
   const load = useCallback(async () => {
     const r = await fetch(`/api/client?token=${encodeURIComponent(token)}${month ? '&month=' + month : ''}`, { cache: 'no-store' });
     const d = (await r.json()) as Board & { error?: string };
@@ -64,7 +70,9 @@ export function ClientBoard({ token }: { token: string }) {
   useEffect(() => {
     load().catch((e) => setError(e.message));
   }, [load]);
+  const [done, setDone] = useState('');
   const decide = async (id: string, status: Status, comment: string) => {
+    if (!name.trim()) throw new Error('Escreva seu nome para registrar a decisão.');
     const r = await fetch('/api/client', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -72,6 +80,12 @@ export function ClientBoard({ token }: { token: string }) {
     });
     const d = (await r.json()) as { error?: string };
     if (!r.ok) throw new Error(d.error || 'Não foi possível registrar.');
+    const title = board?.items.find((i) => i.id === id)?.title || 'A peça';
+    setDone(
+      status === 'APROVADO'
+        ? `“${title}” aprovada. Obrigado! A agência já foi avisada.`
+        : `Pedido enviado para “${title}”. A agência vai preparar uma nova versão e ela volta para você aprovar.`,
+    );
     await load();
   };
   if (error)
@@ -93,6 +107,7 @@ export function ClientBoard({ token }: { token: string }) {
   const monthItems = board.items.filter((i) => i.date.startsWith(board.month));
   const approval = board.plan ? planApprovalOf(board.plan) : 'aprovado';
   // Until the month plan is approved, its pieces stay out of the board.
+  const pending = board.items.filter((i) => i.status === 'APROVAÇÃO');
   const boardItems = board.items.filter(
     (i) => !(approval !== 'aprovado' && i.date.startsWith(board.month) && ['IDEIA', 'PLANEJADO'].includes(i.status)),
   );
@@ -148,9 +163,41 @@ export function ClientBoard({ token }: { token: string }) {
       </nav>
       {tab === 'quadro' ? (
         <>
+          {done && (
+            <p className="notice success" role="status">
+              {done}{' '}
+              <button className="text-btn" onClick={() => setDone('')}>
+                Fechar
+              </button>
+            </p>
+          )}
+          {pending.length > 0 && (
+            <section className="client-pending">
+              <h2>Para você aprovar · {pending.length}</h2>
+              {pending.map((i) => (
+                <button key={i.id} className="client-pending-row" onClick={() => setOpenId(i.id)}>
+                  {i.feedUrl || i.media[0]?.mime.startsWith('image/') ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={i.feedUrl || i.media[0].url} alt="" loading="lazy" />
+                  ) : (
+                    <span className="client-pending-icon">
+                      <FileText size={20} />
+                    </span>
+                  )}
+                  <span>
+                    <strong>{i.title}</strong>
+                    <small className="muted">
+                      {displayDate(i.date)} · {i.format}
+                    </small>
+                  </span>
+                  <em>Abrir e decidir</em>
+                </button>
+              ))}
+            </section>
+          )}
           <p className="muted">
-            Arraste uma peça de “Para aprovação” para Aprovado, Ajuste ou Alteração, ou abra a peça e use os botões.
-            Ajuste é um retoque na mesma arte; Alteração pede uma nova imagem.
+            Abra uma peça para aprovar ou pedir mudança. No computador, você também pode arrastar o card entre as
+            colunas. Ajuste é um retoque na mesma arte; Alteração pede uma nova imagem.
           </p>
           {approval === 'enviado' && (
             <p className="notice">
@@ -186,7 +233,9 @@ export function ClientBoard({ token }: { token: string }) {
           />
         </>
       )}
-      {item && <PieceView item={item} close={() => setOpenId('')} decide={decide} />}
+      {item && (
+        <PieceView item={item} close={() => setOpenId('')} decide={decide} name={name} setName={saveName} />
+      )}
     </main>
   );
 }
@@ -195,10 +244,14 @@ function PieceView({
   item,
   close,
   decide,
+  name,
+  setName,
 }: {
   item: Item;
   close: () => void;
   decide: (id: string, status: Status, comment: string) => Promise<void>;
+  name: string;
+  setName: (v: string) => void;
 }) {
   const [mode, setMode] = useState<'' | 'AJUSTE' | 'ALTERAÇÃO'>('');
   const [comment, setComment] = useState('');
@@ -206,7 +259,7 @@ function PieceView({
   const [error, setError] = useState('');
   const files = item.media.length
     ? item.media
-    : [item.feedUrl && { url: item.feedUrl, mime: 'image/png', name: 'Feed' }, item.storyUrl && { url: item.storyUrl, mime: 'image/png', name: 'Story' }].filter(
+    : [item.feedUrl && { url: item.feedUrl, mime: 'image/png', name: 'Feed · 4:5' }, item.storyUrl && { url: item.storyUrl, mime: 'image/png', name: 'Story · 9:16' }].filter(
         Boolean,
       ) as Item['media'];
   const send = async (status: Status) => {
@@ -226,8 +279,11 @@ function PieceView({
       <div className="client-media">
         {files.map((m, i) =>
           m.mime.startsWith('image/') ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={i} src={m.url} alt={m.name} loading="lazy" />
+            <figure key={i}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={m.url} alt={m.name} loading="lazy" />
+              {files.length > 1 && <figcaption>{m.name}</figcaption>}
+            </figure>
           ) : m.mime.startsWith('video/') ? (
             <video key={i} src={m.url} controls playsInline preload="metadata" />
           ) : (
@@ -280,15 +336,21 @@ function PieceView({
             </div>
           </form>
         ) : (
-          <div className="form-actions">
-            <button className="outline-btn" disabled={busy} onClick={() => setMode('ALTERAÇÃO')}>
-              Pedir alteração (nova imagem)
-            </button>
-            <button className="outline-btn" disabled={busy} onClick={() => setMode('AJUSTE')}>
-              Pedir ajuste
-            </button>
-            <button className="create-btn" disabled={busy} onClick={() => void send('APROVADO')}>
+          <div className="client-decision">
+            {!name.trim() && (
+              <label className="client-name-inline">
+                Seu nome (fica registrado na decisão)
+                <input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+              </label>
+            )}
+            <button className="create-btn" disabled={busy || !name.trim()} onClick={() => void send('APROVADO')}>
               {busy ? 'Aprovando…' : 'Aprovar'}
+            </button>
+            <button className="outline-btn" disabled={busy || !name.trim()} onClick={() => setMode('AJUSTE')}>
+              Pedir ajuste <small>retoque na mesma arte</small>
+            </button>
+            <button className="outline-btn" disabled={busy || !name.trim()} onClick={() => setMode('ALTERAÇÃO')}>
+              Pedir alteração <small>uma nova imagem</small>
             </button>
           </div>
         ))}

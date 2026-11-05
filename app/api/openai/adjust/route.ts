@@ -95,8 +95,12 @@ export async function POST(request: Request) {
         createdAt: new Date().toISOString(),
         locked: 0,
       }),
+      // The new version goes to review: the request panel closes, so the same
+      // ajuste is not paid for twice.
       database()
-        .prepare('UPDATE content_items SET revision=COALESCE(revision,0)+1 WHERE id=?')
+        .prepare(
+          "UPDATE content_items SET revision=COALESCE(revision,0)+1, status=CASE WHEN status IN ('AJUSTE','ALTERAÇÃO') THEN 'REVISÃO' ELSE status END WHERE id=?",
+        )
         .bind(item.id),
       database().prepare("UPDATE image_requests SET status='complete',assetId=? WHERE id=?").bind(versionId, requestId),
     ]);

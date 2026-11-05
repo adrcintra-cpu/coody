@@ -15,7 +15,7 @@ export const statusLabels: Record<Status, string> = {
   PLANEJADO: 'Planejado',
   'EM CRIAÇÃO': 'Em criação',
   REVISÃO: 'Em revisão',
-  APROVAÇÃO: 'Aguardando aprovação',
+  APROVAÇÃO: 'Para aprovação',
   AJUSTE: 'Em ajuste',
   ALTERAÇÃO: 'Em alteração',
   APROVADO: 'Aprovado',
@@ -180,7 +180,6 @@ export type View =
   | 'Calendário'
   | 'Conteúdos'
   | 'Marcas'
-  | 'Aprovações'
   | 'Produção'
   | 'Biblioteca'
   | 'Integrações'

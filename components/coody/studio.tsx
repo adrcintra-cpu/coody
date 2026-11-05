@@ -1,11 +1,11 @@
 'use client';
 import { ArtViewer } from './art-viewer';
-import { MagnificGenerator } from './magnific';
+import { MagnificGenerator, MagnificPanel } from './magnific';
 import { CreativeDirection } from './creative-direction';
 import { AttachmentPicker } from './attachments';
 import { can } from '@/lib/permissions';
-import { ExternalPiece } from './production';
-import { useEffect, useState } from 'react';
+import { ClientLink, ExternalPiece } from './production';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Save,
@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ArrowUpRight,
   Trash2,
+  MessageCircle,
 } from 'lucide-react';
 import Image from 'next/image';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -90,14 +91,22 @@ export function Studio({
   const [aiMessage, setAiMessage] = useState('');
   // Ajuste: edit the same art (then the 9:16 Story again, when there is one).
   // Alteração: a new art from the brief with the request as direction.
+  // The request to apply: the client's last message (else the latest
+  // comment), editable before running.
+  const pieceComments = state.comments
+    .filter((c) => c.contentId === item.id)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const clientRequest =
+    (pieceComments.find((c) => c.user.startsWith('Cliente ·')) || pieceComments[0])?.text || '';
+  const [instruction, setInstruction] = useState(clientRequest);
   const aiRequest = async (kind: 'adjust' | 'regenerate') => {
+    if (aiBusy) return;
     setAiBusy(true);
     setBusy(true);
     setAiMessage(kind === 'adjust' ? 'Ajustando a mesma arte… pode levar até 1 minuto.' : 'Gerando a nova arte… pode levar alguns minutos.');
     try {
-      const comment = state.comments
-        .filter((c) => c.contentId === item.id)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.text || '';
+      const comment = instruction.trim();
+      if (!comment) throw new Error('Descreva o que deve mudar.');
       const r = await fetch(kind === 'adjust' ? '/api/openai/adjust' : '/api/openai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,7 +126,7 @@ export function Studio({
           body: JSON.stringify({ contentId: item.id, requestId: crypto.randomUUID() }),
         }).catch(() => null);
       }
-      setAiMessage('Nova versão pronta. Revise antes de enviar para aprovação.');
+      setAiMessage('Nova versão pronta e em revisão. Confira e use “Enviar para aprovação”.');
       await reload();
     } catch (e) {
       setAiMessage((e as Error).message);
@@ -127,6 +136,10 @@ export function Studio({
     }
   };
   const [confirmApproval, setConfirmApproval] = useState(false);
+  // After "Enviar para aprovação": offer to tell the client right away.
+  const [sentToClient, setSentToClient] = useState(false);
+  const [notifyClient, setNotifyClient] = useState(false);
+  const [confirmPublish, setConfirmPublish] = useState(false);
   const [recomposing, setRecomposing] = useState(false);
   const openai = useIntegrationStatus('/api/openai');
   const [uploading, setUploading] = useState(false);
@@ -148,6 +161,23 @@ export function Studio({
     return () => window.removeEventListener('beforeunload', prevent);
   }, [hasUnsaved, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+  // A new version (AI, upload, another person) arrives without remounting
+  // the Studio: follow it, unless there is unsaved text on screen.
+  const seenLatest = useRef(latest?.id);
+  useEffect(() => {
+    if (!latest || latest.id === seenLatest.current) return;
+    const wasOnLatest = !versionId || versionId === seenLatest.current;
+    seenLatest.current = latest.id;
+    if (!wasOnLatest) return;
+    if (hasUnsaved) {
+      setNotice(`Chegou a versão V${latest.number}. Salve ou descarte seu texto para vê-la.`);
+      return;
+    }
+    setVersionId(latest.id);
+    setDraft(latest);
+    setTags(latest.hashtags.join(' '));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latest?.id]);
   if (!draft || !current)
     return <p>Esta pauta ainda não tem uma versão disponível.</p>;
   const historic = current.id !== latest?.id;
@@ -205,9 +235,21 @@ export function Studio({
     ) {
       setChangeModal(false);
       setFeedback('');
+      if (status === 'APROVAÇÃO') setSentToClient(true);
     }
   };
   const sharedAsset = sharedAssetUrl(draft.feedUrl, draft.storyUrl);
+  // Why "Enviar para aprovação" is not possible yet (shown next to it).
+  const latestHasArt = !!latest && (!!latest.feedUrl || !!latest.media?.length);
+  const latestHasStory =
+    !!latest && (!!latest.media?.length || (!!latest.storyUrl && latest.storyUrl !== latest.feedUrl));
+  const sendBlock = dirty
+    ? 'Salve a nova versão antes de enviar.'
+    : !latestHasArt
+      ? 'Crie ou envie a arte antes de enviar para aprovação.'
+      : item.format.includes('Story') && !latestHasStory
+        ? 'Falta o Story 9:16: use “Recompor Story com IA”.'
+        : '';
   // Story 9:16 = AI recomposition of this same saved art (story-<source id>).
   const needsStory = item.format.includes('Story');
   const recomposedStory =
@@ -346,15 +388,21 @@ export function Studio({
       {(item.status === 'AJUSTE' || item.status === 'ALTERAÇÃO') && (
         <section className="panel studio-request">
           <h2>{item.status === 'AJUSTE' ? 'Ajuste pedido (mesma arte)' : 'Alteração pedida (nova imagem)'}</h2>
-          <p>{lastRequest || 'Sem comentário.'}</p>
+          {canEdit && !current.media?.length ? (
+            <Field label={item.status === 'AJUSTE' ? 'O que ajustar (pedido do cliente, pode editar)' : 'O que mudar (pedido do cliente, pode editar)'}>
+              <Textarea rows={3} maxLength={2000} value={instruction} disabled={aiBusy} onChange={(e) => setInstruction(e.target.value)} />
+            </Field>
+          ) : (
+            <p>{lastRequest || 'Sem comentário.'}</p>
+          )}
           {canEdit && !current.media?.length && (
             <div className="form-actions">
               {item.status === 'AJUSTE' ? (
-                <button className="create-btn" disabled={aiBusy || !latest?.feedUrl} onClick={() => void aiRequest('adjust')}>
+                <button className="create-btn" disabled={aiBusy || !latest?.feedUrl || !instruction.trim()} onClick={() => void aiRequest('adjust')}>
                   {aiBusy ? 'Ajustando a arte…' : 'Aplicar ajuste com IA'}
                 </button>
               ) : (
-                <button className="create-btn" disabled={aiBusy} onClick={() => void aiRequest('regenerate')}>
+                <button className="create-btn" disabled={aiBusy || !instruction.trim()} onClick={() => void aiRequest('regenerate')}>
                   {aiBusy ? 'Gerando nova arte…' : 'Gerar nova arte com IA'}
                 </button>
               )}
@@ -362,7 +410,7 @@ export function Studio({
           )}
           {aiMessage && <p className="form-hint">{aiMessage}</p>}
           <p className="form-hint">
-            Depois de revisar a nova versão, use “Levar para revisão” e envie para aprovação de novo.
+            A IA cria uma nova versão. Confira e use “Enviar para aprovação”. Se preferir, envie um arquivo novo pelo Studio.
           </p>
         </section>
       )}
@@ -397,53 +445,39 @@ export function Studio({
               )}
             </div>
           </div>
-          <div className="art-controls">
-            <Field label="Arte compartilhada do Post e Story">
-              <Picker
-                label="Selecionar arte"
-                value={
-                  sharedAsset || 'none'
-                }
-                onChange={(v) =>
-                  !disabled &&
-                  setDraft({
-                    ...draft,
-                    feedUrl: v === 'none' ? '' : v,
-                    storyUrl: v === 'none' ? '' : v,
-                  })
-                }
-                options={[
-                  { value: 'none', label: 'Sem arte selecionada' },
-                  ...images.map((a) => ({ value: a.url, label: a.name })),
-                ]}
-              />
-            </Field>
-            <button
-              className="outline-btn"
-              disabled={busy}
-              onClick={() => {
-                setNotice('');
-                setUploading(true);
-              }}
-            >
-              <ImagePlus size={15} /> Adicionar referência ou imagem
-            </button>
-            <button
-              className="text-btn"
-              onClick={() => library(item.brandId)}
-            >
-              Abrir Biblioteca
-            </button>
-          </div>
           {notice && (
             <p className="success" role="status">
               {notice}
             </p>
           )}
-          <p className="form-hint">
-            Feed e Story são a mesma criação: o Story é a recomposição em 9:16
-            desta arte, preservando imagem, textos, identidade e conceito.
-          </p>
+          {dirty && (
+            <p className="notice">
+              Salve as alterações dos textos antes de criar outro criativo.
+            </p>
+          )}
+          <section className="panel section-space">
+            <h2>Produtos desta peça</h2>
+            <AttachmentPicker
+              key={item.id}
+              state={state}
+              brandId={item.brandId}
+              value={item.attachments || []}
+              disabled={
+                busy ||
+                ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status)
+              }
+              onUploaded={reload}
+              onChange={(ids) => act('setAttachments', { id: item.id, attachments: ids })}
+            />
+          </section>
+          <CreativeDirection
+            item={item}
+            brand={brand}
+            version={current}
+            disabled={disabled || dirty}
+            onBusy={setBusy}
+            reload={reload}
+          />
           {needsStory && sharedAsset && (
             <section className="story-recompose" aria-live="polite">
               <h3>Story 9:16</h3>
@@ -498,37 +532,55 @@ export function Studio({
               </p>
             </section>
           )}
-          {dirty && (
-            <p className="notice">
-              Salve as alterações dos textos antes de criar outro criativo.
+          <details className="panel section-space studio-more">
+            <summary>Usar arte própria ou da Biblioteca</summary>
+            <p className="form-hint">
+              Escolha uma imagem já enviada ou envie uma nova. Feed e Story usam a mesma arte; o Story é recomposto em 9:16.
             </p>
-          )}
+            <div className="art-controls">
+            <Field label="Arte compartilhada do Post e Story">
+              <Picker
+                label="Selecionar arte"
+                value={
+                  sharedAsset || 'none'
+                }
+                onChange={(v) =>
+                  !disabled &&
+                  setDraft({
+                    ...draft,
+                    feedUrl: v === 'none' ? '' : v,
+                    storyUrl: v === 'none' ? '' : v,
+                  })
+                }
+                options={[
+                  { value: 'none', label: 'Sem arte selecionada' },
+                  ...images.map((a) => ({ value: a.url, label: a.name })),
+                ]}
+              />
+            </Field>
+            <button
+              className="outline-btn"
+              disabled={busy}
+              onClick={() => {
+                setNotice('');
+                setUploading(true);
+              }}
+            >
+              <ImagePlus size={15} /> Adicionar referência ou imagem
+            </button>
+            <button
+              className="text-btn"
+              onClick={() => library(item.brandId)}
+            >
+              Abrir Biblioteca
+            </button>
+          </div>
+          </details>
+          <MagnificPanel>
           <MagnificGenerator key={item.id} state={state} item={item} disabled={disabled || dirty} reload={reload}/>
-          <section className="panel section-space">
-            <h2>Produtos desta peça</h2>
-            <AttachmentPicker
-              key={item.id}
-              state={state}
-              brandId={item.brandId}
-              value={item.attachments || []}
-              disabled={
-                busy ||
-                ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status)
-              }
-              onUploaded={reload}
-              onChange={(ids) => act('setAttachments', { id: item.id, attachments: ids })}
-            />
-          </section>
-          <CreativeDirection
-            item={item}
-            brand={brand}
-            version={current}
-            disabled={disabled || dirty}
-            onBusy={setBusy}
-            reload={reload}
-          />
-          <section className="panel section-space">
-            <h2>Contexto da marca</h2>
+          </MagnificPanel>
+          <details className="panel section-space studio-more">
+            <summary>Contexto da marca</summary>
             <p className="muted">
               {brand.voice || 'Defina o tom de voz no Brand Space.'}
             </p>
@@ -546,7 +598,7 @@ export function Studio({
             <p className="form-hint">
               {item.brief || 'Briefing ainda não preenchido.'}
             </p>
-          </section>
+          </details>
         </section>
         <section className="studio-editor">
           {(locked || historic) && (
@@ -613,6 +665,24 @@ export function Studio({
               ? 'Salvando…'
               : `Salvar nova versão · V${(latest?.number || 0) + 1}`}
           </button>
+          {sentToClient && item.status === 'APROVAÇÃO' && (
+            <div className="notice studio-sent" role="status">
+              <p>
+                <Check size={15} /> Enviada para aprovação. O cliente já vê a peça na área dele.
+              </p>
+              <button className="create-btn" onClick={() => setNotifyClient(true)}>
+                <MessageCircle size={15} /> Avisar cliente no WhatsApp
+              </button>
+            </div>
+          )}
+          {notifyClient && (
+            <ClientLink
+              state={state}
+              brandId={item.brandId}
+              close={() => setNotifyClient(false)}
+              text={`Olá! A peça “${item.title}” está pronta para sua aprovação. É só abrir, conferir e aprovar ou pedir ajuste: {link}`}
+            />
+          )}
           <div className="workflow-actions">
             {!historic && !canEdit && item.status !== 'APROVAÇÃO' ? (
               <p className="muted">
@@ -633,24 +703,19 @@ export function Studio({
                 >
                   Iniciar criação <ArrowUpRight size={16} />
                 </button>
-              ) : item.status === 'EM CRIAÇÃO' ||
-                item.status === 'ALTERAÇÃO' ||
-                item.status === 'AJUSTE' ? (
-                <button
-                  className="create-btn full"
-                  disabled={busy}
-                  onClick={() => void transition('REVISÃO')}
-                >
-                  Levar para revisão <ArrowUpRight size={16} />
-                </button>
-              ) : item.status === 'REVISÃO' ? (
-                <button
-                  className="create-btn full"
-                  disabled={busy}
-                  onClick={() => void transition('APROVAÇÃO')}
-                >
-                  <Send size={16} /> Enviar para aprovação
-                </button>
+              ) : ['EM CRIAÇÃO', 'REVISÃO', 'AJUSTE', 'ALTERAÇÃO'].includes(item.status) ? (
+                <>
+                  {sendBlock && <p className="form-hint">{sendBlock}</p>}
+                  <button
+                    className="create-btn full"
+                    disabled={busy || !!sendBlock}
+                    onClick={async () => {
+                      await transition('APROVAÇÃO');
+                    }}
+                  >
+                    <Send size={16} /> Enviar para aprovação
+                  </button>
+                </>
               ) : item.status === 'APROVAÇÃO' ? (
                 <>
                   <label htmlFor="approve-reference" className="check-label">
@@ -690,13 +755,23 @@ export function Studio({
                   </button>
                 </>
               ) : item.status === 'APROVADO' ? (
-                <button
-                  className="create-btn full"
-                  disabled={busy}
-                  onClick={() => void transition('PUBLICADO')}
-                >
-                  <Check size={16} /> Marcar como publicado
-                </button>
+                confirmPublish ? (
+                  <div className="notice">
+                    <p>Marcar como publicado? A peça sai da produção e não volta a ser editada.</p>
+                    <div className="form-actions">
+                      <button className="outline-btn" disabled={busy} onClick={() => setConfirmPublish(false)}>
+                        Cancelar
+                      </button>
+                      <button className="create-btn" disabled={busy} onClick={() => void transition('PUBLICADO')}>
+                        <Check size={16} /> Confirmar publicação
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="create-btn full" disabled={busy} onClick={() => setConfirmPublish(true)}>
+                    <Check size={16} /> Marcar como publicado
+                  </button>
+                )
               ) : (
                 <p className="success">
                   <Check size={15} /> Conteúdo publicado

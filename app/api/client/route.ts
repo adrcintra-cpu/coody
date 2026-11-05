@@ -1,7 +1,7 @@
 import { database, ensureBrandLifecycle } from '@/lib/repository';
 import { shareByToken } from '@/lib/share';
-import { assertTransition, planApprovalOf } from '@/lib/domain';
-import { statusLabels, type Status } from '@/lib/types';
+import { approvedArtRecord, assertTransition, planApprovalOf } from '@/lib/domain';
+import { statusLabels, type Asset, type Status } from '@/lib/types';
 
 /**
  * Public, by client link token: the brand's board and month plan (GET) and
@@ -46,20 +46,38 @@ export async function GET(request: Request) {
     ).results;
     const ids = contents.map((c) => c.id);
     const marks = ids.map(() => '?').join(',') || "''";
-    const [versions, comments, plan, stories] = await db.batch([
+    const [versions, comments, plan, stories, sent] = await db.batch([
       db.prepare(`SELECT * FROM content_versions WHERE contentId IN (${marks})`).bind(...ids),
-      db.prepare(`SELECT contentId,text,createdAt,user FROM comments WHERE contentId IN (${marks}) ORDER BY createdAt`).bind(...ids),
+      // Only the client's own messages: the team's conversation stays internal.
+      db
+        .prepare(
+          `SELECT contentId,text,createdAt,user FROM comments WHERE contentId IN (${marks}) AND user LIKE 'Cliente ·%' ORDER BY createdAt`,
+        )
+        .bind(...ids),
       db.prepare('SELECT month,monthlyGoal,campaign,approval,approvalNote,approvedAt,approvedBy FROM monthly_plans WHERE brandId=? AND month=?').bind(brand.id, month),
       db.prepare("SELECT id FROM brand_assets WHERE brandId=? AND id LIKE 'story-%'").bind(brand.id),
+      // Versions that were sent to the client (or decided on).
+      db.prepare(`SELECT DISTINCT versionId FROM approvals WHERE contentId IN (${marks})`).bind(...ids),
     ]);
+    const sentIds = new Set((sent.results as { versionId: string }[]).map((r) => r.versionId));
     const storyIds = new Set((stories.results as { id: string }[]).map((s) => s.id));
+    // What the client sees: the piece as sent for approval. While the team is
+    // still creating or fixing it, the last version the client already saw
+    // (never a draft); planned pieces show no art yet.
     const latest = new Map<string, Record<string, unknown>>();
+    const latestSent = new Map<string, Record<string, unknown>>();
     for (const v of versions.results as Record<string, unknown>[]) {
-      const prev = latest.get(v.contentId as string);
-      if (!prev || (v.number as number) > (prev.number as number)) latest.set(v.contentId as string, v);
+      const key = v.contentId as string;
+      const prev = latest.get(key);
+      if (!prev || (v.number as number) > (prev.number as number)) latest.set(key, v);
+      const prevSent = latestSent.get(key);
+      if (sentIds.has(v.id as string) && (!prevSent || (v.number as number) > (prevSent.number as number)))
+        latestSent.set(key, v);
     }
     const items = contents.map((c) => {
-      const v = latest.get(c.id);
+      const v = ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(c.status)
+        ? latest.get(c.id)
+        : latestSent.get(c.id);
       const feed = (v?.feedUrl as string) || '';
       const sourceId = /^\/api\/assets\/([A-Za-z0-9-]+)$/.exec(feed)?.[1];
       const story = sourceId && storyIds.has('story-' + sourceId) ? '/api/assets/story-' + sourceId : '';
@@ -124,9 +142,9 @@ export async function POST(request: Request) {
       throw new Error(target === 'AJUSTE' ? 'Descreva o ajuste.' : 'Descreva a alteração.');
     const name = (typeof data.name === 'string' && data.name.trim() ? data.name.trim() : 'Cliente').slice(0, 80);
     const version = await db
-      .prepare('SELECT id FROM content_versions WHERE contentId=? ORDER BY number DESC LIMIT 1')
+      .prepare('SELECT id,number,feedUrl FROM content_versions WHERE contentId=? ORDER BY number DESC LIMIT 1')
       .bind(item.id)
-      .first<{ id: string }>();
+      .first<{ id: string; number: number; feedUrl: string }>();
     if (!version) throw new Error('Peça sem versão.');
     const now = new Date().toISOString();
     const statements = [
@@ -137,8 +155,35 @@ export async function POST(request: Request) {
         .prepare('INSERT INTO approvals (id,contentId,versionId,decision,createdAt,userId) VALUES (?,?,?,?,?,NULL)')
         .bind(crypto.randomUUID(), item.id, version.id, target, now),
     ];
-    if (target === 'APROVADO')
+    if (target === 'APROVADO') {
       statements.push(db.prepare('UPDATE content_versions SET locked=1 WHERE id=?').bind(version.id));
+      // As when the team approves: the approved art joins the brand's
+      // repertoire (Biblioteca › Artes aprovadas) for future creations.
+      if (version.feedUrl) {
+        const assets = (
+          await db
+            .prepare('SELECT * FROM brand_assets WHERE brandId=? AND url=?')
+            .bind(item.brandId, version.feedUrl)
+            .all<Asset>()
+        ).results;
+        const approvedArt = approvedArtRecord(assets, {
+          brandId: item.brandId,
+          url: version.feedUrl,
+          title: item.title,
+          versionNumber: version.number,
+          id: crypto.randomUUID(),
+          now,
+        });
+        if (approvedArt) {
+          const keys = Object.keys(approvedArt) as (keyof Asset)[];
+          statements.push(
+            db
+              .prepare(`INSERT INTO brand_assets (${keys.join(',')}) VALUES (${keys.map(() => '?').join(',')})`)
+              .bind(...keys.map((k) => approvedArt[k] as string | number)),
+          );
+        }
+      }
+    }
     if (comment)
       statements.push(
         db

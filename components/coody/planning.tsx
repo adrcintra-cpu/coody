@@ -522,7 +522,7 @@ export function Planning({
                           <Undo2 size={15} /> Voltar para rascunho
                         </button>
                       )}
-                      {planApprovalOf(saved) === 'enviado' && can(role, 'approve') && (
+                      {planApprovalOf(saved) !== 'aprovado' && can(role, 'approve') && (
                         <button className="outline-btn" disabled={busy} onClick={() => void planAction('aprovado')}>
                           <Check size={15} /> Cliente aprovou por fora
                         </button>

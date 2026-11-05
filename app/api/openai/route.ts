@@ -13,6 +13,7 @@ import { authorize, forbid } from '@/lib/auth';
 import { database, bucket, insert, readState } from '@/lib/repository';
 import { assetRecord, validateUpload } from '@/lib/asset-upload';
 import { conceptBrief, genericRule, parseDNA, type Concept } from '@/lib/art-direction';
+import { heldByPlan } from '@/lib/domain';
 const model = 'gpt-image-2';
 function apiKey() {
   return (env as unknown as Record<string, string>).OPENAI_API_KEY || '';
@@ -111,6 +112,10 @@ export async function POST(request: Request) {
     const state = activeState(await readState(request));
     const item = state.contents.find((c) => c.id === data.contentId);
     if (!item) throw new Error('Pauta não encontrada.');
+    // A pauta of a month plan the client has not approved yet waits: creating
+    // its art now would put it on the board (and in the client area) early.
+    if (heldByPlan(item, state.plans))
+      throw new Error('O planejamento deste mês ainda não foi aprovado pelo cliente. Aprove o plano (ou marque “Cliente aprovou por fora”) antes de criar a arte.');
     const previous = await database()
       .prepare('SELECT * FROM image_requests WHERE id=?')
       .bind(id)

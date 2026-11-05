@@ -307,19 +307,38 @@ export function ExternalPiece({
 }
 
 /** The client link of a brand: create, copy, send by WhatsApp, revoke. */
-export function ClientLink({ state, brandId, close }: { state: State; brandId: string; close: () => void }) {
-  const [brand, setBrand] = useState(brandId || state.brands[0]?.id || '');
+export function ClientLink({
+  state,
+  brandId,
+  close,
+  text,
+}: {
+  state: State;
+  brandId: string;
+  close: () => void;
+  /** WhatsApp message; {link} is replaced by the client link. */
+  text?: string;
+}) {
+  const brands = state.brands.filter((b) => b.status !== 'inactive');
+  const [brand, setBrand] = useState(brandId || brands[0]?.id || '');
   const [link, setLink] = useState('');
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  // Revoking or replacing the link cuts the client's access: confirm first.
+  const [confirm, setConfirm] = useState<'' | 'revoke' | 'create'>('');
   useEffect(() => {
     if (!brand) return;
     setLink('');
+    setError('');
+    setMessage('');
+    setLoading(true);
     fetch('/api/share?brandId=' + encodeURIComponent(brand), { cache: 'no-store' })
       .then((r) => r.json())
       .then((d: { link?: string; error?: string }) => (d.error ? setError(d.error) : setLink(d.link || '')))
-      .catch(() => setError('Não foi possível carregar o link.'));
+      .catch(() => setError('Não foi possível carregar o link.'))
+      .finally(() => setLoading(false));
   }, [brand]);
   const post = async (action: 'create' | 'revoke') => {
     setBusy(true);
@@ -334,35 +353,48 @@ export function ClientLink({ state, brandId, close }: { state: State; brandId: s
       const d = (await r.json()) as { link?: string; error?: string };
       if (!r.ok) throw new Error(d.error);
       setLink(d.link || '');
-      setMessage(action === 'revoke' ? 'Link desativado. Quem tinha o link perde o acesso.' : 'Link criado.');
+      setMessage(
+        action === 'revoke'
+          ? 'Link desativado. Quem tinha o link perde o acesso.'
+          : link
+            ? 'Novo link criado. O link antigo deixou de funcionar.'
+            : 'Link criado.',
+      );
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      setConfirm('');
     }
   };
   const name = state.brands.find((b) => b.id === brand)?.name || '';
   const whatsapp =
     'https://wa.me/?text=' +
     encodeURIComponent(
-      `Olá! Esta é a área da ${name} no COODY: você vê o planejamento do mês e as peças, e pode aprovar ou pedir ajustes por aqui: ${link}`,
+      (text ||
+        `Olá! Esta é a área da ${name} no COODY: você vê o planejamento do mês e as peças, e pode aprovar ou pedir ajustes por aqui: {link}`
+      ).replace('{link}', link),
     );
   return (
     <FormModal
       open
       title="Área do cliente"
-      description="Página pública e exclusiva desta marca: o cliente abre sem login, vê o planejamento e o quadro, e aprova ou pede ajuste/alteração."
+      description="Página exclusiva desta marca: o cliente abre sem login, vê o planejamento e as peças, e aprova ou pede ajuste/alteração."
       onClose={close}
     >
-      <Field label="Marca">
-        <Picker
-          label="Marca"
-          value={brand}
-          onChange={setBrand}
-          options={state.brands.map((b) => ({ value: b.id, label: b.name }))}
-        />
-      </Field>
-      {link ? (
+      {!brandId && (
+        <Field label="Marca">
+          <Picker
+            label="Marca"
+            value={brand}
+            onChange={setBrand}
+            options={brands.map((b) => ({ value: b.id, label: b.name }))}
+          />
+        </Field>
+      )}
+      {loading ? (
+        <p className="form-hint">Carregando o link…</p>
+      ) : link ? (
         <>
           <div className="invite-link-row">
             <Input readOnly value={link} onFocus={(e) => e.currentTarget.select()} />
@@ -374,29 +406,47 @@ export function ClientLink({ state, brandId, close }: { state: State; brandId: s
                   await navigator.clipboard.writeText(link);
                   setMessage('Link copiado.');
                 } catch {
-                  setMessage('Selecione o link e copie com Cmd+C.');
+                  setMessage('Selecione o link e copie.');
                 }
               }}
             >
               <Copy size={15} /> Copiar
             </button>
           </div>
-          <div className="form-actions">
-            <button type="button" className="text-btn danger" disabled={busy} onClick={() => void post('revoke')}>
-              Desativar link
-            </button>
-            <button type="button" className="outline-btn" disabled={busy} onClick={() => void post('create')}>
-              Gerar novo link
-            </button>
-            <a className="create-btn" href={whatsapp} target="_blank" rel="noreferrer">
-              <MessageCircle size={15} /> Enviar pelo WhatsApp
-            </a>
-          </div>
+          {confirm ? (
+            <div className="notice" role="alertdialog">
+              <p>
+                {confirm === 'revoke'
+                  ? 'Desativar o link? O cliente perde o acesso até você criar um novo.'
+                  : 'Gerar um novo link? O link que o cliente já tem deixa de funcionar.'}
+              </p>
+              <div className="form-actions">
+                <button type="button" className="outline-btn" disabled={busy} onClick={() => setConfirm('')}>
+                  Cancelar
+                </button>
+                <button type="button" className="create-btn danger-btn" disabled={busy} onClick={() => void post(confirm)}>
+                  {busy ? 'Aguarde…' : confirm === 'revoke' ? 'Desativar' : 'Gerar novo'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="form-actions">
+              <button type="button" className="text-btn danger" disabled={busy} onClick={() => setConfirm('revoke')}>
+                Desativar link
+              </button>
+              <button type="button" className="outline-btn" disabled={busy} onClick={() => setConfirm('create')}>
+                Gerar novo link
+              </button>
+              <a className="create-btn" href={whatsapp} target="_blank" rel="noreferrer">
+                <MessageCircle size={15} /> Enviar pelo WhatsApp
+              </a>
+            </div>
+          )}
         </>
       ) : (
         <div className="form-actions">
-          <button type="button" className="create-btn" disabled={busy || !brand} onClick={() => void post('create')}>
-            <Link2 size={15} /> Criar área do cliente
+          <button type="button" className="create-btn" disabled={busy || !brand || !!error} onClick={() => void post('create')}>
+            <Link2 size={15} /> {busy ? 'Criando…' : 'Criar área do cliente'}
           </button>
         </div>
       )}
