@@ -121,10 +121,6 @@ export default function Workspace() {
       visible?.contents.filter((c) => ['APROVAÇÃO', 'AJUSTE', 'ALTERAÇÃO'].includes(c.status)).length || 0,
     [visible],
   );
-  // Integrações is for administrators only, also when opened by URL.
-  useEffect(() => {
-    if (view === 'Integrações' && state && !can(role, 'manage')) setView('Dashboard');
-  }, [view, state, role]);
   // Where Studio's "Voltar" goes: the screen the piece was opened from.
   const [returnView, setReturnView] = useState<View>('Produção');
   const reload = useCallback(async () => {
@@ -318,6 +314,10 @@ export default function Workspace() {
     setLibraryBrand(id);
     navigate('Biblioteca', { brand: id });
   };
+  // Integrações is for administrators only, also when opened by URL.
+  useEffect(() => {
+    if (view === 'Integrações' && state && !can(state.user?.role, 'manage')) setView('Dashboard');
+  }, [view, state]);
   const item = visible?.contents.find((c) => c.id === selected);
   if (clientToken) return <ClientBoard token={clientToken} />;
   if (inviteToken) return <AcceptInvite token={inviteToken} />;
