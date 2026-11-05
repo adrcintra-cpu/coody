@@ -332,7 +332,7 @@ export default function Workspace() {
             width={469}
             height={172}
             className="official-logo"
-            src="/coody-logo.svg"
+            src="/coody-logo-dark.svg"
             alt="COODY"
           />
           <WorkspaceMenu state={state} reload={reload}/>

@@ -48,8 +48,8 @@ export function AcceptInvite({ token }: { token: string }) {
   }
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5">
-        <Image unoptimized width={469} height={172} src="/coody-logo.svg" alt="COODY" className="w-32 mb-8" />
+      <form onSubmit={submit} className="panel auth-card w-full max-w-sm p-8 space-y-5">
+        <Image unoptimized width={469} height={172} src="/coody-logo-dark.svg" alt="COODY" className="w-32 mb-8" />
         {loading ? (
           <p>Abrindo convite…</p>
         ) : !info ? (
@@ -64,19 +64,19 @@ export function AcceptInvite({ token }: { token: string }) {
             <p className="text-sm opacity-80">Convite para {info.email}</p>
             <label className="block">
               Seu nome
-              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className="mt-2 w-full rounded-lg border p-3" />
+              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className="auth-input mt-2 w-full p-3" />
             </label>
             <input type="email" name="username" autoComplete="username" value={info.email} readOnly hidden />
             <label className="block">
               Senha (mínimo 8 caracteres)
-              <input name="password" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="mt-2 w-full rounded-lg border p-3" />
+              <input name="password" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="auth-input mt-2 w-full p-3" />
             </label>
             <label className="block">
               Confirme a senha
-              <input name="confirm" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="mt-2 w-full rounded-lg border p-3" />
+              <input name="confirm" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="auth-input mt-2 w-full p-3" />
             </label>
             {error && <p role="alert">{error}</p>}
-            <button disabled={busy} className="w-full rounded-lg bg-purple-600 p-3 font-medium disabled:opacity-50">
+            <button disabled={busy} className="create-btn w-full">
               {busy ? 'Ativando…' : 'Criar senha e entrar'}
             </button>
           </>

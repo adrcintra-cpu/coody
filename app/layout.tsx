@@ -19,16 +19,16 @@ export const metadata: Metadata = {
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   manifest: '/site.webmanifest',
-  appleWebApp: { title: 'COODY', capable: true, statusBarStyle: 'black-translucent' },
+  appleWebApp: { title: 'COODY', capable: true, statusBarStyle: "default" },
 };
-export const viewport = { themeColor: '#ac0bd6' };
+export const viewport = { themeColor: "#f6f6f3" };
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className="dark">
+    <html lang="pt-BR">
       <body>{children}</body>
     </html>
   );
