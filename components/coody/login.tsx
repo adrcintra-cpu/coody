@@ -15,7 +15,7 @@ function DotSphere() {
     if (!el || !ctx) return;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Points evenly spread on a sphere (golden-angle spiral).
-    const count = 900;
+    const count = 1100;
     const points = Array.from({ length: count }, (_, i) => {
       const y = 1 - (i / (count - 1)) * 2;
       const r = Math.sqrt(1 - y * y);
@@ -37,7 +37,7 @@ function DotSphere() {
       const narrow = w < 760;
       const cx = narrow ? w * 0.5 : w * 0.72;
       const cy = narrow ? h * 0.3 : h * 0.46;
-      const radius = Math.min(narrow ? w * 0.55 : w * 0.3, h * 0.42);
+      const radius = Math.min(narrow ? w * 0.6 : w * 0.37, h * 0.44);
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
       const tilt = 0.35;
@@ -52,9 +52,9 @@ function DotSphere() {
         const red = Math.round(96 + 22 * (1 - t));
         const green = Math.round(118 + 40 * t);
         const blue = Math.round(225 - 10 * t);
-        ctx.fillStyle = `rgb(${red} ${green} ${blue} / ${(0.18 + depth * 0.55).toFixed(3)})`;
+        ctx.fillStyle = `rgb(${red} ${green} ${blue} / ${(0.12 + depth * 0.48).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(cx + x * radius, cy + y * radius, 0.7 + depth * 1.3, 0, Math.PI * 2);
+        ctx.arc(cx + x * radius, cy + y * radius, 0.6 + depth * 1.1, 0, Math.PI * 2);
         ctx.fill();
       }
       if (!still) {
