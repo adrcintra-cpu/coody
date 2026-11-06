@@ -2580,3 +2580,5 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible, summary:fo
 .auth-card label { font-size: 14px; font-weight: 600; color: var(--ox-ink-2); }
 .auth-input { background: var(--ox-surface); border: 1px solid var(--ox-line-2); border-radius: var(--ox-radius-field); color: var(--ox-ink); }
 .auth-input:focus-visible { border-color: var(--ox-primary); box-shadow: 0 0 0 3px rgb(71 0 255 / 0.15); outline: none; }
+/* The layout's own backgrounds stay transparent: the grid and the lights show. */
+[data-slot='sidebar-wrapper'], [data-slot='sidebar-inset'], main.workspace-main { background: transparent !important; }
