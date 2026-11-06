@@ -2575,10 +2575,76 @@ button:focus-visible, a:focus-visible, [role='button']:focus-visible, summary:fo
 @media print {
   body::before, body::after { display: none; }
 }
-/* Login e convite */
-.auth-card h1 { font-size: 30px; font-weight: 300; }
-.auth-card label { font-size: 14px; font-weight: 600; color: var(--ox-ink-2); }
-.auth-input { background: var(--ox-surface); border: 1px solid var(--ox-line-2); border-radius: var(--ox-radius-field); color: var(--ox-ink); }
-.auth-input:focus-visible { border-color: var(--ox-primary); box-shadow: 0 0 0 3px rgb(71 0 255 / 0.15); outline: none; }
+/* Login e convite: o acesso Oxyhub (logo, título fino, linha de apoio e formulário de vidro) */
+.auth-page { position: relative; min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: 48px 20px; }
+.auth-sphere { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.auth-sphere canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.auth-column { width: 100%; max-width: 420px; }
+.auth-logo { height: 40px; width: auto; margin-bottom: 40px; }
+.auth-title { font-size: 2.2rem !important; font-weight: 300 !important; letter-spacing: -0.015em; line-height: 1.08 !important; margin: 0; color: var(--ox-ink); }
+.auth-lead { margin: 8px 0 28px; font-size: 15px; color: var(--ox-muted); line-height: 1.5; }
+.auth-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  border-radius: var(--ox-radius-card);
+  background:
+    linear-gradient(164deg, rgb(255 255 255 / 0.85) 0%, rgb(255 255 255 / 0.45) 30%, rgb(255 255 255 / 0) 30.4%),
+    linear-gradient(180deg, rgb(236 236 242 / 0.42), rgb(244 244 248 / 0.30));
+  border: 1px solid transparent;
+  box-shadow:
+    0 0 0 1px rgb(38 43 54 / 0.13),
+    inset 0 0 0 1px rgb(255 255 255 / 0.55),
+    inset 0 2px 0 rgb(255 255 255 / 1),
+    inset 0 -2px 3px rgb(38 43 54 / 0.06),
+    0 18px 40px -22px rgb(38 43 54 / 0.28),
+    0 2px 6px -3px rgb(38 43 54 / 0.08);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+}
+.auth-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(160deg, #fff 0%, rgb(255 255 255 / 0.5) 25%, rgb(190 192 205 / 0.35) 55%, #fff 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-field > span, .auth-field-head label { font-size: 14px; font-weight: 600; color: var(--ox-ink); }
+.auth-field-head { display: flex; justify-content: space-between; align-items: center; }
+.auth-link { background: none; border: 0; padding: 0; font-size: 13px; font-weight: 600; color: var(--ox-primary); }
+.auth-link:hover { text-decoration: underline; }
+.auth-input {
+  height: 48px;
+  width: 100%;
+  padding: 0 14px;
+  font-size: 15px;
+  border-radius: var(--ox-radius-field);
+  border: 1px solid rgb(38 43 54 / 0.1);
+  background: rgb(255 255 255 / 0.75);
+  color: var(--ox-ink);
+  outline: none;
+  transition: box-shadow 0.15s, border-color 0.15s;
+}
+.auth-input:focus { border-color: var(--ox-primary); box-shadow: 0 0 0 3px rgb(71 0 255 / 0.15); }
+.auth-password { position: relative; }
+.auth-password .auth-input { padding-right: 48px; }
+.auth-eye { position: absolute; top: 0; bottom: 0; right: 4px; width: 40px; display: grid; place-items: center; border: 0; background: none; border-radius: 10px; color: var(--ox-muted); }
+.auth-eye:hover { color: var(--ox-ink); }
+.auth-submit { height: 48px; width: 100%; margin-top: 4px; font-size: 15px !important; gap: 8px; }
+.auth-submit:disabled { opacity: 0.6; }
+.auth-note { text-align: center; font-size: 12.5px; color: var(--ox-muted); margin: 0; }
+.auth-hint { font-size: 13px; color: var(--ox-ink-2); background: var(--ox-primary-soft); border-radius: 12px; padding: 10px 12px; margin: 0; }
+.auth-error { font-size: 13px; color: var(--ox-changes); background: var(--ox-changes-soft); border-radius: 12px; padding: 10px 12px; margin: 0; }
+.auth-foot { margin-top: 32px; text-align: center; font-size: 12px; color: var(--ox-muted); }
 /* The layout's own backgrounds stay transparent: the grid and the lights show. */
 [data-slot='sidebar-wrapper'], [data-slot='sidebar-inset'], main.workspace-main { background: transparent !important; }

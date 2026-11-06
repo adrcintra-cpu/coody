@@ -1,5 +1,5 @@
 'use client';
-import Image from 'next/image';
+import { AuthShell } from './login';
 import { useEffect, useState, type SyntheticEvent } from 'react';
 
 /** #convite?token=… : the invited person sets a password and enters. */
@@ -47,41 +47,50 @@ export function AcceptInvite({ token }: { token: string }) {
     }
   }
   return (
-    <main className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={submit} className="panel auth-card w-full max-w-sm p-8 space-y-5">
-        <Image unoptimized width={469} height={172} src="/coody-logo-dark.svg" alt="COODY" className="w-32 mb-8" />
-        {loading ? (
-          <p>Abrindo convite…</p>
-        ) : !info ? (
-          <>
-            <h1 className="text-xl">Convite indisponível</h1>
-            <p role="alert">{error}</p>
-            <a className="underline" href="/">Ir para o login</a>
-          </>
-        ) : (
-          <>
-            <h1 className="text-xl">Crie seu acesso ao COODY</h1>
-            <p className="text-sm opacity-80">Convite para {info.email}</p>
-            <label className="block">
-              Seu nome
-              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className="auth-input mt-2 w-full p-3" />
-            </label>
-            <input type="email" name="username" autoComplete="username" value={info.email} readOnly hidden />
-            <label className="block">
-              Senha (mínimo 8 caracteres)
-              <input name="password" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="auth-input mt-2 w-full p-3" />
-            </label>
-            <label className="block">
-              Confirme a senha
-              <input name="confirm" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="auth-input mt-2 w-full p-3" />
-            </label>
-            {error && <p role="alert">{error}</p>}
-            <button disabled={busy} className="create-btn w-full">
-              {busy ? 'Ativando…' : 'Criar senha e entrar'}
-            </button>
-          </>
-        )}
-      </form>
-    </main>
+    <AuthShell
+      title={loading ? 'Abrindo convite…' : !info ? 'Convite indisponível' : 'Crie seu acesso ao COODY'}
+      lead={
+        loading
+          ? 'Só um instante.'
+          : !info
+            ? 'Este link não está mais ativo.'
+            : `Convite para ${info.email}. Escolha uma senha para entrar.`
+      }
+    >
+      {loading ? null : !info ? (
+        <div className="auth-card">
+          <p className="auth-error" role="alert">
+            {error}
+          </p>
+          <a className="create-btn auth-submit" href="/">
+            Ir para o login
+          </a>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="auth-card">
+          <label className="auth-field">
+            <span>Seu nome</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required className="auth-input" />
+          </label>
+          <input type="email" name="username" autoComplete="username" value={info.email} readOnly hidden />
+          <label className="auth-field">
+            <span>Senha (mínimo 8 caracteres)</span>
+            <input name="password" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="auth-input" />
+          </label>
+          <label className="auth-field">
+            <span>Confirme a senha</span>
+            <input name="confirm" type="password" autoComplete="new-password" minLength={8} maxLength={256} required className="auth-input" />
+          </label>
+          {error && (
+            <p className="auth-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button disabled={busy} className="create-btn auth-submit">
+            {busy ? 'Ativando…' : 'Criar senha e entrar'}
+          </button>
+        </form>
+      )}
+    </AuthShell>
   );
 }
