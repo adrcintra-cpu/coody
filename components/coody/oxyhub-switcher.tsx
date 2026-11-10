@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { Clapperboard, LayoutGrid, Radar, Workflow, type LucideIcon } from 'lucide-react';
+import { Clapperboard, FileText, LayoutGrid, Radar, Workflow, type LucideIcon } from 'lucide-react';
 
 /**
  * Menu "Oxyhub": volta ao painel único e troca de sistema sem novo login.
@@ -8,11 +8,12 @@ import { Clapperboard, LayoutGrid, Radar, Workflow, type LucideIcon } from 'luci
  */
 const HUB = (process.env.NEXT_PUBLIC_HUB_URL || 'https://hub.oxyhub.com.br').replace(/\/+$/, '');
 
-type SystemId = 'aprovacao' | 'lead' | 'coody';
+type SystemId = 'aprovacao' | 'lead' | 'coody' | 'proposals';
 const SYSTEMS: { id: SystemId; name: string; description: string; icon: LucideIcon }[] = [
   { id: 'aprovacao', name: 'Aprovação de conteúdo', description: 'Planejamento e aprovação', icon: Workflow },
   { id: 'lead', name: 'Lead Hunter', description: 'Prospecção e pipeline', icon: Radar },
   { id: 'coody', name: 'Coody', description: 'Workspace criativo', icon: Clapperboard },
+  { id: 'proposals', name: 'Oxycom Proposals', description: 'Propostas comerciais', icon: FileText },
 ];
 const CURRENT: SystemId = 'coody';
 
