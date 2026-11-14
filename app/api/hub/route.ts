@@ -10,7 +10,8 @@ import { memberByEmail, memberWorkspaces } from '@/lib/members';
  *
  * POST (servidor do Oxyhub → aqui, com x-hub-secret):
  *   { action: "pendencias", email } → o que a pessoa tem para fazer no COODY
- *   { action: "acesso", email }     → URL de entrada de uso único, válida por 60 s
+ *   { action: "acesso", email, para? } → URL de entrada de uso único, válida por 60 s (para = caminho interno, ex.: /#Studio?id=…)
+ *   { action: "eventos", email, from, to } → conteúdos com data para o OxyCalendar (somente leitura)
  * GET /api/hub?t=… → abre a sessão do COODY (cookie coody_session) e vai para o início.
  *
  * Variável de ambiente: COODY_HUB_SECRET (32+ caracteres, o mesmo valor no Oxyhub).
@@ -24,6 +25,11 @@ function sameSecret(a: string, b: string) {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
+}
+
+/** Caminho interno de destino (ex.: /#Studio?id=…); qualquer outro valor volta ao início. */
+function safePara(p: unknown) {
+  return typeof p === 'string' && p.startsWith('/') && !p.startsWith('//') && !p.includes('\\') && p.length <= 300 ? p : null;
 }
 
 function sign(payload: string, secret: string) {
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
   if (secret.length < 32 || !sameSecret(request.headers.get('x-hub-secret') ?? '', secret)) return new Response(null, { status: 403 });
   const raw = await request.text();
   if (raw.length > 2048) return new Response(null, { status: 413 });
-  let data: { action?: unknown; email?: unknown };
+  let data: { action?: unknown; email?: unknown; para?: unknown; from?: unknown; to?: unknown };
   try {
     data = JSON.parse(raw);
   } catch {
@@ -58,10 +64,65 @@ export async function POST(request: Request) {
 
   if (data.action === 'acesso') {
     const payload = Buffer.from(
-      JSON.stringify({ email: who.email, exp: Math.floor(Date.now() / 1000) + TTL, n: randomBytes(12).toString('base64url') }),
+      JSON.stringify({ email: who.email, exp: Math.floor(Date.now() / 1000) + TTL, n: randomBytes(12).toString('base64url'), p: safePara(data.para) }),
     ).toString('base64url');
     const url = `${new URL(request.url).origin}/api/hub?t=${payload}.${sign(payload, secret)}`;
     return Response.json({ access: true, url }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  if (data.action === 'eventos') {
+    const day = /^\d{4}-\d{2}-\d{2}$/;
+    const from = String(data.from ?? ''), to = String(data.to ?? '');
+    if (!day.test(from) || !day.test(to) || to < from) return new Response(null, { status: 400 });
+    let filter = '';
+    let binds: string[] = [];
+    if (who.kind === 'member') {
+      const ws = await memberWorkspaces(who.member.id);
+      if (!ws.length) return Response.json({ access: true, events: [] }, { headers: { 'Cache-Control': 'no-store' } });
+      filter = ` AND b.workspaceId IN (${ws.map(() => '?').join(',')})`;
+      binds = ws;
+    }
+    const { results } = await database()
+      .prepare(
+        `SELECT c.id, c.title, c.brief, c.date, c.format, c.status, c.createdAt, c.brandId, b.name AS brandName, b.workspaceId
+         FROM content_items c JOIN brands b ON b.id = c.brandId
+         WHERE c.deletedAt IS NULL AND b.deletedAt IS NULL AND substr(c.date, 1, 10) BETWEEN ? AND ?${filter}
+         ORDER BY c.date LIMIT 2000`,
+      )
+      .bind(from, to, ...binds)
+      .all<{ id: string; title: string; brief: string; date: string; format: string; status: string; createdAt: string; brandId: string; brandName: string; workspaceId: string }>();
+    const today = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+    const TONE: Record<string, string> = {
+      IDEIA: 'draft', PLANEJADO: 'draft', 'EM CRIAÇÃO': 'primary', 'REVISÃO': 'primary', 'APROVAÇÃO': 'awaiting',
+      AJUSTE: 'changes', 'ALTERAÇÃO': 'changes', APROVADO: 'approved', PUBLICADO: 'muted',
+    };
+    const done = (s: string) => s === 'APROVADO' || s === 'PUBLICADO';
+    const events = (results ?? []).map((c) => {
+      const date = c.date.slice(0, 10);
+      const label = c.status.charAt(0) + c.status.slice(1).toLowerCase();
+      return {
+        source_record_id: c.id,
+        organization_id: c.workspaceId,
+        kind: 'conteudo',
+        kind_label: c.format ? `Conteúdo · ${c.format}` : 'Conteúdo',
+        title: c.title || c.format || 'Conteúdo',
+        description: c.brief || null,
+        start_at: date,
+        end_at: null,
+        all_day: true,
+        client_id: c.brandId,
+        client_name: c.brandName,
+        responsible_user_id: null,
+        responsible_name: null,
+        status: label,
+        status_tone: TONE[c.status] ?? 'primary',
+        overdue: date < today && !done(c.status),
+        derived: false,
+        source_path: `/#Studio?id=${encodeURIComponent(c.id)}`,
+        updated_at: c.createdAt,
+      };
+    });
+    return Response.json({ access: true, events }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
   if (data.action === 'pendencias') {
@@ -114,7 +175,7 @@ export async function GET(request: Request) {
   const [payload, signature, extra] = t.split('.');
   if (secret.length < 32 || extra !== undefined || !payload || !signature || t.length > 1024) return fail();
   if (!sameSecret(signature, sign(payload, secret))) return fail();
-  let data: { email?: string; exp?: number; n?: string };
+  let data: { email?: string; exp?: number; n?: string; p?: string | null };
   try {
     data = JSON.parse(Buffer.from(payload, 'base64url').toString());
   } catch {
@@ -139,7 +200,7 @@ export async function GET(request: Request) {
   return new Response(null, {
     status: 302,
     headers: {
-      Location: origin + '/',
+      Location: origin + (safePara(data.p) ?? '/'),
       'Cache-Control': 'no-store',
       'Set-Cookie': `coody_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200`,
     },
