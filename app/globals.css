@@ -2707,3 +2707,23 @@ h3 {
   min-height: 40px;
   padding-inline: 14px !important;
 }
+
+/* Celular: barra superior cabe em 375px */
+@media (max-width: 767px) {
+  .topbar {
+    padding: 0 14px !important;
+    gap: 8px;
+  }
+  .top-actions {
+    gap: 8px !important;
+    min-width: 0;
+  }
+  .top-actions .month-input {
+    width: 132px !important;
+    min-width: 0 !important;
+    padding-inline: 10px !important;
+  }
+  .breadcrumb strong {
+    display: none;
+  }
+}
