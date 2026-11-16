@@ -379,7 +379,7 @@ export default function Workspace() {
           {!!state?.user && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.assign(HUB_SIGN_OUT); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
+      <SidebarInset className="min-w-0">
         <header className="topbar">
           <div className="breadcrumb">
             <SidebarTrigger />
