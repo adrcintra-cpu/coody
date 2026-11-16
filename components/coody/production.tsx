@@ -13,7 +13,7 @@ import { formats, today, type Action, type State, type Status } from '@/lib/type
 
 /**
  * Produção: the production board of every brand (or one), with the client
- * link and the upload of pieces made outside the COODY for approval.
+ * link and the upload of pieces made outside the OxyCreate for approval.
  */
 export function Production({
   state,
@@ -146,7 +146,7 @@ export function Production({
   );
 }
 
-/** A post, carousel, video or file made outside the COODY, for approval. */
+/** A post, carousel, video or file made outside the OxyCreate, for approval. */
 export function ExternalPiece({
   state,
   brandId,
@@ -181,7 +181,7 @@ export function ExternalPiece({
       description={
         piece
           ? 'Os novos arquivos viram a próxima versão da peça.'
-          : 'Post, carrossel, vídeo ou arquivo feito fora do COODY. A peça entra direto em "Para aprovação".'
+          : 'Post, carrossel, vídeo ou arquivo feito fora do OxyCreate. A peça entra direto em "Para aprovação".'
       }
       onClose={() => !busy && close()}
     >
@@ -345,7 +345,7 @@ export function ClientLink({ state, brandId, close }: { state: State; brandId: s
   const whatsapp =
     'https://wa.me/?text=' +
     encodeURIComponent(
-      `Olá! Esta é a área da ${name} no COODY: você vê o planejamento do mês e as peças, e pode aprovar ou pedir ajustes por aqui: ${link}`,
+      `Olá! Esta é a área da ${name} no OxyCreate: você vê o planejamento do mês e as peças, e pode aprovar ou pedir ajustes por aqui: ${link}`,
     );
   return (
     <FormModal

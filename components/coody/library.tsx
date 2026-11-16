@@ -221,7 +221,7 @@ export function LibraryView({
         <p className="notice">
           Pasta: {assetCategories.find((c) => c.value === category)?.label}.{' '}
           {category === 'product_photo'
-            ? 'Envie fotos reais dos produtos e descreva nome, modelo e características; o COODY usará esses arquivos na criação.'
+            ? 'Envie fotos reais dos produtos e descreva nome, modelo e características; o OxyCreate usará esses arquivos na criação.'
             : 'Novos arquivos serão adicionados nesta pasta.'}{' '}
           <button className="text-btn" onClick={() => setCategory('all')}>
             Ver todas as pastas

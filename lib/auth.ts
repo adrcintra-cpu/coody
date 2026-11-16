@@ -7,7 +7,7 @@ import { isRole, can, deniedMessage, type Permission } from './permissions';
 
 const denied = () =>
   Response.json(
-    { error: 'Entre com sua conta para acessar o COODY.', loginRequired: true },
+    { error: 'Entre com sua conta para acessar o OxyCreate.', loginRequired: true },
     { status: 401 },
   );
 // One check per request (routes and activeWorkspace both ask).

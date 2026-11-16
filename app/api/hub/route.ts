@@ -6,13 +6,13 @@ import { memberByEmail, memberWorkspaces } from '@/lib/members';
 
 /**
  * Integração com o Oxyhub (painel único dos sistemas Oxycom). Só ACRESCENTA:
- * o login, as tabelas e as telas do COODY continuam iguais.
+ * o login, as tabelas e as telas do OxyCreate continuam iguais.
  *
  * POST (servidor do Oxyhub → aqui, com x-hub-secret):
- *   { action: "pendencias", email } → o que a pessoa tem para fazer no COODY
+ *   { action: "pendencias", email } → o que a pessoa tem para fazer no OxyCreate
  *   { action: "acesso", email, para? } → URL de entrada de uso único, válida por 60 s (para = caminho interno, ex.: /#Studio?id=…)
  *   { action: "eventos", email, from, to } → conteúdos com data para o OxyCalendar (somente leitura)
- * GET /api/hub?t=… → abre a sessão do COODY (cookie coody_session) e vai para o início.
+ * GET /api/hub?t=… → abre a sessão do OxyCreate (cookie coody_session) e vai para o início.
  *
  * Variável de ambiente: COODY_HUB_SECRET (32+ caracteres, o mesmo valor no Oxyhub).
  */

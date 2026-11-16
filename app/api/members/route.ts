@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         db.prepare('DELETE FROM member_invites WHERE memberId=? AND usedAt IS NULL').bind(member.id),
         bump,
       ]);
-      return Response.json({ ok: true, message: 'Acesso suspenso. A pessoa saiu do COODY.' });
+      return Response.json({ ok: true, message: 'Acesso suspenso. A pessoa saiu do OxyCreate.' });
     }
     if (data.action === 'enable') {
       await db.batch([

@@ -29,7 +29,7 @@ export function hashPassword(password: string) {
   return salt + ':' + scryptSync(password, salt, 64).toString('hex');
 }
 export function readSession(request: Request, ownerEmail: string, secret: string, now = Date.now()): CurrentUser | Response {
-  const denied = () => Response.json({ error: 'Entre com sua conta para acessar o COODY.', loginRequired: true }, { status: 401 });
+  const denied = () => Response.json({ error: 'Entre com sua conta para acessar o OxyCreate.', loginRequired: true }, { status: 401 });
   if (!ownerEmail || secret.length < 32) return denied();
   const token = request.headers.get('cookie')?.split(';').map(s=>s.trim()).find(s=>s.startsWith('coody_session='))?.slice(14);
   if (!token || token.length > 2048) return denied();

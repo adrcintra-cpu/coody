@@ -1,6 +1,6 @@
 /**
  * Integração com o Oxyhub (login único dos sistemas Oxycom).
- * O login acontece no hub; o COODY só recebe a pessoa já autenticada (/api/hub).
+ * O login acontece no hub; o OxyCreate só recebe a pessoa já autenticada (/api/hub).
  */
 export const HUB_URL = (process.env.NEXT_PUBLIC_HUB_URL || 'https://hub.oxyhub.com.br').replace(/\/+$/, '');
 export const HUB_SIGN_OUT = `${HUB_URL}/sair`;

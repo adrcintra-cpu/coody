@@ -98,7 +98,7 @@ export function Dashboard({
               <i className={'dot dot-' + s.replaceAll(' ', '-')} />
               {s === 'APROVAÇÃO' ? 'Em aprovação' : statusLabels[s]}
             </span>
-            <strong>
+            <strong className={items.some((c) => c.status === s) ? 'is-set' : 'is-zero'}>
               {String(items.filter((c) => c.status === s).length).padStart(
                 2,
                 '0',
