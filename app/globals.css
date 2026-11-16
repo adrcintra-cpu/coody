@@ -2614,3 +2614,54 @@ h3 {
   border-radius: 14px !important;
   font-weight: 500;
 }
+
+/* Roxo só para ação e destaque: textos informativos voltam para grafite e cinza */
+.calendar-day,
+.comments article strong {
+  color: #262b36 !important;
+}
+.calendar-day > span:first-child {
+  font-weight: 600;
+}
+.calendar-label {
+  color: #737985 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.stage-label,
+.studio-toolbar small,
+.art-empty,
+.art-empty span,
+.editor-meta,
+.comments article small,
+.comparison small,
+.loading-state,
+.special-date small {
+  color: #737985 !important;
+}
+.context-stats span {
+  color: #4a505c !important;
+}
+/* Abas / seletor segmentado: trilho pílula com grafite a 5% e item ativo branco sólido */
+[data-slot='tabs-list'] {
+  background: rgb(38 43 54 / 0.05) !important;
+  border-radius: 999px !important;
+  padding: 4px !important;
+  height: auto !important;
+}
+[data-slot='tabs-trigger'] {
+  border-radius: 999px !important;
+  height: 34px !important;
+  padding: 0 14px !important;
+  font-weight: 600 !important;
+  color: #4a505c !important;
+}
+[data-slot='tabs-trigger'][data-active],
+[data-slot='tabs-trigger'][data-state='active'],
+[data-slot='tabs-trigger'][aria-selected='true'] {
+  background: #ffffff !important;
+  color: #262b36 !important;
+  box-shadow: 0 1px 3px rgb(38 43 54 / 0.18) !important;
+}
