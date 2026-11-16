@@ -2547,3 +2547,38 @@ h3 {
 [data-sidebar='menu-button'][aria-current='page'] {
   background: #ffffff !important;
 }
+
+/* Etiqueta de status: pílula *-soft com texto na cor forte e ponto de 6px */
+.status {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  font-size: 12.5px;
+  white-space: nowrap;
+  background: #ededea;
+  color: #5f6470 !important;
+}
+.status > i,
+.status::before {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 999px;
+}
+.status-IDEIA,
+.status-PLANEJADO { background: #ededea !important; color: #5f6470 !important; }
+.status-EM-CRIAÇÃO,
+.status-REVISÃO { background: #f1ebff !important; color: #3200b8 !important; }
+.status-APROVAÇÃO { background: #e6f0fc !important; color: #0b63c9 !important; }
+.status-AJUSTE,
+.status-ALTERAÇÃO { background: #fde7ef !important; color: #b4235a !important; }
+.status-APROVADO { background: #e3f5ec !important; color: #0b7a4b !important; }
+.status-PUBLICADO { background: rgb(38 43 54 / 0.05) !important; color: #737985 !important; }
+.dot-IDEIA, .dot-PLANEJADO { background: #5f6470 !important; }
+.dot-EM-CRIAÇÃO, .dot-REVISÃO { background: #4700ff !important; }
+.dot-APROVAÇÃO { background: #0b63c9 !important; }
+.dot-AJUSTE, .dot-ALTERAÇÃO { background: #b4235a !important; }
+.dot-APROVADO { background: #0b7a4b !important; }
+.dot-PUBLICADO { background: #737985 !important; }
