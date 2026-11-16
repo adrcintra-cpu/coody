@@ -176,6 +176,7 @@ export type State = {
 };
 export type View =
   | 'Dashboard'
+  | 'Pautas'
   | 'Planejamento'
   | 'Calendário'
   | 'Conteúdos'

@@ -19,12 +19,14 @@ import {
 } from '@/lib/domain';
 import { isInactive } from '@/lib/brand-lifecycle';
 import { actionPermission, can, deniedMessage } from '@/lib/permissions';
+import { contentLink, sendToPlanning, syncFromPlanningSoon } from '@/lib/oxyplanning';
 import { validateAttachments } from '@/lib/creative-materials';
 import { formats, type Brand, type Content, type Status, type Plan, type MediaItem } from '@/lib/types';
 export async function GET(request: Request) {
   const user = await authorize(request);
   if (user instanceof Response) return user;
   try {
+    await syncFromPlanningSoon();
     const profile = await database()
       .prepare('SELECT avatarUrl FROM users WHERE id=?')
       .bind(user.id)
@@ -296,6 +298,17 @@ export async function POST(request: Request) {
       if (!item) throw new Error('Conteúdo não encontrado.');
       const target = data.status as Status;
       assertTransition(item.status, target);
+      // Pauta ligada ao OxyPlanning: revisão interna obrigatória, quem aprova é aprovador/administrador,
+      // e a decisão do cliente chega só pelo OxyPlanning.
+      const planningLink = await contentLink(item.id).catch(() => null);
+      if (planningLink) {
+        if (target === 'APROVAÇÃO' && item.status === 'EM CRIAÇÃO')
+          throw new Error('Pauta do OxyPlanning: envie para Revisão interna antes de seguir ao cliente.');
+        if (target === 'APROVAÇÃO' && !can(user.role, 'approve'))
+          throw new Error('Somente aprovadores e administradores da Oxycom aprovam a revisão interna.');
+        if (item.status === 'APROVAÇÃO' && ['APROVADO', 'AJUSTE', 'ALTERAÇÃO'].includes(target))
+          throw new Error('A decisão do cliente desta pauta vem do OxyPlanning.');
+      }
       const version = state.versions
         .filter((v) => v.contentId === item.id)
         .sort((a, b) => b.number - a.number)[0];
@@ -335,6 +348,16 @@ export async function POST(request: Request) {
           .bind(item.id)
           .first<{ versionId: string }>();
         assertChangesAddressed(target, version?.id, changeRequest?.versionId);
+      }
+      if (planningLink && target === 'APROVAÇÃO') {
+        if (!version) throw new Error('Crie a arte no Studio antes de enviar ao cliente.');
+        const row = await db
+          .prepare('SELECT * FROM content_versions WHERE id=?')
+          .bind(version.id)
+          .first<Parameters<typeof sendToPlanning>[0]['version']>();
+        if (!row) throw new Error('Versão não encontrada.');
+        // Se o envio falhar, o erro sobe e o status não muda.
+        await sendToPlanning({ link: planningLink, item, version: row, email: user.email });
       }
       statements.push(
         db

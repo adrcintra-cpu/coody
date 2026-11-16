@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   CalendarDays,
   CalendarRange,
+  Inbox,
   Layers,
   Shapes,
   CheckCheck,
@@ -52,6 +53,7 @@ import { Dashboard } from './dashboard';
 import { Brands } from './brands';
 import { LibraryView } from './library';
 import { Planning } from './planning';
+import { OxyPlanningInbox } from './oxyplanning';
 import { Contents, Calendar } from './contents';
 import { Studio } from './studio';
 import { Integrations, Settings } from './settings';
@@ -61,6 +63,7 @@ import { activeState } from '@/lib/brand-lifecycle';
 import type { View, State, Content, Action } from '@/lib/types';
 const nav = [
   ['Dashboard', LayoutDashboard],
+  ['Pautas', Inbox],
   ['Planejamento', CalendarRange],
   ['Calendário', CalendarDays],
   ['Conteúdos', Layers],
@@ -483,6 +486,13 @@ export default function Workspace() {
               act={act}
               reload={reload}
               initialBrand={libraryBrand}
+            />
+          ) : view === 'Pautas' ? (
+            <OxyPlanningInbox
+              state={visible}
+              role={role}
+              reload={reload}
+              openId={(id) => navigate('Studio', { id })}
             />
           ) : view === 'Planejamento' ? (
             <Planning

@@ -1,4 +1,5 @@
 import { database, ensureBrandLifecycle } from '@/lib/repository';
+import { contentLink } from '@/lib/oxyplanning';
 import { shareByToken } from '@/lib/share';
 import { assertTransition, planApprovalOf } from '@/lib/domain';
 import { statusLabels, type Status } from '@/lib/types';
@@ -118,6 +119,8 @@ export async function POST(request: Request) {
     const target = data.status as Status;
     if (item.status !== 'APROVAÇÃO' || !['APROVADO', 'AJUSTE', 'ALTERAÇÃO'].includes(target))
       throw new Error('Esta peça não está aguardando aprovação.');
+    if (await contentLink(item.id).catch(() => null))
+      throw new Error('Esta peça está em aprovação no OxyPlanning. Responda por lá.');
     assertTransition(item.status, target);
     const comment = typeof data.comment === 'string' ? data.comment.trim().slice(0, 2000) : '';
     if (target !== 'APROVADO' && !comment)
