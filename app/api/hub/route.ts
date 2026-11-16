@@ -2,7 +2,7 @@ import { env } from 'cloudflare:workers';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { database } from '@/lib/repository';
 import { signSession } from '@/lib/session';
-import { memberByEmail, memberWorkspaces } from '@/lib/members';
+import { ensureMembers, memberByEmail, memberWorkspaces } from '@/lib/members';
 
 /**
  * Integração com o Oxyhub (painel único dos sistemas Oxycom). Só ACRESCENTA:
@@ -12,6 +12,7 @@ import { memberByEmail, memberWorkspaces } from '@/lib/members';
  *   { action: "pendencias", email } → o que a pessoa tem para fazer no OxyCreate
  *   { action: "acesso", email, para? } → URL de entrada de uso único, válida por 60 s (para = caminho interno, ex.: /#Studio?id=…)
  *   { action: "eventos", email, from, to } → conteúdos com data para o OxyCalendar (somente leitura)
+ *   { action: "membros", email } → quem tem acesso ao OxyCreate, papel e situação (somente leitura; só para administradores)
  * GET /api/hub?t=… → abre a sessão do OxyCreate (cookie coody_session) e vai para o início.
  *
  * Variável de ambiente: COODY_HUB_SECRET (32+ caracteres, o mesmo valor no Oxyhub).
@@ -61,6 +62,28 @@ export async function POST(request: Request) {
   const email = typeof data.email === 'string' ? data.email.trim().toLowerCase().slice(0, 200) : '';
   const who = email ? await person(email) : null;
   if (!who) return Response.json({ access: false }, { headers: { 'Cache-Control': 'no-store' } });
+
+  if (data.action === 'membros') {
+    if (!(who.kind === 'owner' || (who.kind === 'member' && who.member.role === 'ADMINISTRADOR'))) return Response.json({ access: true, error: 'Somente administradores.' }, { status: 403 });
+    await ensureMembers();
+    const rows = (
+      await database()
+        .prepare("SELECT email, name, role, status FROM members WHERE status <> 'disabled' ORDER BY name")
+        .all<{ email: string; name: string; role: string; status: string }>()
+    ).results;
+    const ROLE: Record<string, string> = { ADMINISTRADOR: 'Administrador', EDITOR: 'Editor', APROVADOR: 'Aprovador' };
+    const owner = (c.COODY_OWNER_EMAIL ?? '').trim().toLowerCase();
+    return Response.json(
+      {
+        access: true,
+        members: [
+          ...(owner ? [{ email: owner, name: null, role: 'Dono da conta' }] : []),
+          ...rows.map((m) => ({ email: m.email.toLowerCase(), name: m.name, role: (ROLE[m.role] ?? m.role) + (m.status === 'invited' ? ' (convite pendente)' : '') })),
+        ],
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
 
   if (data.action === 'acesso') {
     const payload = Buffer.from(
