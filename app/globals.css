@@ -2738,3 +2738,19 @@ h3 {
   line-height: 33px;
   color: #262b36;
 }
+
+/* Logo oficial do OxyCreate: 33px de altura no menu (padrão da barra), proporção preservada */
+.official-logo {
+  height: 33px !important;
+  width: auto !important;
+  max-width: 100%;
+}
+.client-logo {
+  height: 28px !important;
+  width: auto !important;
+}
+.product-logo {
+  display: block;
+  height: 33px;
+  width: auto;
+}

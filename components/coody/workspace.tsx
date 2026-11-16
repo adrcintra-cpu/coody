@@ -305,7 +305,7 @@ export default function Workspace() {
     <SidebarProvider>
       <Sidebar className="coody-sidebar">
         <SidebarHeader>
-          <span className="product-wordmark" aria-label="OxyCreate">OxyCreate</span>
+          <Image unoptimized width={1920} height={425} src="/oxycreate-logo.svg" alt="OxyCreate" className="official-logo" />
           <WorkspaceMenu state={state} reload={reload}/>
           {(!state || can(role, 'edit')) && (
             <button

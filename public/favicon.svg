@@ -1,13 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg id="Camada_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 595.3 595.3">
-  <!-- Generator: Adobe Illustrator 30.8.2, SVG Export Plug-In . SVG Version: 2.1.4 Build 7)  -->
-  <defs>
-    <style>
-      .st0 {
-        fill: #9a10da;
-      }
-    </style>
-  </defs>
-  <path class="st0" d="M430.7,308.2l-76,76c-31.5,31.5-82.5,31.5-114,0l-76-76c-7-7-18.4-7-25.4,0l-47.5,47.5c-7,7-7,18.4,0,25.4l76,76c71.7,71.7,188,71.7,259.8,0l76-76c7-7,7-18.4,0-25.4l-47.5-47.5c-7-7-18.4-7-25.4,0Z"/>
-  <rect class="st0" x="194.6" y="134.7" width="206.1" height="103.1" rx="17.9" ry="17.9" transform="translate(-44.5 265) rotate(-45)"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="15.3 15.0 383.6 383.6"><path fill="#240dfe" d="M317.8,215.6l-63.3,63.3c-26.2,26.2-68.7,26.2-94.9,0l-63.3-63.3c-5.9-5.9-15.3-5.9-21.2,0l-39.5,39.5c-5.9,5.8-5.9,15.3,0,21.1l63.3,63.3c59.7,59.8,156.6,59.8,216.3,0l63.3-63.3c5.8-5.8,5.8-15.3,0-21.1l-39.6-39.5C333.1,209.7,323.6,209.7,317.8,215.6Z"/>
+    <rect fill="#240dfe" x="121.2" y="71.1" width="171.6" height="85.8" rx="14.9" ry="14.9" transform="translate(-20 179.8) rotate(-45)"/>
+  </svg>

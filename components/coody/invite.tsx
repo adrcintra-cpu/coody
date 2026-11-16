@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useEffect, useState, type SyntheticEvent } from 'react';
 
 /** #convite?token=… : the invited person sets a password and enters. */
@@ -48,7 +49,7 @@ export function AcceptInvite({ token }: { token: string }) {
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5">
-        <span className="product-wordmark mb-8 block" aria-label="OxyCreate">OxyCreate</span>
+        <Image unoptimized width={1920} height={425} src="/oxycreate-logo.svg" alt="OxyCreate" className="product-logo mb-8" />
         {loading ? (
           <p>Abrindo convite…</p>
         ) : !info ? (
