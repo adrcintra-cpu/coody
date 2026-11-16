@@ -2582,3 +2582,35 @@ h3 {
 .dot-AJUSTE, .dot-ALTERAÇÃO { background: #b4235a !important; }
 .dot-APROVADO { background: #0b7a4b !important; }
 .dot-PUBLICADO { background: #737985 !important; }
+
+/* Mais superfícies em vidro: semanas do planejamento, calendário, membros */
+.week-meter,
+.calendar-scroll {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(164deg, rgb(255 255 255 / 0.85) 0%, rgb(255 255 255 / 0.45) 30%, rgb(255 255 255 / 0) 30.4%),
+    linear-gradient(180deg, rgb(236 236 242 / 0.42), rgb(244 244 248 / 0.3)) !important;
+  border: 1px solid transparent !important;
+  border-radius: 22px !important;
+  box-shadow: 0 0 0 1px rgb(38 43 54 / 0.13), inset 0 2px 0 rgb(255 255 255 / 1), 0 18px 40px -22px rgb(38 43 54 / 0.28);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+}
+.week-meter {
+  border-radius: 18px !important;
+}
+.member-row {
+  background: rgb(255 255 255 / 0.72) !important;
+  border: 1px solid rgb(255 255 255 / 0.9) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 0 0 0.5px rgb(38 43 54 / 0.08), 0 4px 10px -6px rgb(38 43 54 / 0.18);
+}
+/* Aviso: fundo suave com texto forte (sem cinza chapado) */
+.notice {
+  background: #f1ebff !important;
+  color: #3200b8 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  font-weight: 500;
+}
