@@ -109,7 +109,7 @@ export function ClientBoard({ token }: { token: string }) {
   return (
     <main className="client-page">
       <header className="client-header">
-        <Image unoptimized width={469} height={172} src="/coody-logo.svg" alt="COODY" className="client-logo" />
+        <Image unoptimized width={469} height={172} src="/coody-logo-light.svg" alt="COODY" className="client-logo" />
         <div>
           <p className="eyebrow">{board.brand.segment || 'PRODUÇÃO'}</p>
           <h1>{board.brand.name}</h1>
