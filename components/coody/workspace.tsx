@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
   CalendarDays,
-  CalendarRange,
   Inbox,
   Layers,
   Shapes,
@@ -52,9 +51,8 @@ import {
 import { Dashboard } from './dashboard';
 import { Brands } from './brands';
 import { LibraryView } from './library';
-import { Planning } from './planning';
-import { OxyPlanningInbox } from './oxyplanning';
-import { Contents, Calendar } from './contents';
+import { OxyPlanningInbox, PlanningCalendar } from './oxyplanning';
+import { Contents } from './contents';
 import { Studio } from './studio';
 import { Integrations, Settings } from './settings';
 import { ContentForm } from './forms';
@@ -64,7 +62,6 @@ import type { View, State, Content, Action } from '@/lib/types';
 const nav = [
   ['Dashboard', LayoutDashboard],
   ['Pautas', Inbox],
-  ['Planejamento', CalendarRange],
   ['Calendário', CalendarDays],
   ['Conteúdos', Layers],
   ['Marcas', Shapes],
@@ -165,6 +162,7 @@ export default function Workspace() {
         if (nav.some(([v]) => v === name) || name === 'Studio')
           setView(name as View);
         else if (name === 'Aprovações') setView('Produção');
+        else if (name === 'Planejamento') setView('Pautas');
         else if (name) {
           setView('Dashboard');
           setMessage('Página não encontrada. Você voltou ao Dashboard.');
@@ -494,22 +492,13 @@ export default function Workspace() {
               reload={reload}
               openId={(id) => navigate('Studio', { id })}
             />
-          ) : view === 'Planejamento' ? (
-            <Planning
-              key={month}
-              state={visible}
-              month={month}
-              act={act}
-              open={open}
-              create={create}
-            />
           ) : view === 'Calendário' ? (
-            <Calendar
+            <PlanningCalendar
               key={month}
               state={visible}
               month={month}
-              open={open}
-              create={create}
+              openId={(id) => navigate('Studio', { id })}
+              goPautas={() => navigate('Pautas')}
             />
           ) : view === 'Produção' || view === 'Aprovações' ? (
             <Production

@@ -64,9 +64,9 @@ export function Dashboard({
         </div>
         <button
           className="outline-btn"
-          onClick={() => navigate('Planejamento')}
+          onClick={() => navigate('Pautas')}
         >
-          <SlidersHorizontal size={16} /> Ver planejamento{' '}
+          <SlidersHorizontal size={16} /> Ver pautas{' '}
           <ArrowUpRight size={15} />
         </button>
       </div>
@@ -233,7 +233,7 @@ export function Dashboard({
                 <button
                   className="brand-rhythm"
                   key={b.id}
-                  onClick={() => navigate('Planejamento')}
+                  onClick={() => navigate('Pautas')}
                 >
                   <div>
                     <BrandMark brand={b} />

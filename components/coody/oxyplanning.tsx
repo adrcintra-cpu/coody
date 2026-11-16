@@ -1,6 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CalendarCheck2, Link2, LoaderCircle, RefreshCw, Send } from 'lucide-react';
+import { ArrowRight, CalendarCheck2, ExternalLink, Link2, LoaderCircle, RefreshCw, Send } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { HUB_URL } from '@/lib/oxyhub';
 import { Picker, NoData, BrandMark, StatusBadge } from './shared';
 import { can } from '@/lib/permissions';
 import type { State } from '@/lib/types';
@@ -232,6 +234,150 @@ export function OxyPlanningInbox({
             ))
           )}
         </>
+      )}
+    </>
+  );
+}
+
+/**
+ * Calendário do OxyCreate = calendário do OxyPlanning: mostra as publicações planejadas lá
+ * (marcas ligadas), com o andamento da produção aqui quando a pauta está no OxyCreate.
+ */
+export function PlanningCalendar({
+  state,
+  month,
+  openId,
+  goPautas,
+}: {
+  state: State;
+  month: string;
+  openId: (id: string) => void;
+  goPautas: () => void;
+}) {
+  const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
+  const [view, setView] = useState(() => (narrow ? 'list' : 'month'));
+  const [brand, setBrand] = useState('all');
+  const [data, setData] = useState<Data | null>(null);
+  const year = Number(month.slice(0, 4)),
+    m = Number(month.slice(5));
+  const n = new Date(year, m, 0).getDate();
+  const first = month + '-01',
+    last = month + '-' + String(n).padStart(2, '0');
+
+  const load = useCallback(async () => {
+    setData(null);
+    try {
+      const r = await fetch(`/api/oxyplanning?from=${first}&to=${last}`, { cache: 'no-store' });
+      setData((await r.json()) as Data);
+    } catch {
+      setData({ state: 'erro', message: 'Não foi possível falar com o OxyPlanning. Verifique a conexão e tente de novo.' });
+    }
+  }, [first, last]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const ok = data?.state === 'operacional' ? data : null;
+  const items = (ok?.pautas || []).filter((p) => brand === 'all' || p.brandId === brand);
+  const offset = (new Date(year, m - 1, 1).getDay() + 6) % 7;
+  const cells = Array.from({ length: Math.ceil((n + offset) / 7) * 7 }, (_, i) => i - offset + 1);
+  const contentOf = (id: string) => state.contents.find((c) => c.id === id);
+  const linkedBrands = state.brands.filter((b) => ok?.links.some((l) => l.brandId === b.id));
+
+  const chip = (p: Pauta) => {
+    const b = state.brands.find((x) => x.id === p.brandId);
+    const content = p.contentId ? contentOf(p.contentId) : undefined;
+    return (
+      <button
+        className="calendar-content"
+        key={p.postId}
+        onClick={() => (content ? openId(content.id) : goPautas())}
+        title={content ? 'Abrir no Studio' : 'Ver em Pautas'}
+      >
+        <small>
+          {b?.name} · {p.formatLabel || formatLabel[p.format] || p.format}
+        </small>
+        <strong>{p.title || 'Sem título'}</strong>
+        {content ? <StatusBadge status={content.status} /> : <span className="planning-chip">{planningLabel[p.planningStatus] || p.planningStatus}</span>}
+      </button>
+    );
+  };
+
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">OXYPLANNING</p>
+          <h1>Calendário</h1>
+          <p>As datas vêm do OxyPlanning. Para mudar uma data, altere lá.</p>
+        </div>
+        <a className="outline-btn" href={HUB_URL + '/abrir/aprovacao'} target="_blank" rel="noreferrer">
+          <ExternalLink size={16} /> Abrir no OxyPlanning
+        </a>
+      </div>
+      <div className="toolbar">
+        <Picker
+          label="Marca"
+          value={brand}
+          onChange={setBrand}
+          options={[{ value: 'all', label: 'Todas as marcas' }, ...linkedBrands.map((b) => ({ value: b.id, label: b.name }))]}
+        />
+        <Tabs value={view} onValueChange={(v) => setView(String(v))}>
+          <TabsList>
+            <TabsTrigger value="month">Mês</TabsTrigger>
+            <TabsTrigger value="list">Lista</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {ok && <span className="muted">{items.length} publicações no mês · {items.filter((p) => p.contentId).length} em produção aqui</span>}
+      </div>
+      {!data ? (
+        <section className="panel" aria-busy="true">
+          <p className="muted">
+            <LoaderCircle className="animate-spin" size={16} /> Buscando o calendário no OxyPlanning…
+          </p>
+        </section>
+      ) : data.state !== 'operacional' ? (
+        <section className="panel" role="status">
+          <h2>{data.state === 'aguardando_integracao' ? 'Aguardando integração' : 'OxyPlanning indisponível'}</h2>
+          <p className="muted">{data.message}</p>
+          <button className="outline-btn" onClick={() => void load()}>
+            <RefreshCw size={16} /> Tentar de novo
+          </button>
+        </section>
+      ) : !data.links.length ? (
+        <NoData title="Nenhuma marca ligada ao OxyPlanning" description="Ligue as marcas aos clientes em Pautas para ver o calendário." />
+      ) : view === 'list' ? (
+        items.length ? (
+          <div className="planning-day">{items.map(chip)}</div>
+        ) : (
+          <NoData title="Sem publicações neste mês" description="Quando a cadência for planejada no OxyPlanning, as publicações aparecem aqui." />
+        )
+      ) : (
+        <div className="calendar-scroll">
+          <div className="calendar-grid">
+            {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((d) => (
+              <div className="calendar-label" key={d}>
+                {d}
+              </div>
+            ))}
+            {cells.map((d, i) => {
+              const valid = d > 0 && d <= n;
+              const date = month + '-' + String(d).padStart(2, '0');
+              return (
+                <div className={'calendar-cell ' + (!valid ? 'outside' : '')} key={i}>
+                  {valid && (
+                    <>
+                      <span className="calendar-day planning-calendar-day">
+                        <span>{d}</span>
+                      </span>
+                      {items.filter((p) => p.date === date).map(chip)}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </>
   );

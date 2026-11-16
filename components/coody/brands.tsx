@@ -31,7 +31,6 @@ import { BrandAssist } from './brand-assist';
 import { can } from '@/lib/permissions';
 import { ClientLink } from './production';
 import { LibraryView } from './library';
-import { Planning } from './planning';
 import { DNAEditor, LinesEditor } from './art-direction';
 import { dnaFields, dnaFilled, parseDNA } from '@/lib/art-direction';
 import { Contents } from './contents';
@@ -219,7 +218,7 @@ export function Brands({
           )}
           <Tabs
             value={
-              inactive && !['overview', 'settings'].includes(brandTab)
+              (inactive && !['overview', 'settings'].includes(brandTab)) || brandTab === 'planning'
                 ? 'overview'
                 : brandTab
             }
@@ -229,7 +228,6 @@ export function Brands({
               <TabsTrigger value="overview">Visão geral</TabsTrigger>
               {!inactive && (
                 <>
-                  <TabsTrigger value="planning">Planejamento</TabsTrigger>
                   <TabsTrigger value="contents">Conteúdos</TabsTrigger>
                   <TabsTrigger value="library">Biblioteca</TabsTrigger>
                 </>
@@ -358,17 +356,6 @@ export function Brands({
             </TabsContent>
             {!inactive && (
             <>
-            <TabsContent value="planning" className="brand-module">
-              <Planning
-                key={b.id + month}
-                state={scoped}
-                month={month}
-                act={act}
-                open={open}
-                create={create}
-                fixedBrandId={b.id}
-              />
-            </TabsContent>
             <TabsContent value="contents" className="brand-module">
               <Contents
                 act={act}

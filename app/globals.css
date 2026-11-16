@@ -2851,3 +2851,6 @@ h3 {
   .metric:nth-last-child(-n + 2) { border-bottom: 0 !important; }
   .metric > strong { font-size: 32px !important; }
 }
+.planning-calendar-day { cursor: default; }
+.calendar-content .planning-chip { height: 22px; padding: 0 9px; font-size: 11px; align-self: flex-start; }
+.planning-day h3 { color: #4a505c; }

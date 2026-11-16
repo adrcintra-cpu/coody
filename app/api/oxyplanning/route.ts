@@ -39,6 +39,10 @@ const str = (v: unknown, max = 300) => (typeof v === 'string' ? v.trim().slice(0
 
 export async function GET(request: Request) {
   const user = await authorize(request);
+  const q = new URL(request.url).searchParams;
+  const DAY = /^\d{4}-\d{2}-\d{2}$/;
+  const from = DAY.test(q.get('from') || '') ? q.get('from')! : today();
+  const to = DAY.test(q.get('to') || '') ? q.get('to')! : '';
   if (user instanceof Response) return user;
   if (!planningConfigured())
     return Response.json({ state: 'aguardando_integracao', message: 'Integração com o OxyPlanning ainda não configurada.' });
@@ -53,7 +57,7 @@ export async function GET(request: Request) {
     const [{ clients }, { posts }, cLinks] = await Promise.all([
       ponte<{ clients: { id: string; name: string; slug: string }[] }>({ action: 'clientes' }),
       links.length
-        ? ponte<{ posts: Post[] }>({ action: 'pautas', client_ids: [...new Set(links.map((l) => l.clientId))], from: today() })
+        ? ponte<{ posts: Post[] }>({ action: 'pautas', client_ids: [...new Set(links.map((l) => l.clientId))], from, to })
         : Promise.resolve({ posts: [] as Post[] }),
       contentLinks(),
     ]);
