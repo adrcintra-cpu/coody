@@ -2825,3 +2825,29 @@ h3 {
 .planning-pauta-body .muted { font-size: 13px; }
 .planning-chip { display: inline-flex; align-items: center; height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgb(38 43 54 / .06); color: #262b36; white-space: nowrap; }
 .planning-direct { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* Faixa de números do Dashboard: 8 blocos (total + 7 status) sempre em linhas completas */
+.metrics {
+  grid-template-columns: minmax(0, 1.35fr) repeat(7, minmax(0, 1fr)) !important;
+  padding: 0 6px;
+}
+.metric { padding: 22px 16px !important; gap: 10px; border-bottom: 0 !important; }
+.metric:first-child { padding-left: 20px !important; }
+.metric > span:first-child { font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.metric > .muted { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.metric-link { font-size: 12px; white-space: nowrap; margin-top: auto; }
+.metric.total { grid-column: auto !important; }
+@media (max-width: 1360px) {
+  .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  .metric:nth-child(5) { border-left: 0; padding-left: 20px !important; }
+  .metric:nth-child(-n + 4) { border-bottom: 1px solid #efefea !important; }
+}
+@media (max-width: 640px) {
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; padding: 0; }
+  .metric { padding: 16px 14px !important; border-bottom: 1px solid #efefea !important; }
+  .metric:nth-child(odd) { border-left: 0; padding-left: 16px !important; }
+  .metric:nth-child(5) { padding-left: 16px !important; }
+  .metric:nth-child(even) { border-left: 1px solid #efefea; padding-left: 14px !important; }
+  .metric:nth-last-child(-n + 2) { border-bottom: 0 !important; }
+  .metric > strong { font-size: 32px !important; }
+}
