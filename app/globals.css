@@ -2727,3 +2727,14 @@ h3 {
     display: none;
   }
 }
+
+/* Nome do produto em texto (até existir o logo oficial do OxyCreate) */
+.product-wordmark {
+  display: inline-block;
+  font-family: 'Saira', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 33px;
+  color: #262b36;
+}

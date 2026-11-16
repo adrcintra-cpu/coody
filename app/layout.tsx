@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 export const metadata: Metadata = {
-  title: 'COODY — Workspace criativo',
+  title: 'OxyCreate — Workspace criativo',
   description:
     'Planejamento editorial, inteligência de marca, produção criativa e aprovação.',
   // App icon: browser tab, home screen (iOS/Android) and installed app.
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   manifest: '/site.webmanifest',
-  appleWebApp: { title: 'COODY', capable: true, statusBarStyle: 'black-translucent' },
+  appleWebApp: { title: 'OxyCreate', capable: true, statusBarStyle: 'black-translucent' },
 };
 export const viewport = { themeColor: '#ac0bd6' };
 export default function RootLayout({

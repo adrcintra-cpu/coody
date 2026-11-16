@@ -254,7 +254,7 @@ export default function Workspace() {
           name: 'start_content_creation',
           title: 'Abrir criação de conteúdo',
           description:
-            'Abre o formulário de nova pauta no COODY. Não salva nem gera conteúdo.',
+            'Abre o formulário de nova pauta no OxyCreate. Não salva nem gera conteúdo.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -305,14 +305,7 @@ export default function Workspace() {
     <SidebarProvider>
       <Sidebar className="coody-sidebar">
         <SidebarHeader>
-          <Image
-            unoptimized
-            width={469}
-            height={172}
-            className="official-logo"
-            src="/coody-logo-light.svg"
-            alt="COODY"
-          />
+          <span className="product-wordmark" aria-label="OxyCreate">OxyCreate</span>
           <WorkspaceMenu state={state} reload={reload}/>
           {(!state || can(role, 'edit')) && (
             <button

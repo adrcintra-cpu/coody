@@ -1,5 +1,4 @@
 'use client';
-import Image from 'next/image';
 import { useEffect, useState, type SyntheticEvent } from 'react';
 
 /** #convite?token=… : the invited person sets a password and enters. */
@@ -49,7 +48,7 @@ export function AcceptInvite({ token }: { token: string }) {
   return (
     <main className="min-h-screen flex items-center justify-center p-6">
       <form onSubmit={submit} className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 space-y-5">
-        <Image unoptimized width={469} height={172} src="/coody-logo-light.svg" alt="COODY" className="w-32 mb-8" />
+        <span className="product-wordmark mb-8 block" aria-label="OxyCreate">OxyCreate</span>
         {loading ? (
           <p>Abrindo convite…</p>
         ) : !info ? (
@@ -60,7 +59,7 @@ export function AcceptInvite({ token }: { token: string }) {
           </>
         ) : (
           <>
-            <h1 className="text-xl">Crie seu acesso ao COODY</h1>
+            <h1 className="text-xl">Crie seu acesso ao OxyCreate</h1>
             <p className="text-sm opacity-80">Convite para {info.email}</p>
             <label className="block">
               Seu nome
