@@ -286,23 +286,31 @@ export async function syncFromPlanningSoon() {
 }
 
 /**
- * Pautas produzidas antes do registro da versão de partida: registra agora e, se a publicação
- * ainda não tem arquivo no OxyPlanning, desfaz a marcação indevida de "arte enviada direto".
+ * Pautas em produção que ainda não foram enviadas daqui: registra a versão de partida (pautas antigas)
+ * e, se a publicação continua sem arquivo no OxyPlanning, desfaz a marcação indevida de
+ * "arte enviada direto" (que tirava a pauta da produção). Devolve quantos conteúdos voltaram.
  */
 export async function adoptBaseVersions(posts: { id: string; current_version_id: string | null; media_count?: number }[]) {
-  const legacy = (await contentLinks()).filter((l) => !l.baseVersionId && !l.sentVersionId);
-  if (!legacy.length) return;
+  const open = (await contentLinks()).filter((l) => !l.sentVersionId);
+  if (!open.length) return 0;
   const db = database();
   const byPost = new Map(posts.map((p) => [p.id, p]));
   const statements: D1PreparedStatement[] = [];
-  for (const l of legacy) {
+  let reverted = 0;
+  for (const l of open) {
     const post = byPost.get(l.postId);
-    if (!post?.current_version_id) continue;
-    statements.push(db.prepare('UPDATE planning_content_links SET baseVersionId=? WHERE contentId=?').bind(post.current_version_id, l.contentId));
-    if (post.media_count === 0) {
-      statements.push(db.prepare("UPDATE content_items SET status='PLANEJADO', revision=COALESCE(revision,0)+1 WHERE id=? AND status='APROVAÇÃO'").bind(l.contentId));
-      statements.push(db.prepare("DELETE FROM comments WHERE contentId=? AND user='OxyPlanning' AND text LIKE 'Arte enviada direto no OxyPlanning%'").bind(l.contentId));
+    if (!post?.current_version_id || typeof post.media_count !== 'number') continue;
+    if (!l.baseVersionId) statements.push(db.prepare('UPDATE planning_content_links SET baseVersionId=? WHERE contentId=?').bind(post.current_version_id, l.contentId));
+    const sameVersion = !l.baseVersionId || l.baseVersionId === post.current_version_id;
+    if (sameVersion && post.media_count === 0) {
+      const item = await db.prepare("SELECT status FROM content_items WHERE id=?").bind(l.contentId).first<{ status: string }>();
+      if (item?.status === 'APROVAÇÃO') {
+        statements.push(db.prepare("UPDATE content_items SET status='PLANEJADO', revision=COALESCE(revision,0)+1 WHERE id=? AND status='APROVAÇÃO'").bind(l.contentId));
+        statements.push(db.prepare("DELETE FROM comments WHERE contentId=? AND user='OxyPlanning' AND text LIKE 'Arte enviada direto no OxyPlanning%'").bind(l.contentId));
+        reverted++;
+      }
     }
   }
   if (statements.length) await db.batch(statements);
+  return reverted;
 }

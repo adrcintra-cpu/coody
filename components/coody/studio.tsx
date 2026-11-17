@@ -88,6 +88,22 @@ export function Studio({
   const [sendingFiles, setSendingFiles] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
+  // Pauta ligada ao OxyPlanning: a decisão do cliente acontece lá, não aqui
+  const [planning, setPlanning] = useState<{ linked: boolean; sent?: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/oxyplanning?content=${encodeURIComponent(item.id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then(async (d: { linked?: boolean; sent?: boolean; repaired?: boolean } | null) => {
+        if (!alive || !d || typeof d.linked !== 'boolean') return;
+        setPlanning({ linked: d.linked, sent: d.sent });
+        if (d.repaired) await reload();
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Ajuste: edit the same art (then the 9:16 Story again, when there is one).
   // Alteração: a new art from the brief with the request as direction.
   const aiRequest = async (kind: 'adjust' | 'regenerate') => {
@@ -651,6 +667,12 @@ export function Studio({
                 >
                   <Send size={16} /> Enviar para aprovação
                 </button>
+              ) : item.status === 'APROVAÇÃO' && planning?.linked ? (
+                <p className="muted">
+                  {planning.sent
+                    ? 'Com o cliente no OxyPlanning. A aprovação ou o pedido de alteração é feito lá e volta para cá sozinho.'
+                    : 'Esta pauta está com o cliente no OxyPlanning. A decisão é feita lá e volta para cá sozinha.'}
+                </p>
               ) : item.status === 'APROVAÇÃO' ? (
                 <>
                   <label htmlFor="approve-reference" className="check-label">
@@ -789,6 +811,11 @@ export function Studio({
           open
           onClose={() => setChangeModal(false)}
         >
+          {error && (
+            <p className="error notice" role="alert">
+              {error}
+            </p>
+          )}
           <Field label={changeModal === 'AJUSTE' ? 'O que ajustar?' : 'O que precisa mudar?'}>
             <Textarea
               value={feedback}

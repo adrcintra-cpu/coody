@@ -70,6 +70,18 @@ export async function GET(request: Request) {
   try {
     await ensurePlanningTables();
     await repairMissingVersions(database()).catch(() => undefined);
+    // Um conteúdo só: diz se está ligado a uma pauta do OxyPlanning (e corrige pautas antigas)
+    const contentId = (q.get('content') || '').slice(0, 60);
+    if (contentId) {
+      const link = (await contentLinks()).find((l) => l.contentId === contentId);
+      if (!link) return Response.json({ linked: false });
+      let repaired = false;
+      if (!link.sentVersionId) {
+        const { posts } = await ponte<{ posts: Post[] }>({ action: 'pautas', client_ids: [link.clientId], from: '2000-01-01' });
+        repaired = (await adoptBaseVersions(posts.filter((p) => p.id === link.postId))) > 0;
+      }
+      return Response.json({ linked: true, sent: !!link.sentVersionId, planningStatus: link.planningStatus, repaired });
+    }
     const state = await readState(request);
     const visible = new Set(state.brands.map((b) => b.id));
     const links = (await brandLinks()).filter((l) => visible.has(l.brandId));
