@@ -33,11 +33,26 @@ type Post = {
   /** Arquivos na versão atual (enviada pela ponte do Oxyhub; ausente em versões antigas) */
   media_count?: number;
   campaign: { name: string } | null;
-  version: { title: string; theme: string | null; objective: string | null; art_text: string | null; submitted_at: string | null } | null;
+  version: { title: string; theme: string | null; objective: string | null; art_text: string | null; caption?: string | null; submitted_at: string | null } | null;
 };
 
 /** Pode ser produzida no OxyCreate: rascunho, ou enviada ao cliente só com texto (sem arquivo) e ainda não aprovada. */
 const needsArt = (p: Post) => p.status === 'draft' || ((p.status === 'awaiting' || p.status === 'changes_requested') && p.media_count === 0);
+
+/** Primeira versão do conteúdo (o Studio precisa dela): título, texto da arte e legenda que vieram do OxyPlanning. */
+const firstVersion = (db: D1Database, contentId: string, v: { title?: string; art_text?: string | null; caption?: string | null } | null, now: string) =>
+  db
+    .prepare("INSERT INTO content_versions (id, contentId, number, headline, copy, caption, hashtags, feedUrl, storyUrl, change, createdAt, locked) VALUES (?,?,1,?,?,?,'[]','','',?,?,0)")
+    .bind(crypto.randomUUID(), contentId, v?.title || 'Pauta do OxyPlanning', v?.art_text || '', v?.caption || '', 'Briefing do OxyPlanning', now);
+
+/** Conteúdos criados a partir de pautas antes desta correção ficaram sem versão: cria a primeira. */
+async function repairMissingVersions(db: D1Database) {
+  const orphans = await db
+    .prepare('SELECT c.id, c.title FROM content_items c JOIN planning_content_links l ON l.contentId = c.id WHERE NOT EXISTS (SELECT 1 FROM content_versions v WHERE v.contentId = c.id)')
+    .all<{ id: string; title: string }>();
+  const rows = orphans.results ?? [];
+  if (rows.length) await db.batch(rows.map((r) => firstVersion(db, r.id, { title: r.title }, new Date().toISOString())));
+}
 
 const today = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const str = (v: unknown, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -53,6 +68,7 @@ export async function GET(request: Request) {
     return Response.json({ state: 'aguardando_integracao', message: 'Integração com o OxyPlanning ainda não configurada.' });
   try {
     await ensurePlanningTables();
+    await repairMissingVersions(database()).catch(() => undefined);
     const state = await readState(request);
     const visible = new Set(state.brands.map((b) => b.id));
     const links = (await brandLinks()).filter((l) => visible.has(l.brandId));
@@ -138,7 +154,10 @@ export async function POST(request: Request) {
       if (!can(user.role, 'edit')) throw new Error(deniedMessage('edit'));
       const postId = str(body.postId, 60);
       const exists = await db.prepare('SELECT contentId FROM planning_content_links WHERE postId=?').bind(postId).first<{ contentId: string }>();
-      if (exists) return Response.json({ ok: true, contentId: exists.contentId });
+      if (exists) {
+        await repairMissingVersions(db);
+        return Response.json({ ok: true, contentId: exists.contentId });
+      }
       const links = await brandLinks();
       const { posts } = await ponte<{ posts: Post[] }>({ action: 'pautas', client_ids: [...new Set(links.map((l) => l.clientId))], from: '2000-01-01' });
       const post = posts.find((p) => p.id === postId);
@@ -156,6 +175,7 @@ export async function POST(request: Request) {
         db
           .prepare("INSERT INTO content_items (id, revision, brandId, title, brief, objective, pillar, date, format, status, createdAt, attachments) VALUES (?,0,?,?,?,?,?,?,?,'PLANEJADO',?,'[]')")
           .bind(contentId, brand.id, post.version?.title || 'Pauta do OxyPlanning', brief, post.version?.objective || '', post.version?.theme || '', post.scheduled_date, createFormat(post.format), now),
+        firstVersion(db, contentId, post.version, now),
         db
           .prepare('INSERT INTO planning_content_links (contentId, postId, clientId, planningStatus, createdAt) VALUES (?,?,?,?,?)')
           .bind(contentId, post.id, post.client_id, post.status, now),
