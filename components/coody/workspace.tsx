@@ -22,20 +22,11 @@ import {
   Plus,
   X,
   LoaderCircle,
-  ChevronDown,
+  LogOut,
+  Menu as MenuIcon,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarTrigger,
-  SidebarInset,
-} from '@/components/ui/sidebar';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import {
@@ -59,19 +50,46 @@ import { ContentForm } from './forms';
 import { today } from '@/lib/types';
 import { activeState } from '@/lib/brand-lifecycle';
 import type { View, State, Content, Action } from '@/lib/types';
-const nav = [
-  ['Dashboard', LayoutDashboard],
-  ['Pautas', Inbox],
-  ['Calendário', CalendarDays],
-  ['Conteúdos', Layers],
-  ['Marcas', Shapes],
-  ['Produção', CheckCheck],
-  ['Biblioteca', Library],
-  ['Integrações', Plug],
-  ['Configurações', SettingsIcon],
-] as const;
+type NavName = 'Dashboard' | 'Pautas' | 'Calendário' | 'Conteúdos' | 'Marcas' | 'Produção' | 'Biblioteca' | 'Integrações' | 'Configurações';
+const ICON_OF: Record<NavName, typeof LayoutDashboard> = {
+  Dashboard: LayoutDashboard,
+  Pautas: Inbox,
+  Calendário: CalendarDays,
+  Conteúdos: Layers,
+  Marcas: Shapes,
+  Produção: CheckCheck,
+  Biblioteca: Library,
+  Integrações: Plug,
+  Configurações: SettingsIcon,
+};
+/** Menu lateral no padrão Oxyhub: seções em maiúsculas. */
+const GROUPS: { label: string; items: NavName[] }[] = [
+  { label: 'Visão geral', items: ['Dashboard'] },
+  { label: 'Planejamento', items: ['Pautas', 'Calendário'] },
+  { label: 'Criação', items: ['Conteúdos', 'Produção', 'Biblioteca'] },
+  { label: 'Marcas', items: ['Marcas'] },
+  { label: 'Sistema', items: ['Integrações', 'Configurações'] },
+];
 export default function Workspace() {
   const [view, setView] = useState<View>('Dashboard');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem('oc.sidebar') === '1');
+    } catch {
+      /* sem armazenamento */
+    }
+  }, []);
+  const toggleCollapsed = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem('oc.sidebar', c ? '0' : '1');
+      } catch {
+        /* ignora */
+      }
+      return !c;
+    });
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState('');
@@ -159,7 +177,7 @@ export default function Workspace() {
         const [raw, query] = window.location.hash.slice(1).split('?');
         const name = decodeURIComponent(raw),
           params = new URLSearchParams(query || '');
-        if (nav.some(([v]) => v === name) || name === 'Studio')
+        if (name in ICON_OF || name === 'Studio')
           setView(name as View);
         else if (name === 'Aprovações') setView('Produção');
         else if (name === 'Planejamento') setView('Pautas');
@@ -302,108 +320,112 @@ export default function Workspace() {
   if (inviteToken) return <AcceptInvite token={inviteToken} />;
   if (loginRequired) return <Login />;
   const role = state?.user?.role;
-  return (
-    <SidebarProvider>
-      <Sidebar className="coody-sidebar">
-        <SidebarHeader>
-          <Image unoptimized width={1920} height={425} src="/oxycreate-logo.svg" alt="OxyCreate" className="official-logo" />
-          <WorkspaceMenu state={state} reload={reload}/>
+  const badge = visible?.contents.filter((c) => c.status === 'APROVAÇÃO').length || 0;
+  const sideNav = (mini: boolean, onPick?: () => void) => (
+    <>
+      {!mini && (
+        <div className="oxy-side-top">
+          <WorkspaceMenu state={state} reload={reload} />
           {(!state || can(role, 'edit')) && (
-            <button
-              className="create-btn"
-              disabled={!state}
-              onClick={() => create(month + '-15')}
-            >
+            <button className="create-btn" disabled={!state} onClick={() => { onPick?.(); create(month + '-15'); }}>
               <Plus size={18} /> Criar conteúdo
             </button>
           )}
-        </SidebarHeader>
-        <SidebarContent>
-          <p className="nav-label">WORKSPACE</p>
-          <SidebarMenu>
-            {nav.filter(([name]) => name !== 'Integrações' || !state || can(role, 'manage')).map(([name, Icon]) => (
-              <SidebarMenuItem key={name}>
-                <SidebarMenuButton
-                  isActive={
-                    view === name || (view === 'Studio' && name === 'Conteúdos')
-                  }
-                  onClick={() => navigate(name)}
+        </div>
+      )}
+      {GROUPS.map((g) => {
+        const items = g.items.filter((name) => name !== 'Integrações' || !state || can(role, 'manage'));
+        if (!items.length) return null;
+        return (
+          <div key={g.label} className="oxy-nav-group">
+            {!mini && <span className="oxy-nav-label">{g.label}</span>}
+            {items.map((name) => {
+              const Icon = ICON_OF[name];
+              const active = view === name || (view === 'Studio' && name === 'Conteúdos');
+              return (
+                <button
+                  key={name}
+                  className="oxy-nav-link"
+                  aria-current={active ? 'page' : undefined}
+                  title={mini ? name : undefined}
+                  onClick={() => { navigate(name); onPick?.(); }}
                 >
-                  <Icon />
-                  <span>{name}</span>
-                  {name === 'Produção' &&
-                    !!visible?.contents.filter((c) => c.status === 'APROVAÇÃO')
-                      .length && (
-                      <span className="nav-badge">
-                        {
-                          visible.contents.filter((c) => c.status === 'APROVAÇÃO')
-                            .length
-                        }
-                      </span>
-                    )}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter>
-          <div className="demo-note">
-            <span className="live-dot" /> Workspace privado
+                  <Icon size={18} />
+                  {!mini && <span>{name}</span>}
+                  {!mini && name === 'Produção' && badge > 0 && <span className="nav-badge">{badge}</span>}
+                </button>
+              );
+            })}
           </div>
-          <button className="profile" onClick={() => navigate('Configurações')}>
-            <span className="avatar">
-              {state?.user?.avatarUrl ? (
-                <Image
-                  unoptimized
-                  src={state.user.avatarUrl}
-                  width={36}
-                  height={36}
-                  alt={state.user.name}
-                />
-              ) : (
-                state?.user?.name?.slice(0, 2).toUpperCase() || 'CO'
-              )}
-            </span>
-            <span>
-              {state?.user?.name || 'Minha conta'}
-              <small>{role ? roleLabels[role] : 'Minha conta'}</small>
-            </span>
-            <ChevronDown size={15} />
-          </button>
-          {!!state?.user && <button className="text-sm p-2" onClick={async () => { const response = await fetch('/api/session', {method:'DELETE'}); if (response.ok) window.location.assign(HUB_SIGN_OUT); else setError('Não foi possível sair. Tente novamente.'); }}>Sair da conta</button>}
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset className="min-w-0">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <SidebarTrigger />
-            <span>Workspace</span>
-            <span>/</span>
-            <strong>{view}</strong>
-          </div>
-          <div className="top-actions">
-            <Input
-              type="month"
-              aria-label="Mês do workspace"
-              className="month-input"
-              value={month}
-              onChange={(e) => {
-                if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value))
-                  setMonth(e.target.value);
-                const [path, query] = window.location.hash.split('?');
-                const params = new URLSearchParams(query || '');
-                params.set('month', e.target.value);
-                window.history.replaceState(
-                  null,
-                  '',
-                  (path || '#Dashboard') + '?' + params.toString(),
-                );
+        );
+      })}
+    </>
+  );
+  return (
+    <div className="oxy-app">
+      <header className="glass-bar oxy-topbar">
+        <button className="glass-btn oxy-menu-btn" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>
+          <MenuIcon size={20} />
+        </button>
+        <button className="oxy-brand" onClick={() => navigate('Dashboard')} aria-label="Ir para o Dashboard">
+          <Image unoptimized width={110} height={33} src="/oxycom.svg" alt="Oxycom" className="oxy-logo" priority />
+          <span className="oxy-product">OxyCreate</span>
+        </button>
+        <div className="oxy-spacer" />
+        <Input
+          type="month"
+          aria-label="Mês do workspace"
+          className="month-input"
+          value={month}
+          onChange={(e) => {
+            if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value);
+            const [path, query] = window.location.hash.split('?');
+            const params = new URLSearchParams(query || '');
+            params.set('month', e.target.value);
+            window.history.replaceState(null, '', (path || '#Dashboard') + '?' + params.toString());
+          }}
+        />
+        {state && role !== 'APROVADOR' && <OxyhubSwitcher />}
+        {state && <Notifications />}
+        {state?.user && (
+          <>
+            <button className="oxy-user" onClick={() => navigate('Configurações')} title={role ? roleLabels[role] : undefined}>
+              {state.user.name?.split(' ')[0] || 'Minha conta'}
+            </button>
+            <button
+              className="glass-btn oxy-out"
+              aria-label="Sair"
+              title="Sair"
+              onClick={async () => {
+                const response = await fetch('/api/session', { method: 'DELETE' });
+                if (response.ok) window.location.assign(HUB_SIGN_OUT);
+                else setError('Não foi possível sair. Tente novamente.');
               }}
-            />
-            {state && role !== 'APROVADOR' && <OxyhubSwitcher/>}
-            {state && <Notifications/>}
+            >
+              <LogOut size={18} />
+            </button>
+          </>
+        )}
+      </header>
+      <div className="oxy-body">
+        <nav aria-label="Menu principal" className={'glass oxy-side' + (collapsed ? ' collapsed' : '')}>
+          {sideNav(collapsed)}
+          <button className="oxy-nav-link oxy-toggle" onClick={toggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}>
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            {!collapsed && <span>Recolher</span>}
+          </button>
+        </nav>
+        {menuOpen && (
+          <div className="oxy-sheet-backdrop" onClick={() => setMenuOpen(false)}>
+            <div className="glass-strong oxy-sheet" role="dialog" aria-modal="true" aria-label="Menu" onClick={(e) => e.stopPropagation()}>
+              <button className="oxy-nav-link oxy-sheet-close" onClick={() => setMenuOpen(false)} aria-label="Fechar menu">
+                <X size={18} />
+              </button>
+              {sideNav(false, () => setMenuOpen(false))}
+            </div>
           </div>
-        </header>
+        )}
+        <div className="oxy-main-col">
         <main className="workspace-main">
           {role === 'APROVADOR' && (
             <p className="notice role-notice">
@@ -555,7 +577,8 @@ export default function Workspace() {
             <Contents state={visible} month={month} open={open} create={create} act={act} reload={reload} />
           )}
         </main>
-      </SidebarInset>
+        </div>
+      </div>
       {form && visible && (
         <ContentForm
           state={visible}
@@ -622,6 +645,6 @@ export default function Workspace() {
           </button>
         </output>
       )}
-    </SidebarProvider>
+    </div>
   );
 }

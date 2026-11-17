@@ -2854,3 +2854,48 @@ h3 {
 .planning-calendar-day { cursor: default; }
 .calendar-content .planning-chip { height: 22px; padding: 0 9px; font-size: 11px; align-self: flex-start; }
 .planning-day h3 { color: #4a505c; }
+
+/* ===== Shell padrão Oxyhub (igual ao OxyGrowth): barra do topo + menu lateral flutuante ===== */
+.oxy-app { display: flex; flex-direction: column; min-height: 100svh; }
+.oxy-topbar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 24px; }
+.oxy-menu-btn { display: none; width: 44px; height: 44px; border-radius: 999px; place-items: center; color: #262b36; }
+.oxy-brand { display: flex; align-items: center; gap: 16px; background: none; border: 0; padding: 0; cursor: pointer; }
+.oxy-logo { height: 33px !important; width: auto !important; }
+.oxy-product { border-left: 1px solid #dcdde2; padding-left: 16px; font-size: 14px; font-weight: 600; color: #4a505c; }
+.oxy-spacer { flex: 1; }
+.oxy-topbar .month-input { width: auto; height: 40px; }
+.oxy-user { background: none; border: 0; font: inherit; font-size: 14px; color: #4a505c; cursor: pointer; padding: 0 2px; }
+.oxy-user:hover { color: #262b36; }
+.oxy-out { width: 40px; height: 40px; border-radius: 999px; display: inline-grid; place-items: center; color: #262b36; cursor: pointer; }
+.oxy-body { flex: 1; display: flex; align-items: flex-start; gap: 24px; padding: 24px; }
+.oxy-main-col { flex: 1; min-width: 0; }
+.oxy-main-col .workspace-main { padding: 0 0 50px !important; max-width: none; }
+.oxy-side { position: sticky; top: 88px; width: 248px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; border-radius: 22px; max-height: calc(100svh - 112px); overflow-y: auto; }
+.oxy-side.collapsed { width: 72px; }
+.oxy-side-top { display: flex; flex-direction: column; gap: 10px; padding: 0 2px 6px; }
+.oxy-side-top .create-btn { width: 100%; justify-content: center; }
+.oxy-nav-group { display: flex; flex-direction: column; gap: 4px; }
+.oxy-nav-label { padding: 12px 14px 4px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #737985; }
+.oxy-nav-link { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; border-radius: 999px; color: #4a505c; font: inherit; font-size: 14px; font-weight: 500; background: none; border: 0; cursor: pointer; width: 100%; text-align: left; }
+.oxy-nav-link > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.oxy-nav-link:hover { color: #262b36; background: rgb(38 43 54 / .05); }
+.oxy-nav-link[aria-current="page"] { background: #fff; color: #262b36; font-weight: 600; box-shadow: 0 0 0 .5px rgb(38 43 54 / .08), 0 4px 10px -6px rgb(38 43 54 / .18); }
+.oxy-nav-link[aria-current="page"] svg { color: #4700ff; }
+.oxy-nav-link svg { flex: none; }
+.oxy-side.collapsed .oxy-nav-link { justify-content: center; padding: 0; }
+.oxy-toggle { margin-top: 12px; }
+.oxy-sheet-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(38 43 54 / .2); }
+.oxy-sheet { position: absolute; top: 12px; bottom: 12px; left: 12px; width: 280px; overflow-y: auto; border-radius: 24px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.oxy-sheet-close { align-self: flex-end; width: 40px; justify-content: center; padding: 0; }
+@media (max-width: 1024px) {
+  .oxy-side { display: none; }
+  .oxy-menu-btn { display: inline-grid; }
+}
+@media (max-width: 760px) {
+  .oxy-topbar { height: 60px; padding: 0 12px; gap: 8px; }
+  .oxy-product, .oxy-user { display: none; }
+  .oxy-topbar .month-input { width: 132px; padding: 0 8px; }
+  .oxy-logo { height: 28px !important; }
+  .oxy-body { padding: 16px; }
+}
+@media (min-width: 1600px) { .oxy-body { padding: 24px 48px; } }
