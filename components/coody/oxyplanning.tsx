@@ -211,7 +211,7 @@ export function OxyPlanningInbox({
                             Abrir <ArrowRight size={16} />
                           </button>
                         </>
-                      ) : p.planningStatus !== 'draft' ? (
+                      ) : p.hasArt ? (
                         <span className="muted planning-direct">
                           <Send size={14} /> Arte enviada no OxyPlanning
                         </span>

@@ -30,9 +30,14 @@ type Post = {
   status: string;
   current_version_id: string | null;
   is_extraordinary: boolean;
+  /** Arquivos na versão atual (enviada pela ponte do Oxyhub; ausente em versões antigas) */
+  media_count?: number;
   campaign: { name: string } | null;
   version: { title: string; theme: string | null; objective: string | null; art_text: string | null; submitted_at: string | null } | null;
 };
+
+/** Pode ser produzida no OxyCreate: rascunho, ou enviada ao cliente só com texto (sem arquivo) e ainda não aprovada. */
+const needsArt = (p: Post) => p.status === 'draft' || ((p.status === 'awaiting' || p.status === 'changes_requested') && p.media_count === 0);
 
 const today = () => new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
 const str = (v: unknown, max = 300) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -83,7 +88,7 @@ export async function GET(request: Request) {
           objective: p.version?.objective || '',
           campaign: p.campaign?.name || '',
           extra: p.is_extraordinary,
-          hasArt: !!p.version?.submitted_at || p.status !== 'draft',
+          hasArt: !needsArt(p),
           contentId: byPost.get(p.id)?.contentId || '',
         })),
       },
@@ -142,7 +147,7 @@ export async function POST(request: Request) {
       const brand = state.brands.find((b) => b.id === brandId);
       if (!brand) throw new Error('A marca ligada a este cliente não está neste workspace.');
       if (isInactive(brand)) throw new Error(`A marca ${brand.name} está inativa. Reative-a em Marcas para continuar.`);
-      if (post.status !== 'draft') throw new Error('Esta publicação já tem arte enviada no OxyPlanning.');
+      if (!needsArt(post)) throw new Error('Esta publicação já tem arte enviada no OxyPlanning.');
       const contentId = crypto.randomUUID();
       const brief = [post.version?.art_text, post.campaign?.name ? `Campanha: ${post.campaign.name}` : '', post.format_label ? `Formato no OxyPlanning: ${post.format_label}` : '']
         .filter(Boolean)
