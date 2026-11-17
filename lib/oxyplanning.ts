@@ -48,6 +48,8 @@ export async function ensurePlanningTables() {
       'CREATE TABLE IF NOT EXISTS planning_content_links (contentId TEXT PRIMARY KEY NOT NULL, postId TEXT NOT NULL UNIQUE, clientId TEXT NOT NULL, sentVersionId TEXT, sentContentVersionId TEXT, sentAt TEXT, sentBy TEXT, planningStatus TEXT, lastCommentAt TEXT, syncedAt TEXT, createdAt TEXT NOT NULL)',
     ),
   ]);
+  // Versão do OxyPlanning que existia quando a pauta entrou em produção (para reconhecer arte enviada direto por lá)
+  await db.prepare('ALTER TABLE planning_content_links ADD COLUMN baseVersionId TEXT').run().catch(() => undefined);
   ready = true;
 }
 
@@ -63,6 +65,7 @@ export type ContentLink = {
   planningStatus: string | null;
   lastCommentAt: string | null;
   syncedAt: string | null;
+  baseVersionId?: string | null;
 };
 
 export async function brandLinks() {
@@ -245,8 +248,9 @@ export async function syncFromPlanning() {
 
     const ours = !!link.sentVersionId && post.current_version_id === link.sentVersionId;
     if (!link.sentVersionId || !ours) {
-      // Arte enviada direto no OxyPlanning: tira a pauta da fila de produção
-      if (post.current_version_id && ['awaiting', 'changes_requested', 'approved', 'published'].includes(post.status) && post.current_version_id !== link.sentVersionId) {
+      // Arte enviada direto no OxyPlanning: uma versão nova por lá depois que a pauta entrou em produção aqui.
+      // Sem a versão de partida registrada (pautas antigas), não dá para afirmar: não mexe.
+      if (link.baseVersionId && post.current_version_id && ['awaiting', 'changes_requested', 'approved', 'published'].includes(post.status) && post.current_version_id !== link.sentVersionId && post.current_version_id !== link.baseVersionId) {
         const target = post.status === 'published' ? 'PUBLICADO' : post.status === 'approved' ? 'APROVADO' : 'APROVAÇÃO';
         if (!['APROVADO', 'PUBLICADO'].includes(item.status) || target === 'PUBLICADO')
           set(target, 'Arte enviada direto no OxyPlanning. Esta pauta saiu da fila de produção do OxyCreate.');
@@ -279,4 +283,26 @@ export async function syncFromPlanningSoon() {
   if (!planningConfigured() || Date.now() - lastSync < 120_000) return;
   lastSync = Date.now();
   await Promise.race([syncFromPlanning().catch((e) => console.error('oxyplanning sync', e)), new Promise((r) => setTimeout(r, 4000))]);
+}
+
+/**
+ * Pautas produzidas antes do registro da versão de partida: registra agora e, se a publicação
+ * ainda não tem arquivo no OxyPlanning, desfaz a marcação indevida de "arte enviada direto".
+ */
+export async function adoptBaseVersions(posts: { id: string; current_version_id: string | null; media_count?: number }[]) {
+  const legacy = (await contentLinks()).filter((l) => !l.baseVersionId && !l.sentVersionId);
+  if (!legacy.length) return;
+  const db = database();
+  const byPost = new Map(posts.map((p) => [p.id, p]));
+  const statements: D1PreparedStatement[] = [];
+  for (const l of legacy) {
+    const post = byPost.get(l.postId);
+    if (!post?.current_version_id) continue;
+    statements.push(db.prepare('UPDATE planning_content_links SET baseVersionId=? WHERE contentId=?').bind(post.current_version_id, l.contentId));
+    if (post.media_count === 0) {
+      statements.push(db.prepare("UPDATE content_items SET status='PLANEJADO', revision=COALESCE(revision,0)+1 WHERE id=? AND status='APROVAÇÃO'").bind(l.contentId));
+      statements.push(db.prepare("DELETE FROM comments WHERE contentId=? AND user='OxyPlanning' AND text LIKE 'Arte enviada direto no OxyPlanning%'").bind(l.contentId));
+    }
+  }
+  if (statements.length) await db.batch(statements);
 }

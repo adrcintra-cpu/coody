@@ -3,6 +3,7 @@ import { database, readState } from '@/lib/repository';
 import { can, deniedMessage } from '@/lib/permissions';
 import { isInactive } from '@/lib/brand-lifecycle';
 import {
+  adoptBaseVersions,
   brandLinks,
   contentLinks,
   createFormat,
@@ -82,6 +83,7 @@ export async function GET(request: Request) {
         : Promise.resolve({ posts: [] as Post[] }),
       contentLinks(),
     ]);
+    await adoptBaseVersions(posts).catch((e) => console.error('oxyplanning base versions', e));
     const byPost = new Map(cLinks.map((l) => [l.postId, l]));
     const brandOf = new Map(links.map((l) => [l.clientId, l.brandId]));
     return Response.json(
@@ -177,8 +179,8 @@ export async function POST(request: Request) {
           .bind(contentId, brand.id, post.version?.title || 'Pauta do OxyPlanning', brief, post.version?.objective || '', post.version?.theme || '', post.scheduled_date, createFormat(post.format), now),
         firstVersion(db, contentId, post.version, now),
         db
-          .prepare('INSERT INTO planning_content_links (contentId, postId, clientId, planningStatus, createdAt) VALUES (?,?,?,?,?)')
-          .bind(contentId, post.id, post.client_id, post.status, now),
+          .prepare('INSERT INTO planning_content_links (contentId, postId, clientId, planningStatus, createdAt, baseVersionId) VALUES (?,?,?,?,?,?)')
+          .bind(contentId, post.id, post.client_id, post.status, now, post.current_version_id),
       ]);
       return Response.json({ ok: true, contentId });
     }
