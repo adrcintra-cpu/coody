@@ -88,6 +88,9 @@ export function Studio({
   const [sendingFiles, setSendingFiles] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
+  const [direction, setDirection] = useState('');
+  const [kind, setKind] = useState<'post' | 'carousel'>(item.format === 'Carrossel' ? 'carousel' : 'post');
+  const [slideCount, setSlideCount] = useState(5);
   // Pauta ligada ao OxyPlanning: a decisão do cliente acontece lá, não aqui
   const [planning, setPlanning] = useState<{ linked: boolean; sent?: boolean } | null>(null);
   useEffect(() => {
@@ -222,6 +225,99 @@ export function Studio({
       setChangeModal(false);
       setFeedback('');
     }
+  };
+  // Criação em uma tela: gera textos + arte na linha da marca e já deixa pronta para revisão
+  const generateArt = async () => {
+    setAiBusy(true);
+    setBusy(true);
+    setError('');
+    setAiMessage('Criando a arte na linha da marca… pode levar até 2 minutos.');
+    try {
+      const r = await fetch('/api/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: crypto.randomUUID(), contentId: item.id, mode: 'creative', prompt: direction.trim() }),
+      });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Não foi possível gerar a arte.');
+      if (item.format.includes('Feed') && item.format.includes('Story')) {
+        setAiMessage('Arte pronta. Adaptando o Story 9:16…');
+        await fetch('/api/openai/story', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contentId: item.id, requestId: crypto.randomUUID() }),
+        }).catch(() => null);
+      }
+      setAiMessage('Arte pronta. Confira os textos e envie para aprovação.');
+      setDirection('');
+      await reload();
+    } catch (e) {
+      setAiMessage('');
+      setError((e as Error).message);
+    } finally {
+      setAiBusy(false);
+      setBusy(false);
+    }
+  };
+  // Carrossel: planeja os textos, gera lâmina por lâmina (a 1ª define o estilo) e grava a versão
+  const generateCarousel = async () => {
+    setAiBusy(true);
+    setBusy(true);
+    setError('');
+    const post = async (body: Record<string, unknown>) => {
+      const r = await fetch('/api/openai/carousel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentId: item.id, ...body }),
+      });
+      const d = (await r.json()) as Record<string, unknown> & { error?: string };
+      if (!r.ok) throw new Error(d.error || 'Não foi possível gerar o carrossel.');
+      return d;
+    };
+    try {
+      setAiMessage('Planejando os textos das lâminas…');
+      const { plan } = (await post({ step: 'plan', count: slideCount, prompt: direction.trim() })) as unknown as {
+        plan: { slides: { headline: string; copy: string }[]; visualPrompt: string };
+      };
+      const ids: string[] = [];
+      for (let i = 0; i < plan.slides.length; i++) {
+        setAiMessage(`Criando a lâmina ${i + 1} de ${plan.slides.length}… (cerca de 1 minuto cada)`);
+        const { assetId } = (await post({
+          step: 'slide',
+          index: i,
+          total: plan.slides.length,
+          slide: plan.slides[i],
+          visualPrompt: plan.visualPrompt,
+          styleAssetId: ids[0] || '',
+        })) as unknown as { assetId: string };
+        ids.push(assetId);
+      }
+      setAiMessage('Salvando o carrossel…');
+      await post({ step: 'finish', assetIds: ids, plan });
+      setAiMessage('Carrossel pronto. Confira as lâminas e envie para aprovação.');
+      setDirection('');
+      await reload();
+    } catch (e) {
+      setAiMessage('');
+      setError((e as Error).message);
+    } finally {
+      setAiBusy(false);
+      setBusy(false);
+    }
+  };
+  // Um clique: salva o que foi editado e leva para a revisão interna (sem "Iniciar criação" separado)
+  const sendToReview = async () => {
+    if (dirty) {
+      const saved = await run('saveVersion', {
+        ...draft,
+        id: item.id,
+        hashtags: tags.trim().split(/\s+/).filter(Boolean),
+        change: 'Textos e composição revisados no Studio',
+      });
+      if (!saved) return;
+    }
+    if (['IDEIA', 'PLANEJADO'].includes(item.status) && !(await run('status', { id: item.id, status: 'EM CRIAÇÃO' }))) return;
+    await run('status', { id: item.id, status: 'REVISÃO' });
   };
   const sharedAsset = sharedAssetUrl(draft.feedUrl, draft.storyUrl);
   // Story 9:16 = AI recomposition of this same saved art (story-<source id>).
@@ -413,6 +509,57 @@ export function Studio({
               )}
             </div>
           </div>
+          {canEdit && !historic && !locked && !current.media?.length && (
+            <section className="panel quick-create" aria-live="polite">
+              <div className="section-head">
+                <h2>Criar a arte</h2>
+              </div>
+              <div className="quick-kind" role="group" aria-label="Tipo de peça">
+                <button type="button" className={kind === 'post' ? 'on' : ''} disabled={busy} onClick={() => setKind('post')}>
+                  Post único
+                </button>
+                <button type="button" className={kind === 'carousel' ? 'on' : ''} disabled={busy} onClick={() => setKind('carousel')}>
+                  Carrossel
+                </button>
+                {kind === 'carousel' && (
+                  <label className="quick-count">
+                    Lâminas
+                    <select value={slideCount} disabled={busy} onChange={(e) => setSlideCount(Number(e.target.value))}>
+                      {[3, 4, 5, 6, 7, 8].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+              <Textarea
+                rows={2}
+                value={direction}
+                disabled={busy}
+                onChange={(e) => setDirection(e.target.value)}
+                placeholder="Direção (opcional): ex. seguir a linha das últimas artes aprovadas, foto do produto em destaque"
+              />
+              <div className="form-actions">
+                <button
+                  className="create-btn"
+                  disabled={busy || openai.checking || openai.configured === false}
+                  onClick={() => void (kind === 'carousel' ? generateCarousel() : generateArt())}
+                >
+                  {aiBusy ? 'Criando…' : kind === 'carousel' ? `Gerar carrossel com IA · ${slideCount} lâminas` : 'Gerar arte com IA'}
+                </button>
+                <button className="outline-btn" disabled={busy} onClick={() => setSendingFiles(true)}>
+                  {kind === 'carousel' ? 'Subir lâminas prontas' : 'Subir arte pronta'}
+                </button>
+              </div>
+              {openai.configured === false && <IntegrationMissing name="OpenAI" />}
+              {aiMessage && !(item.status === 'AJUSTE' || item.status === 'ALTERAÇÃO') && <p className="form-hint">{aiMessage}</p>}
+              <p className="form-hint">
+                A IA segue a identidade da marca e as artes já aprovadas pelo cliente (biblioteca e OxyPlanning). Cria uma nova versão com arte e textos; você confere e envia.
+              </p>
+            </section>
+          )}
           <div className="art-controls">
             <Field label="Arte compartilhada do Post e Story">
               <Picker
@@ -519,6 +666,8 @@ export function Studio({
               Salve as alterações dos textos antes de criar outro criativo.
             </p>
           )}
+          <details className="studio-more">
+            <summary>Mais opções de criação</summary>
           <MagnificGenerator key={item.id} state={state} item={item} disabled={disabled || dirty} reload={reload}/>
           <section className="panel section-space">
             <h2>Produtos desta peça</h2>
@@ -563,6 +712,7 @@ export function Studio({
               {item.brief || 'Briefing ainda não preenchido.'}
             </p>
           </section>
+          </details>
         </section>
         <section className="studio-editor">
           {(locked || historic) && (
@@ -641,23 +791,13 @@ export function Studio({
                 Aguardando a decisão de um aprovador ou administrador.
               </p>
             ) : !historic &&
-              (['IDEIA', 'PLANEJADO'].includes(item.status) ? (
+              (['IDEIA', 'PLANEJADO', 'EM CRIAÇÃO', 'ALTERAÇÃO', 'AJUSTE'].includes(item.status) ? (
                 <button
                   className="create-btn full"
                   disabled={busy}
-                  onClick={() => void transition('EM CRIAÇÃO')}
+                  onClick={() => void sendToReview()}
                 >
-                  Iniciar criação <ArrowUpRight size={16} />
-                </button>
-              ) : item.status === 'EM CRIAÇÃO' ||
-                item.status === 'ALTERAÇÃO' ||
-                item.status === 'AJUSTE' ? (
-                <button
-                  className="create-btn full"
-                  disabled={busy}
-                  onClick={() => void transition('REVISÃO')}
-                >
-                  Levar para revisão <ArrowUpRight size={16} />
+                  Enviar para revisão <ArrowUpRight size={16} />
                 </button>
               ) : item.status === 'REVISÃO' ? (
                 <button

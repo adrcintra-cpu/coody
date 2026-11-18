@@ -2900,3 +2900,17 @@ h3 {
   .oxy-body { padding: 16px; }
 }
 @media (min-width: 1600px) { .oxy-body { padding: 24px 48px; } }
+
+/* Studio: criação em uma tela */
+.quick-create { margin-top: 16px; display: grid; gap: 12px; }
+.quick-create .form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.studio-more { margin-top: 18px; }
+.studio-more > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--line, rgb(15 21 64 / 0.12)); background: rgb(255 255 255 / 0.7); font-weight: 600; font-size: 14px; }
+.studio-more > summary::-webkit-details-marker { display: none; }
+.studio-more > summary::after { content: '▾'; font-size: 12px; opacity: 0.6; }
+.studio-more[open] > summary::after { content: '▴'; }
+.quick-kind { display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: 999px; background: rgb(15 21 64 / 0.05); width: fit-content; flex-wrap: wrap; }
+.quick-kind > button { height: 34px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-2, #3b4060); background: transparent; border: 0; cursor: pointer; }
+.quick-kind > button.on { background: #fff; color: var(--ink, #0f1540); box-shadow: 0 1px 4px rgb(15 21 64 / 0.12); }
+.quick-count { display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--muted, #6b6f86); }
+.quick-count select { height: 30px; border-radius: 999px; border: 1px solid rgb(15 21 64 / 0.12); padding: 0 8px; background: #fff; }

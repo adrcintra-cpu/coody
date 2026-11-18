@@ -314,3 +314,32 @@ export async function adoptBaseVersions(posts: { id: string; current_version_id:
   if (statements.length) await db.batch(statements);
   return reverted;
 }
+
+/**
+ * Artes que o cliente já aprovou no OxyPlanning: referência de estilo ("a linha criativa dele")
+ * para a IA. Só leitura; devolve no formato de entrada da OpenAI. Sem ligação ou com falha, vem vazio.
+ */
+export async function planningStyleReferences(brandId: string, limit = 4) {
+  const empty = { images: [] as { asset: { id: string; name: string; category: string }; file: File }[], content: [] as Record<string, unknown>[] };
+  if (!planningConfigured()) return empty;
+  try {
+    const link = (await brandLinks()).find((l) => l.brandId === brandId);
+    if (!link) return empty;
+    const { refs } = await ponte<{ refs: { post_id: string; title: string; url: string; mime: string }[] }>({ action: 'referencias', client_id: link.clientId, limit });
+    for (const r of refs) {
+      const res = await fetch(r.url, { signal: AbortSignal.timeout(15_000) }).catch(() => null);
+      if (!res?.ok) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (!bytes.length || bytes.length > 6 * 1024 * 1024) continue;
+      const name = `Aprovada pelo cliente no OxyPlanning: ${r.title || 'publicação'}`.slice(0, 160);
+      empty.images.push({ asset: { id: 'planning-' + r.post_id, name, category: 'approved_planning' }, file: new File([bytes], 'referencia.' + (r.mime.split('/')[1] || 'png'), { type: r.mime }) });
+      empty.content.push({ type: 'input_text', text: JSON.stringify({ arquivo: name, categoria: 'arte aprovada pelo cliente', orientacao: 'Referência da linha criativa atual do cliente: siga o estilo, a tipografia, as cores e a composição. Não copie os textos.' }) });
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 16384) binary += String.fromCharCode(...bytes.subarray(i, i + 16384));
+      empty.content.push({ type: 'input_image', image_url: `data:${r.mime};base64,${btoa(binary)}`, detail: 'high' });
+    }
+  } catch (e) {
+    console.error('oxyplanning references', e);
+  }
+  return empty;
+}

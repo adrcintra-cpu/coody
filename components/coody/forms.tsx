@@ -209,7 +209,7 @@ export function ContentForm({
               label="Formatos"
               value={format}
               onChange={setFormat}
-              options={['Feed + Story', 'Feed', 'Story'].map((v) => ({
+              options={['Feed + Story', 'Feed', 'Story', 'Carrossel'].map((v) => ({
                 value: v,
                 label: v,
               }))}

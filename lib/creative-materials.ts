@@ -85,12 +85,17 @@ export function pieceMaterials(
   const attached = attachments
     .map((id) => assets.find((a) => a.id === id && isAttachable(a, brandId)))
     .filter((a): a is Asset => !!a);
-  if (!attached.length)
-    return { materials: creativeMaterials(brandId, assets), attached };
-  const identity = creativeMaterials(brandId, assets).filter(
-    (a) =>
-      (a.category === 'logo' || a.category === 'brandbook') &&
-      !attached.some((x) => x.id === a.id),
-  );
-  return { materials: [...identity, ...attached], attached };
+  const all = creativeMaterials(brandId, assets);
+  const isIdentity = (a: Asset) => a.category === 'logo' || a.category === 'brandbook';
+  // Artes aprovadas e referências prioritárias da marca: definem a linha criativa
+  const references = all.filter((a) => !isIdentity(a) && (a.approved === 1 || a.priority === 1) && a.mime.startsWith('image/'));
+  if (!attached.length) {
+    // Sem anexos: identidade + o melhor da biblioteca, com teto para não estourar o limite de imagens
+    const images = all.filter((a) => a.mime.startsWith('image/'));
+    const keep = new Set(images.slice(0, 10).map((a) => a.id));
+    return { materials: all.filter((a) => !a.mime.startsWith('image/') || keep.has(a.id)), attached };
+  }
+  const identity = all.filter((a) => isIdentity(a) && !attached.some((x) => x.id === a.id));
+  const refs = references.filter((a) => !attached.some((x) => x.id === a.id)).slice(0, 4);
+  return { materials: [...identity, ...attached, ...refs], attached };
 }
