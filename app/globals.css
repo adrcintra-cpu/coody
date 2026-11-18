@@ -2857,7 +2857,7 @@ h3 {
 
 /* ===== Shell padrão Oxyhub (igual ao OxyGrowth): barra do topo + menu lateral flutuante ===== */
 .oxy-app { display: flex; flex-direction: column; min-height: 100svh; }
-.oxy-topbar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 24px; }
+.oxy-topbar { position: sticky; top: 0; z-index: 80; display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 24px; }
 .oxy-menu-btn { display: none; width: 44px; height: 44px; border-radius: 999px; place-items: center; color: #262b36; }
 .oxy-brand { display: flex; align-items: center; gap: 16px; background: none; border: 0; padding: 0; cursor: pointer; }
 .oxy-logo { height: 33px !important; width: auto !important; }

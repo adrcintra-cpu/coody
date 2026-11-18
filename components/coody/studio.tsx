@@ -277,7 +277,7 @@ export function Studio({
     try {
       setAiMessage('Planejando os textos das lâminas…');
       const { plan } = (await post({ step: 'plan', count: slideCount, prompt: direction.trim() })) as unknown as {
-        plan: { slides: { headline: string; copy: string }[]; visualPrompt: string };
+        plan: { slides: { headline: string; copy: string; visual: string }[]; visualPrompt: string };
       };
       const ids: string[] = [];
       for (let i = 0; i < plan.slides.length; i++) {
@@ -289,6 +289,7 @@ export function Studio({
           slide: plan.slides[i],
           visualPrompt: plan.visualPrompt,
           styleAssetId: ids[0] || '',
+          prompt: direction.trim(),
         })) as unknown as { assetId: string };
         ids.push(assetId);
       }
