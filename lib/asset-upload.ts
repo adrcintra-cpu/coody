@@ -7,6 +7,7 @@ const allowed = new Map([
   ['image/png', ['png']],
   ['image/jpeg', ['jpg', 'jpeg']],
   ['image/webp', ['webp']],
+  ['image/gif', ['gif']],
   ['image/svg+xml', ['svg']],
   ['application/pdf', ['pdf']],
 ]);
@@ -29,7 +30,9 @@ export async function validateUpload(file: unknown) {
     (file.type === 'image/jpeg' &&
       !(sig[0] === 255 && sig[1] === 216 && sig[2] === 255)) ||
     (file.type === 'image/webp' &&
-      !(ascii.startsWith('RIFF') && ascii.slice(8) === 'WEBP'))
+      !(ascii.startsWith('RIFF') && ascii.slice(8) === 'WEBP')) ||
+    (file.type === 'image/gif' &&
+      !(ascii.startsWith('GIF87a') || ascii.startsWith('GIF89a')))
   )
     throw new Error('O conteúdo do arquivo não corresponde ao formato.');
   if (file.type === 'image/svg+xml') {

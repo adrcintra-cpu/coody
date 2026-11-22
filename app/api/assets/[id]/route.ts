@@ -31,7 +31,7 @@ export async function GET(
   }
   const object = await bucket().get(`brands/${asset.brandId}/${id}`);
   if (!object) return new Response('Arquivo não encontrado', { status: 404 });
-  const ext:Record<string,string>={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/svg+xml':'.svg','application/pdf':'.pdf','video/mp4':'.mp4','video/quicktime':'.mov','video/webm':'.webm'};
+  const ext:Record<string,string>={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','image/gif':'.gif','image/svg+xml':'.svg','application/pdf':'.pdf','video/mp4':'.mp4','video/quicktime':'.mov','video/webm':'.webm'};
   const filename=/\.(png|jpe?g|webp|svg|pdf|mp4|mov|webm)$/i.test(asset.name)?asset.name:asset.name+(ext[asset.mime]||'');
   const download=new URL(request.url).searchParams.get('download')==='1';
   return new Response(object.body, {

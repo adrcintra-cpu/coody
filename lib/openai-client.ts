@@ -1,4 +1,21 @@
 export class OpenAIError extends Error {}
+const FALLBACK_IMAGE_MODEL = 'gpt-image-2';
+function modelOf(body: Record<string, unknown> | FormData) {
+  return String(body instanceof FormData ? body.get('model') || '' : body.model || '');
+}
+/** Same request on gpt-image-2, for projects still without Images 2.6 access. */
+function withFallbackModel(body: Record<string, unknown> | FormData) {
+  if (body instanceof FormData) {
+    const copy = new FormData();
+    for (const [k, v] of body.entries()) copy.append(k, v);
+    copy.set('model', FALLBACK_IMAGE_MODEL);
+    copy.delete('complexity');
+    return copy;
+  }
+  const rest: Record<string, unknown> = { ...body, model: FALLBACK_IMAGE_MODEL };
+  delete rest.complexity;
+  return rest;
+}
 export async function openaiRequest(
   key: string,
   path: 'responses' | 'images/generations' | 'images/edits',
@@ -26,6 +43,18 @@ export async function openaiRequest(
   }
   if (!response.ok) {
     const raw = await response.text();
+    const usedModel = modelOf(body);
+    if (
+      path !== 'responses' &&
+      usedModel.startsWith('gpt-image-2.') &&
+      String(body instanceof FormData ? body.get('output_format') : body.output_format) !== 'gif' &&
+      (response.status === 403 ||
+        response.status === 404 ||
+        (response.status === 400 && /model/i.test(raw) && /(not found|does not exist|not supported|access|invalid)/i.test(raw)))
+    ) {
+      console.warn('openai_image_model_fallback', JSON.stringify({ path, from: usedModel, status: response.status }));
+      return openaiRequest(key, path, withFallbackModel(body), transport);
+    }
     let result: { error?: { code?: string; type?: string; message?: string } } =
       {};
     try {

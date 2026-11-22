@@ -12,7 +12,8 @@ import {
   storyRecomposePrompt,
 } from '@/lib/story-recompose';
 
-const model = 'gpt-image-2';
+import { EDIT_MODEL } from '@/lib/image-model';
+const model = EDIT_MODEL;
 function apiKey() {
   return (env as unknown as Record<string, string>).OPENAI_API_KEY || '';
 }

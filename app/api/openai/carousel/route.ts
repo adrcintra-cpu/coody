@@ -16,7 +16,8 @@ import type { MediaItem } from '@/lib/types';
  *  slide  → gera UMA lâmina (a partir da 2ª, usa a 1ª como referência de estilo)
  *  finish → grava a versão com as lâminas e deixa a peça em revisão interna
  */
-const model = 'gpt-image-2';
+import { IMAGE_MODEL } from '@/lib/image-model';
+const model = IMAGE_MODEL;
 const apiKey = () => (env as unknown as Record<string, string>).OPENAI_API_KEY || '';
 const PROTECTED = ['APROVAÇÃO', 'APROVADO', 'PUBLICADO'];
 

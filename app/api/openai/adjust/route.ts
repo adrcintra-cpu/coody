@@ -12,7 +12,8 @@ import { assetRecord, validateUpload } from '@/lib/asset-upload';
  * detail) and keeps everything else. The result becomes a new version with
  * the same texts, in review.
  */
-const model = 'gpt-image-2';
+import { EDIT_MODEL } from '@/lib/image-model';
+const model = EDIT_MODEL;
 const apiKey = () => (env as unknown as Record<string, string>).OPENAI_API_KEY || '';
 
 export async function POST(request: Request) {

@@ -6,6 +6,8 @@ import { AttachmentPicker } from './attachments';
 import { can } from '@/lib/permissions';
 import { ExternalPiece } from './production';
 import { useEffect, useState } from 'react';
+import { gifToMp4, mp4Supported } from '@/lib/gif-to-mp4';
+import { directUpload } from '@/lib/client-upload';
 import {
   ArrowLeft,
   Save,
@@ -91,6 +93,7 @@ export function Studio({
   const [direction, setDirection] = useState('');
   const [kind, setKind] = useState<'post' | 'carousel'>(item.format === 'Carrossel' ? 'carousel' : 'post');
   const [slideCount, setSlideCount] = useState(5);
+  const [motion, setMotion] = useState({ style: 'sutil', length: 'medio', speed: 'normal', prompt: '' });
   // Pauta ligada ao OxyPlanning: a decisão do cliente acontece lá, não aqui
   const [planning, setPlanning] = useState<{ linked: boolean; sent?: boolean } | null>(null);
   useEffect(() => {
@@ -297,6 +300,61 @@ export function Studio({
       await post({ step: 'finish', assetIds: ids, plan });
       setAiMessage('Carrossel pronto. Confira as lâminas e envie para aprovação.');
       setDirection('');
+      await reload();
+    } catch (e) {
+      setAiMessage('');
+      setError((e as Error).message);
+    } finally {
+      setAiBusy(false);
+      setBusy(false);
+    }
+  };
+  // Motion: anima a arte atual (GIF na OpenAI), converte em MP4 aqui no navegador e grava como nova versão
+  const motionSource =
+    (/^\/api\/assets\//.test(current?.feedUrl || '') && !current?.media?.length ? current?.feedUrl : '') ||
+    // Carrossel fica de fora: a nova versão teria só o vídeo e perderia as lâminas.
+    (current?.media?.length === 1 && ['image/png', 'image/jpeg', 'image/webp'].includes(current.media[0].mime) ? current.media[0].url : '') ||
+    '';
+  const generateMotion = async () => {
+    if (dirty) {
+      setError('Salve uma nova versão antes de animar a arte.');
+      return;
+    }
+    setAiBusy(true);
+    setBusy(true);
+    setError('');
+    setAiMessage('Animando a arte… pode levar até 3 minutos.');
+    try {
+      const r = await fetch('/api/openai/motion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentId: item.id, requestId: crypto.randomUUID(), ...motion, prompt: motion.prompt.trim() }),
+      });
+      const d = (await r.json()) as { error?: string; assetId?: string; url?: string; frameMs?: number };
+      if (!r.ok || !d.assetId || !d.url) throw new Error(d.error || 'Não foi possível criar o motion.');
+      let mediaId = d.assetId;
+      let note = '';
+      if (mp4Supported()) {
+        setAiMessage('Motion pronto. Convertendo para MP4 (Instagram)… mantenha esta aba aberta.');
+        const file = await gifToMp4(d.url, { frameMs: d.frameMs || 140, minSeconds: 6 });
+        setAiMessage('Salvando o vídeo…');
+        const asset = await directUpload(file, item.brandId, {
+          name: (item.title + ' · motion.mp4').slice(0, 200),
+          category: 'delivery',
+          description: 'Motion com IA convertido em MP4',
+        });
+        mediaId = asset.id;
+      } else {
+        note = ' Este navegador não converte para MP4: a versão ficou em GIF, que o Instagram e o OxyPlanning não aceitam. Abra no Chrome ou Safari e anime de novo.';
+      }
+      const saved = await run('mediaVersion', {
+        id: item.id,
+        media: [mediaId],
+        change: 'Motion com IA (' + motion.style + ', ' + motion.length + ', ' + motion.speed + ')',
+      });
+      if (!saved) return;
+      setAiMessage('Motion pronto. Confira o vídeo e envie para revisão.' + note);
+      setMotion({ ...motion, prompt: '' });
       await reload();
     } catch (e) {
       setAiMessage('');
@@ -558,6 +616,56 @@ export function Studio({
               {aiMessage && !(item.status === 'AJUSTE' || item.status === 'ALTERAÇÃO') && <p className="form-hint">{aiMessage}</p>}
               <p className="form-hint">
                 A IA segue a identidade da marca e as artes já aprovadas pelo cliente (biblioteca e OxyPlanning). Cria uma nova versão com arte e textos; você confere e envia.
+              </p>
+            </section>
+          )}
+          {canEdit && !historic && !locked && !!motionSource && !['APROVAÇÃO', 'APROVADO', 'PUBLICADO'].includes(item.status) && (
+            <section className="panel quick-create motion-create" aria-live="polite">
+              <div className="section-head">
+                <h2>Animar a arte (motion)</h2>
+              </div>
+              <div className="quick-kind" role="group" aria-label="Tipo de movimento">
+                {[
+                  ['sutil', 'Sutil'],
+                  ['dinamico', 'Dinâmico'],
+                  ['produto', 'Destaque do produto'],
+                ].map(([v, label]) => (
+                  <button key={v} type="button" className={motion.style === v ? 'on' : ''} disabled={busy} onClick={() => setMotion({ ...motion, style: v })}>
+                    {label}
+                  </button>
+                ))}
+                <label className="quick-count">
+                  Duração do loop
+                  <select value={motion.length} disabled={busy} onChange={(e) => setMotion({ ...motion, length: e.target.value })}>
+                    <option value="curto">Curto</option>
+                    <option value="medio">Médio</option>
+                    <option value="longo">Longo</option>
+                  </select>
+                </label>
+                <label className="quick-count">
+                  Velocidade
+                  <select value={motion.speed} disabled={busy} onChange={(e) => setMotion({ ...motion, speed: e.target.value })}>
+                    <option value="lento">Lenta</option>
+                    <option value="normal">Normal</option>
+                    <option value="rapido">Rápida</option>
+                  </select>
+                </label>
+              </div>
+              <Textarea
+                rows={2}
+                value={motion.prompt}
+                disabled={busy}
+                onChange={(e) => setMotion({ ...motion, prompt: e.target.value })}
+                placeholder="Movimento (opcional): ex. luz percorrendo o vidro, partículas subindo, produto girando devagar"
+              />
+              <div className="form-actions">
+                <button className="create-btn" disabled={busy || openai.checking || openai.configured === false} onClick={() => void generateMotion()}>
+                  {aiBusy ? 'Animando…' : 'Animar com IA'}
+                </button>
+              </div>
+              {aiMessage && <p className="form-hint">{aiMessage}</p>}
+              <p className="form-hint">
+                Anima a arte atual mantendo textos e logo. Sai em MP4 4:5 com no mínimo 6 segundos (o loop se repete), pronto para o feed ou Reels. Cria uma nova versão; a arte estática continua na versão anterior.
               </p>
             </section>
           )}

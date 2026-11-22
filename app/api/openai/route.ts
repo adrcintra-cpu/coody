@@ -14,7 +14,8 @@ import { authorize, forbid } from '@/lib/auth';
 import { database, bucket, insert, readState } from '@/lib/repository';
 import { assetRecord, validateUpload } from '@/lib/asset-upload';
 import { conceptBrief, genericRule, parseDNA, type Concept } from '@/lib/art-direction';
-const model = 'gpt-image-2';
+import { IMAGE_MODEL, FALLBACK_IMAGE_MODEL } from '@/lib/image-model';
+const model = IMAGE_MODEL;
 function apiKey() {
   return (env as unknown as Record<string, string>).OPENAI_API_KEY || '';
 }
@@ -38,11 +39,19 @@ export async function GET(request: Request) {
       message: 'Chave OpenAI não configurada.',
     });
   try {
-    const response = await fetch('https://api.openai.com/v1/models/' + model, {
-      headers: { Authorization: 'Bearer ' + apiKey() },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(15000),
-    });
+    const check = (name: string) =>
+      fetch('https://api.openai.com/v1/models/' + name, {
+        headers: { Authorization: 'Bearer ' + apiKey() },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(15000),
+      });
+    let activeModel: string = model;
+    let response = await check(model);
+    // Projects without Images 2.6 access keep working on gpt-image-2.
+    if (response.status === 404 || response.status === 403) {
+      const fallback = await check(FALLBACK_IMAGE_MODEL);
+      if (fallback.ok) { response = fallback; activeModel = FALLBACK_IMAGE_MODEL; }
+    }
     // OpenAI's own reason (wrong key, missing scopes, other project), with
     // the key masked, so the cause is visible without opening server logs.
     let detail = '';
@@ -59,7 +68,7 @@ export async function GET(request: Request) {
     return Response.json({
       configured: true,
       connected: response.ok,
-      model,
+      model: activeModel,
       status: response.status,
       // Last 4 characters only, to compare with the key in the OpenAI panel.
       keyEnd: key.length > 12 ? key.slice(-4) : '',

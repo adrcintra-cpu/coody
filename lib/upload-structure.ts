@@ -9,6 +9,18 @@ export function validateFileStructure(bytes: ArrayBuffer, mime: string) {
   };
   const text = (a: number, z: number) =>
     new TextDecoder().decode(b.subarray(a, z));
+  if (mime === 'image/gif') {
+    // Header, logical screen and the trailer byte that closes the stream.
+    if (
+      b.length < 14 ||
+      !['GIF87a', 'GIF89a'].includes(text(0, 6)) ||
+      !v.getUint16(6, true) ||
+      !v.getUint16(8, true) ||
+      b[b.length - 1] !== 0x3b
+    )
+      fail();
+    return;
+  }
   if (mime === 'image/png') {
     if (
       b.length < 45 ||
