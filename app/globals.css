@@ -530,7 +530,7 @@ small {
   background: #0b63c9;
 }
 .dot-APROVAÇÃO {
-  background: #8a5a00;
+  background: #f59e0b;
 }
 .dot-ALTERAÇÃO {
   background: #b4235a;
@@ -574,7 +574,7 @@ small {
 .attention-dot {
   height: 6px;
   width: 6px;
-  background: #8a5a00;
+  background: #f59e0b;
   border-radius: 50%;
 }
 .count {
@@ -646,10 +646,10 @@ small {
   background: currentColor;
 }
 .status-ALTERAÇÃO {
-  color: #8a5a00;
+  color: #b45309;
 }
 .status-APROVAÇÃO {
-  color: #8a5a00;
+  color: #b45309;
 }
 .status-APROVADO {
   color: #4a505c;
@@ -1159,7 +1159,7 @@ small {
 .kanban-column.can-drop{border-color:#dcdde2}
 .kanban-column.no-drop{opacity:.55}
 .kanban-column.over{background:#efefea;border-color:#4700ff}
-.kanban-column.aprovacao header h2{color:#8a5a00}
+.kanban-column.aprovacao header h2{color:#b45309}
 .kanban-column.ajuste header h2{color:#0b63c9}
 .kanban-column.alteracao header h2{color:#b4235a}
 .kanban-column.aprovado header h2,.kanban-column.publicado header h2{color:#0b7a4b}
@@ -2201,7 +2201,7 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
 .concept p { margin: 0; }
 .concept-kind { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .8; }
 .concept-kind.autoral { color: #4700ff; opacity: 1; }
-.concept-kind.experimental { color: #8a5a00; opacity: 1; }
+.concept-kind.experimental { color: #b45309; opacity: 1; }
 .concept-chosen { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: #e3f5ec; }
 .concept-tags { font-size: 13px; opacity: .85; }
 .concept .form-actions { flex-wrap: wrap; margin-top: auto; }
@@ -2210,7 +2210,7 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
 .validation-head strong { display: inline-flex; gap: 6px; align-items: center; }
 .validation-score { font-weight: 700; font-size: 18px; }
 .validation-score.good { color: #0b7a4b; }
-.validation-score.ok { color: #8a5a00; }
+.validation-score.ok { color: #b45309; }
 .validation-score.bad { color: #b4235a; }
 .validation-report ul { margin: 4px 0 0; padding-left: 18px; }
 
