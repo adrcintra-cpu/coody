@@ -2876,11 +2876,11 @@ h3 {
 .oxy-user { background: none; border: 0; font: inherit; font-size: 14px; color: #4a505c; cursor: pointer; padding: 0 2px; }
 .oxy-user:hover { color: #262b36; }
 .oxy-out { width: 40px; height: 40px; border-radius: 999px; display: inline-grid; place-items: center; color: #262b36; cursor: pointer; }
-/* Menu encostado na borda esquerda (padrão Oxyhub, 23/11/2026); o conteúdo tem o próprio respiro */
+/* Menu suspenso a 12px da borda esquerda (padrão Oxyhub, 23/11/2026); o conteúdo tem o próprio respiro */
 .oxy-body { flex: 1; display: flex; align-items: flex-start; gap: 24px; padding: 0 24px 24px 0; }
 .oxy-main-col { flex: 1; min-width: 0; padding-top: 24px; }
 .oxy-main-col .workspace-main { padding: 0 0 50px !important; max-width: none; }
-.oxy-side { position: sticky; top: 64px; align-self: flex-start; width: 248px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; border-radius: 0 !important; height: calc(100svh - 64px); max-height: none; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; z-index: 20; }
+.oxy-side { position: sticky; top: 76px; align-self: flex-start; margin: 12px 0 12px 12px; width: 248px; flex: none; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; border-radius: 22px !important; height: calc(100svh - 88px); max-height: none; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; z-index: 20; }
 .oxy-side::-webkit-scrollbar { display: none; }
 .oxy-side.collapsed { width: 72px; }
 .oxy-side-top { display: flex; flex-direction: column; gap: 10px; padding: 0 2px 6px; }
