@@ -2927,3 +2927,36 @@ h3 {
 .quick-kind > button.on { background: #fff; color: var(--ink, #0f1540); box-shadow: 0 1px 4px rgb(15 21 64 / 0.12); }
 .quick-count { display: inline-flex; align-items: center; gap: 8px; padding: 0 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--muted, #6b6f86); }
 .quick-count select { height: 30px; border-radius: 999px; border: 1px solid rgb(15 21 64 / 0.08); padding: 0 8px; background: #fff; }
+
+/* ── Oxyhub · testeira padrão (23/11/2026) ─────────────────────────────────
+   Topo de toda página: sobretítulo (contexto: sistema ou cliente) → título em
+   Saira Light → frase de apoio; ações à direita, alinhadas pela base do texto.
+   No celular as ações descem para baixo do texto. */
+.oxy-pagehead {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 16px 24px; margin: 0 0 28px;
+}
+.oxy-pagehead-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 420px; }
+.oxy-pagehead .eyebrow { margin: 0; align-self: flex-start; }
+.oxy-pagehead .oxy-pagehead-title { margin: 0; }
+.oxy-pagehead-title {
+  font-weight: 300; font-size: clamp(34px, 2.4vw + 18px, 46px); line-height: 1.08;
+  letter-spacing: -0.015em; color: #262b36; text-wrap: balance; overflow-wrap: anywhere;
+  display: flex; align-items: center; gap: 12px;
+}
+.oxy-pagehead-sub { margin: 0; max-width: 72ch; font-size: 15px; line-height: 1.6; color: #737985; }
+.oxy-pagehead-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+@media (max-width: 640px) {
+  .oxy-pagehead { margin-bottom: 20px; }
+  .oxy-pagehead-actions { width: 100%; }
+}
+/* OxyCreate: as páginas usam .page-heading; mesmas medidas da testeira padrão */
+.page-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; margin-bottom: 28px; }
+.page-heading > div:first-child { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 420px; }
+.page-heading h1 { font-size: clamp(34px, 2.4vw + 18px, 46px) !important; margin: 0 !important; overflow-wrap: anywhere; }
+.page-heading .eyebrow { margin: 0 !important; align-self: flex-start; }
+.page-heading > div > p:last-child:not(.eyebrow) { margin: 0; max-width: 72ch; font-size: 15px; line-height: 1.6; color: #737985; }
+@media (max-width: 640px) {
+  .page-heading { margin-bottom: 20px; }
+  .page-heading > :not(:first-child) { width: 100%; }
+}
