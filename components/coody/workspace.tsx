@@ -7,7 +7,7 @@ import { can, roleLabels } from '@/lib/permissions';
 import { WorkspaceMenu } from './workspace-menu';
 import { Notifications } from './notifications';
 import { OxyhubSwitcher } from './oxyhub-switcher';
-import { clearHubLoginAttempt, HUB_SIGN_OUT } from '@/lib/oxyhub';
+import { clearHubLoginAttempt, HUB_SIGN_OUT, HUB_URL } from '@/lib/oxyhub';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   LayoutDashboard,
@@ -367,8 +367,10 @@ export default function Workspace() {
         <button className="glass-btn oxy-menu-btn" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>
           <MenuIcon size={20} />
         </button>
-        <button className="oxy-brand" onClick={() => navigate('Dashboard')} aria-label="Ir para o Dashboard">
-          <Image unoptimized width={110} height={33} src="/oxycom.svg" alt="Oxycom" className="oxy-logo" priority />
+        <a className="oxy-brand" href={HUB_URL} aria-label="Oxyhub · tela inicial" title="Tela inicial do Oxyhub">
+          <Image unoptimized width={107} height={33} src="/oxyhub-logo.svg" alt="Oxyhub" className="oxy-logo" priority />
+        </a>
+        <button className="oxy-brand" onClick={() => navigate('Dashboard')} aria-label="Ir para o Dashboard do OxyCreate">
           <span className="oxy-product">OxyCreate</span>
         </button>
         <div className="oxy-spacer" />
