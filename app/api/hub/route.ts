@@ -13,6 +13,9 @@ import { ensureMembers, memberByEmail, memberWorkspaces } from '@/lib/members';
  *   { action: "acesso", email, para? } → URL de entrada de uso único, válida por 60 s (para = caminho interno, ex.: /#Studio?id=…)
  *   { action: "eventos", email, from, to } → conteúdos com data para o OxyCalendar (somente leitura)
  *   { action: "membros", email } → quem tem acesso ao OxyCreate, papel e situação (somente leitura; só para administradores)
+ *   { action: "acesso_opcoes", email } → perfis e workspaces possíveis (tela "Pessoas e acessos" do Oxyhub; só administradores)
+ *   { action: "definir_acesso", email, alvo, nome?, papel, escopo? } → inclui/atualiza (ativo, entra pelo Oxyhub)
+ *       ou suspende (papel null) uma pessoa; escopo = workspaces liberados (vazio = todos). Só administradores.
  * GET /api/hub?t=… → abre a sessão do OxyCreate (cookie coody_session) e vai para o início.
  *
  * Variável de ambiente: COODY_HUB_SECRET (32+ caracteres, o mesmo valor no Oxyhub).
@@ -52,8 +55,8 @@ export async function POST(request: Request) {
   const secret = c.COODY_HUB_SECRET ?? '';
   if (secret.length < 32 || !sameSecret(request.headers.get('x-hub-secret') ?? '', secret)) return new Response(null, { status: 403 });
   const raw = await request.text();
-  if (raw.length > 2048) return new Response(null, { status: 413 });
-  let data: { action?: unknown; email?: unknown; para?: unknown; from?: unknown; to?: unknown };
+  if (raw.length > 8192) return new Response(null, { status: 413 });
+  let data: { action?: unknown; email?: unknown; para?: unknown; from?: unknown; to?: unknown; alvo?: unknown; nome?: unknown; papel?: unknown; escopo?: unknown };
   try {
     data = JSON.parse(raw);
   } catch {
@@ -63,13 +66,75 @@ export async function POST(request: Request) {
   const who = email ? await person(email) : null;
   if (!who) return Response.json({ access: false }, { headers: { 'Cache-Control': 'no-store' } });
 
+  const isAdmin = who.kind === 'owner' || (who.kind === 'member' && who.member.role === 'ADMINISTRADOR');
+  if (data.action === 'acesso_opcoes') {
+    if (!isAdmin) return Response.json({ access: true, error: 'Somente administradores.' }, { status: 403 });
+    const ws = (await database().prepare('SELECT id,name FROM workspaces ORDER BY createdAt,id').all<{ id: string; name: string }>()).results;
+    return Response.json(
+      {
+        access: true,
+        roles: [
+          { value: 'ADMINISTRADOR', label: 'Administrador' },
+          { value: 'EDITOR', label: 'Editor' },
+          { value: 'APROVADOR', label: 'Aprovador' },
+        ],
+        scopes: { label: 'Workspaces', items: ws.map((w) => ({ id: w.id, name: w.name })) },
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+  if (data.action === 'definir_acesso') {
+    if (!isAdmin) return Response.json({ access: true, error: 'Somente administradores.' }, { status: 403 });
+    await ensureMembers();
+    const db = database();
+    const alvo = typeof data.alvo === 'string' ? data.alvo.trim().toLowerCase().slice(0, 200) : '';
+    const nome = typeof data.nome === 'string' ? data.nome.trim().slice(0, 120) : '';
+    const papel = data.papel === null ? null : String(data.papel ?? '');
+    const fail = (error: string, status = 400) => Response.json({ access: true, error }, { status });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(alvo)) return fail('E-mail inválido.');
+    if (alvo === (c.COODY_OWNER_EMAIL ?? '').trim().toLowerCase()) return fail('O administrador principal não pode ser alterado por aqui.');
+    if (papel !== null && !['ADMINISTRADOR', 'EDITOR', 'APROVADOR'].includes(papel)) return fail('Perfil inválido.');
+    const now = new Date().toISOString();
+    const current = await memberByEmail(alvo);
+    if (papel === null) {
+      if (current)
+        await db.batch([
+          db.prepare("UPDATE members SET status='disabled', sessionVersion=sessionVersion+1, updatedAt=? WHERE id=?").bind(now, current.id),
+          db.prepare('DELETE FROM member_invites WHERE memberId=? AND usedAt IS NULL').bind(current.id),
+        ]);
+      return Response.json({ access: true, ok: true }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+    const known = (await db.prepare('SELECT id FROM workspaces').all<{ id: string }>()).results.map((w) => w.id);
+    const asked = Array.isArray(data.escopo) ? [...new Set(data.escopo.filter((x): x is string => typeof x === 'string'))] : [];
+    if (asked.some((id) => !known.includes(id))) return fail('Workspace inválido.');
+    const list = asked.length ? asked : known;
+    const id = current?.id ?? crypto.randomUUID();
+    const links = [
+      db.prepare('DELETE FROM member_workspaces WHERE memberId=?').bind(id),
+      ...list.map((w) => db.prepare('INSERT INTO member_workspaces (memberId,workspaceId) VALUES (?,?)').bind(id, w)),
+    ];
+    // Entra pelo Oxyhub: fica ativo sem senha própria (o link de uso único do Hub abre a sessão).
+    await db.batch([
+      current
+        ? db
+            .prepare("UPDATE members SET role=?, name=?, status='active', sessionVersion=sessionVersion+1, updatedAt=? WHERE id=?")
+            .bind(papel, nome || current.name, now, id)
+        : db
+            .prepare("INSERT INTO members (id,email,name,role,status,createdAt,updatedAt) VALUES (?,?,?,?,'active',?,?)")
+            .bind(id, alvo, nome || alvo.split('@')[0], papel, now, now),
+      ...links,
+    ]);
+    return Response.json({ access: true, ok: true }, { headers: { 'Cache-Control': 'no-store' } });
+  }
   if (data.action === 'membros') {
     if (!(who.kind === 'owner' || (who.kind === 'member' && who.member.role === 'ADMINISTRADOR'))) return Response.json({ access: true, error: 'Somente administradores.' }, { status: 403 });
     await ensureMembers();
     const rows = (
       await database()
-        .prepare("SELECT email, name, role, status FROM members WHERE status <> 'disabled' ORDER BY name")
-        .all<{ email: string; name: string; role: string; status: string }>()
+        .prepare(
+          "SELECT m.email, m.name, m.role, m.status, (SELECT group_concat(w.workspaceId) FROM member_workspaces w WHERE w.memberId=m.id) AS ws FROM members m WHERE m.status <> 'disabled' ORDER BY m.name",
+        )
+        .all<{ email: string; name: string; role: string; status: string; ws: string | null }>()
     ).results;
     const ROLE: Record<string, string> = { ADMINISTRADOR: 'Administrador', EDITOR: 'Editor', APROVADOR: 'Aprovador' };
     const owner = (c.COODY_OWNER_EMAIL ?? '').trim().toLowerCase();
@@ -77,8 +142,14 @@ export async function POST(request: Request) {
       {
         access: true,
         members: [
-          ...(owner ? [{ email: owner, name: null, role: 'Dono da conta' }] : []),
-          ...rows.map((m) => ({ email: m.email.toLowerCase(), name: m.name, role: (ROLE[m.role] ?? m.role) + (m.status === 'invited' ? ' (convite pendente)' : '') })),
+          ...(owner ? [{ email: owner, name: null, role: 'Dono da conta', papel: 'dono' }] : []),
+          ...rows.map((m) => ({
+            email: m.email.toLowerCase(),
+            name: m.name,
+            role: (ROLE[m.role] ?? m.role) + (m.status === 'invited' ? ' (convite pendente)' : ''),
+            papel: m.role,
+            escopo: m.ws ? m.ws.split(',') : [],
+          })),
         ],
       },
       { headers: { 'Cache-Control': 'no-store' } },
