@@ -103,12 +103,14 @@ export async function DELETE(request: Request) {
           .bind(asset.url, asset.url)
           .all<{ title: string; deletedAt: string | null }>()
       ).results;
-      if (used.length) {
+      // Só peças ativas seguram o arquivo. Peça que está na lixeira não impede a exclusão
+      // (a lixeira não tem "excluir de vez" e a peça continua restaurável, só sem essa arte).
+      if (used.some((u) => !u.deletedAt)) {
         kept.push({
           name: asset.name,
           reason:
             'usado na arte de ' +
-            used.map((u) => '“' + u.title + '”' + (u.deletedAt ? ' (na lixeira)' : '')).join(', '),
+            used.filter((u) => !u.deletedAt).map((u) => '“' + u.title + '”').join(', '),
         });
         continue;
       }
