@@ -2974,6 +2974,36 @@ h3 {
   /* Menu do OxyStudio no menu do Hub (como na Vercel); o workspace sobe para a barra */
   .oxyhub-nav-hub [data-oxyhub-nav] { display: none !important; }
   .oxyhub-nav-hub .oxy-body { padding-left: 24px; }
-  .oxyhub-nav-hub .embed-only { display: block; min-width: 240px; }
+  .oxyhub-nav-hub .embed-only { display: block; }
+  /* Dentro do Hub não existe uma segunda barra: workspace, mês e avisos viram controles leves
+     no topo da página (pílulas de vidro), que rolam junto com o conteúdo. */
+  .oxyhub-embed .oxy-topbar {
+    position: static;
+    height: auto;
+    padding: 16px 24px 0;
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .oxyhub-embed .oxy-topbar .workspace-name,
+  .oxyhub-embed .oxy-topbar .month-input,
+  .oxyhub-embed .oxy-topbar .notification-bell {
+    height: 40px;
+    border-radius: 999px;
+    border: 0;
+    background: rgb(255 255 255 / 0.62);
+    box-shadow: 0 0 0 1px rgb(15 21 64 / 0.08), 0 4px 12px -8px rgb(15 21 64 / 0.25);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+  .oxyhub-embed .oxy-topbar .workspace-name { width: auto; padding: 0 14px 0 6px; gap: 8px; font-size: 14px; font-weight: 600; }
+  .oxyhub-embed .oxy-topbar .workspace-name small { display: none; }
+  .oxyhub-embed .oxy-topbar .workspace-icon { width: 28px; height: 28px; border-radius: 999px; overflow: hidden; }
+  .oxyhub-embed .oxy-topbar .workspace-icon img { border-radius: 999px; }
+  .oxyhub-embed .oxy-topbar .month-input { padding: 0 14px; width: auto; }
+  .oxyhub-embed .oxy-topbar .notification-bell { width: 40px; padding: 0; display: grid; place-items: center; }
+  .oxyhub-embed .oxy-topbar .notification-bell > span { right: -2px; top: -3px; }
 }
 .embed-only { display: none; }
