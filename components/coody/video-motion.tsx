@@ -138,6 +138,8 @@ export function VideoMotion({ state, act, reload }: { state: State; act: Action;
   const [language, setLanguage] = useState('pt-BR');
   const [captions, setCaptions] = useState(true);
   const [musicId, setMusicId] = useState('');
+  const [narration, setNarration] = useState(false);
+  const musicInput = useRef<HTMLInputElement>(null);
   const [style, setStyle] = useState(STYLES[0]);
   const [quality, setQuality] = useState('alta');
   const [briefing, setBriefing] = useState('');
@@ -178,7 +180,7 @@ export function VideoMotion({ state, act, reload }: { state: State; act: Action;
     () => state.assets.filter((a) => a.brandId === brandId && ['video', 'image', 'audio'].includes(kindOf(a.mime))),
     [state.assets, brandId],
   );
-  const audios = media.filter((a) => kindOf(a.mime) === 'audio' && assetIds.includes(a.id));
+  const audios = media.filter((a) => kindOf(a.mime) === 'audio');
   const jobs = (data?.jobs ?? []).filter((j) => j.brandId === brandId);
   const roots = jobs.filter((j, i) => jobs.findIndex((x) => x.rootId === j.rootId) === i); // última versão de cada produção
   const job = jobs.find((j) => j.id === selected) ?? roots[0];
@@ -215,6 +217,20 @@ export function VideoMotion({ state, act, reload }: { state: State; act: Action;
     reload();
   }
 
+  async function uploadMusic(file: File) {
+    if (!brandId) return;
+    setError('');
+    try {
+      setUploading(file.name);
+      const a = await directUpload(file, brandId, { name: file.name, category: 'material', description: 'Video & Motion · trilha sonora' }, (p) => setUploading(`${file.name} · ${p}%`));
+      setMusicId(a.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Falha no envio.');
+    }
+    setUploading('');
+    reload();
+  }
+
   async function post(body: Record<string, unknown>, what: string) {
     setBusy(what);
     setError('');
@@ -245,6 +261,7 @@ export function VideoMotion({ state, act, reload }: { state: State; act: Action;
           captions,
           music: musicId ? 'source' : 'none',
           musicAssetId: musicId || null,
+          narration,
           style,
           quality,
           briefing,
@@ -464,7 +481,7 @@ export function VideoMotion({ state, act, reload }: { state: State; act: Action;
             <label className="flex items-center gap-2 text-[14px] font-semibold text-[#262b36]">
               <input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} className="size-4 accent-[#4700ff]" /> Legendas automáticas
             </label>
-            <label className="block">
+            <div className="block">
               <span className={label}>Trilha sonora</span>
               <select value={musicId} onChange={(e) => setMusicId(e.target.value)} className={field}>
                 <option value="">Sem trilha</option>
@@ -474,11 +491,17 @@ export function VideoMotion({ state, act, reload }: { state: State; act: Action;
                   </option>
                 ))}
               </select>
-              {!audios.length ? <span className="mt-1 block text-[12px] text-[#737985]">Escolha um áudio nos conteúdos para usar como trilha.</span> : null}
-            </label>
+              <button type="button" className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#4700ff] disabled:opacity-50" disabled={!!uploading || !brandId} onClick={() => musicInput.current?.click()}>
+                {uploading ? <LoaderCircle size={14} className="animate-spin" /> : <Upload size={14} />} {uploading ? `Enviando ${uploading}` : 'Enviar trilha (MP3, M4A, WAV)'}
+              </button>
+              <input ref={musicInput} type="file" hidden accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,audio/aac" onChange={(e) => e.target.files?.[0] && void uploadMusic(e.target.files[0])} />
+            </div>
             <div>
               <span className={label}>Narração</span>
-              <span className="inline-flex rounded-full bg-[#ebe4ff] px-2.5 py-1 text-[12px] font-semibold text-[#4700ff]">Em desenvolvimento</span>
+              <label className="flex items-center gap-2 text-[14px] font-semibold text-[#262b36]">
+                <input type="checkbox" checked={narration} onChange={(e) => setNarration(e.target.checked)} className="size-4 accent-[#4700ff]" /> Narrar com a voz do Mac
+              </label>
+              <span className="mt-1 block text-[12px] text-[#737985]">Voz Luciana, gravada no seu Mac, sem custo. A IA escreve a fala de cada cena.</span>
             </div>
           </div>
 

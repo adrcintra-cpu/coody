@@ -78,6 +78,8 @@ export type Scene = {
   motion: 'none' | 'kenburns' | 'pop' | 'slide-up' | 'glass';
   background: 'brand' | 'dark' | 'light' | 'source';
   muted: boolean;
+  /** Texto falado na cena (narração com a voz do Mac). Vazio sem narração. */
+  voice: string;
 };
 export type EditPlan = {
   title: string;
@@ -182,7 +184,7 @@ export function cleanRequest(raw: Record<string, unknown>): VideoRequest {
     captions: raw.captions === true,
     music: raw.music === 'source' ? 'source' : 'none',
     musicAssetId: id(raw.musicAssetId) || null,
-    narration: false,
+    narration: raw.narration === true,
     style: STYLES.find((s) => s === raw.style) ?? 'Liquid Glass',
     quality: (Object.keys(QUALITIES).find((q) => q === raw.quality) as VideoRequest['quality']) ?? 'alta',
     briefing,
@@ -210,10 +212,11 @@ export const planSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['kind', 'icon', 'sourceId', 'start', 'duration', 'headline', 'text', 'layout', 'transition', 'motion', 'background', 'muted'],
+        required: ['kind', 'icon', 'voice', 'sourceId', 'start', 'duration', 'headline', 'text', 'layout', 'transition', 'motion', 'background', 'muted'],
         properties: {
           kind: { type: 'string', enum: ['clip', 'image', 'title', 'glass3d', 'logo', 'end'] },
           icon: { type: 'string', enum: [...GLASS_ICONS] },
+          voice: { type: 'string' },
           sourceId: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           start: { type: 'number' },
           duration: { type: 'number' },
@@ -269,6 +272,7 @@ export function cleanPlan(raw: unknown, sources: SourceInfo[], maxSeconds: numbe
       motion: (['none', 'kenburns', 'pop', 'slide-up', 'glass'] as const).find((v) => v === s.motion) ?? 'none',
       background: (['brand', 'dark', 'light', 'source'] as const).find((v) => v === s.background) ?? 'brand',
       muted: s.muted === true,
+      voice: str(s.voice, 400),
     });
   }
   if (!scenes.length) throw new Error('A IA não montou nenhuma cena válida com os arquivos escolhidos.');
