@@ -63,7 +63,7 @@ export type VideoRequest = {
 };
 
 /** Ícones 3D de vidro que o motor sabe montar (peças 3D, não desenho plano). */
-export const GLASS_ICONS = ['clock', 'gear', 'network', 'chart', 'bolt', 'rocket', 'chat', 'check', 'target', 'cloud', 'shield', 'sparkles', 'none'] as const;
+export const GLASS_ICONS = ['clock', 'gear', 'network', 'chart', 'bolt', 'rocket', 'chat', 'check', 'target', 'cloud', 'shield', 'sparkles', 'chaos', 'orbit', 'flow', 'agents', 'funnel', 'integration', 'dashboard', 'burst', 'none'] as const;
 export type GlassIcon = (typeof GLASS_ICONS)[number];
 export type Scene = {
   kind: 'clip' | 'image' | 'title' | 'glass3d' | 'logo' | 'end';
@@ -144,6 +144,12 @@ const num = (v: unknown, min: number, max: number, def: number) => {
 };
 const id = (v: unknown) => (typeof v === 'string' && /^[A-Za-z0-9-]{1,80}$/.test(v) ? v : '');
 
+function briefingSeconds(b: string): number | null {
+  const m = /(?:v[íi]deo|dura[çc][ãa]o)[^.\n]{0,60}?\b(\d{1,3})\s*(?:s\b|seg|segundos)/i.exec(b) || /\bdura[çc][ãa]o\s*:\s*(\d{1,3})\s*s/i.exec(b);
+  const n = m ? Number(m[1]) : NaN;
+  return n >= 5 && n <= 600 ? n : null;
+}
+
 export function cleanRequest(raw: Record<string, unknown>): VideoRequest {
   const type = PRODUCTION_TYPES.find((t) => t === raw.type) ?? 'Edição de vídeo';
   const formats: VideoRequest['formats'] = [];
@@ -179,12 +185,14 @@ export function cleanRequest(raw: Record<string, unknown>): VideoRequest {
   return {
     type,
     formats: formats.slice(0, 6),
-    durationSeconds: Math.round(num(raw.durationSeconds, 5, 600, 30)),
+    // Duração escrita no briefing ("vídeo de 69 segundos") vale mais que o padrão do formulário
+    durationSeconds: briefingSeconds(briefing) ?? Math.round(num(raw.durationSeconds, 5, 600, 30)),
     language: (Object.keys(LANGUAGES).find((l) => l === raw.language) as VideoRequest['language']) ?? 'pt-BR',
     captions: raw.captions === true,
     music: raw.music === 'source' ? 'source' : 'none',
     musicAssetId: id(raw.musicAssetId) || null,
-    narration: raw.narration === true,
+    // Briefing com falas de "Narração:" já pede narração
+    narration: raw.narration === true || /narra[çc][ãa]o\s*:/i.test(briefing),
     style: STYLES.find((s) => s === raw.style) ?? 'Liquid Glass',
     quality: (Object.keys(QUALITIES).find((q) => q === raw.quality) as VideoRequest['quality']) ?? 'alta',
     briefing,
