@@ -11,11 +11,11 @@ import {
   Library,
   LoaderCircle,
   RefreshCw,
-  Send,
   Sparkles,
   Upload,
 } from 'lucide-react';
-import type { Asset, State } from '@/lib/types';
+import type { Action, Asset, State } from '@/lib/types';
+import { PautaPicker, pautaBriefing, type Pauta } from './pauta-picker';
 import { directUpload } from '@/lib/client-upload';
 
 /**
@@ -97,6 +97,7 @@ type Job = {
   error: string;
   createdBy: string;
   createdAt: string;
+  sourceRef: { planning?: { postId: string; date: string; title: string; caption: string } } | null;
 };
 type Payload = { configured: boolean; workers: Worker[]; queue: number; jobs: Job[] };
 
@@ -124,7 +125,7 @@ const ago = (iso: string) => {
   return s < 60 ? `há ${s}s` : s < 3600 ? `há ${Math.round(s / 60)} min` : new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 };
 
-export function VideoMotion({ state, reload }: { state: State; reload: () => void }) {
+export function VideoMotion({ state, act, reload }: { state: State; act: Action; reload: () => void }) {
   const brands = state.brands;
   const [brandId, setBrandId] = useState(brands[0]?.id || '');
   const brand = brands.find((b) => b.id === brandId);
@@ -142,7 +143,9 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
   const [briefing, setBriefing] = useState('');
   const [assetIds, setAssetIds] = useState<string[]>([]);
   const [folderSel, setFolderSel] = useState<Record<string, string[]>>({});
-  const [origin, setOrigin] = useState<'upload' | 'library' | 'folder' | 'previous' | 'calendar'>('library');
+  const [origin, setOrigin] = useState<'upload' | 'library' | 'folder' | 'previous'>('library');
+  const [pauta, setPauta] = useState<Pauta | null>(null);
+  const [notice, setNotice] = useState('');
   const [uploading, setUploading] = useState('');
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -250,10 +253,49 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
             .filter(([, files]) => files.length)
             .map(([id, files]) => ({ id, files })),
         },
+        sourceRef: pauta ? JSON.stringify({ planning: { postId: pauta.postId, date: pauta.date, title: pauta.title || pauta.theme, caption: pauta.caption } }) : null,
       },
       'create',
     );
     if (d?.id) setSelected(d.id);
+  }
+
+  /** Aprova; com pauta do OxyPlanning, cria a peça (Vídeo) e envia como nova versão da publicação. */
+  async function approve(j: Job) {
+    const ok = await post({ action: 'approve', id: j.id }, 'approve');
+    if (!ok) return;
+    const ref = j.sourceRef?.planning;
+    if (!ref) return setNotice('Versão aprovada. O vídeo está na biblioteca da marca (Peças enviadas).');
+    setBusy('approve');
+    try {
+      const contentId = crypto.randomUUID();
+      await act('createExternal', {
+        id: contentId,
+        brandId: j.brandId,
+        title: (ref.title || j.title || 'Vídeo').slice(0, 200),
+        date: ref.date,
+        format: 'Vídeo',
+        brief: (j.request?.briefing || '').slice(0, 2000),
+        headline: j.plan?.title || ref.title || j.title,
+        copy: j.plan?.direction || '',
+        caption: ref.caption || '',
+        media: j.outputs.filter((o) => o.kind === 'video').map((o) => o.assetId),
+        change: `Video & Motion · versão ${j.version}`,
+      });
+      const r = await fetch('/api/openai/studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'planning', contentId, postId: ref.postId }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { planning?: string; error?: string };
+      if (!r.ok) throw new Error(d.error || 'Falha ao enviar ao OxyPlanning.');
+      setNotice(`Vídeo aprovado e enviado para a pauta “${ref.title || 'sem título'}” de ${d.planning} no OxyPlanning, para aprovação do cliente.`);
+      reload();
+    } catch (e) {
+      setError(`Versão aprovada aqui, mas não foi para o OxyPlanning: ${e instanceof Error ? e.message : 'falha'}.`);
+    } finally {
+      setBusy('');
+    }
   }
 
   return (
@@ -265,7 +307,7 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
           <p>Diga o que quer criar. A IA monta o roteiro e o OxyVideo edita, anima e renderiza de verdade. A versão pronta fica para revisão.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select aria-label="Marca" value={brandId} onChange={(e) => (setBrandId(e.target.value), setAssetIds([]), setMusicId(''), setSelected(''))} className="h-11 rounded-full border border-[rgb(15_21_64/.08)] bg-white px-4 text-[14px] font-semibold">
+          <select aria-label="Marca" value={brandId} onChange={(e) => (setBrandId(e.target.value), setAssetIds([]), setMusicId(''), setSelected(''), setPauta(null))} className="h-11 rounded-full border border-[rgb(15_21_64/.08)] bg-white px-4 text-[14px] font-semibold">
             {brands.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
@@ -284,6 +326,19 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
             <Clapperboard size={18} className="text-[#4700ff]" /> Nova produção
           </h2>
 
+          <PautaPicker
+            brandId={brandId}
+            selected={pauta}
+            only="video"
+            onPick={(p) => {
+              setPauta(p);
+              if (!p) return;
+              setBriefing(pautaBriefing(p) + '\n\nO que mais você quer no vídeo: ');
+              if (p.format === 'reel' || p.format === 'story') setType('Reels e Stories');
+              setFormats(['vertical']);
+            }}
+          />
+
           <div>
             <span className={label}>Conteúdos ({total} escolhido{total === 1 ? '' : 's'})</span>
             <div className="flex flex-wrap gap-1 rounded-[18px] bg-[rgb(15_21_64/.05)] p-1">
@@ -293,7 +348,6 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
                   ['upload', 'Enviar arquivos', Upload],
                   ['folder', 'Pasta do computador', FolderOpen],
                   ['previous', 'Produções anteriores', History],
-                  ['calendar', 'OxyCalendar', Send],
                 ] as const
               ).map(([k, l, Icon]) => (
                 <button key={k} type="button" className={pill(origin === k)} onClick={() => setOrigin(k)}>
@@ -340,12 +394,7 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
                 ) : (
                   <p className="text-[13.5px] text-[#737985]">Ainda não há produções prontas desta marca.</p>
                 )
-              ) : (
-                <p className="flex flex-wrap items-center gap-2 text-[13.5px] text-[#737985]">
-                  <span className="rounded-full bg-[#ebe4ff] px-2.5 py-1 text-[12px] font-semibold text-[#4700ff]">Em desenvolvimento</span>
-                  O botão “Enviar para Video &amp; Motion” nas tarefas do OxyCalendar chega na próxima etapa.
-                </p>
-              )}
+              ) : null}
             </div>
           </div>
 
@@ -446,6 +495,7 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
           </label>
 
           {error ? <p className="rounded-[12px] bg-[#fde2ea] px-3 py-2 text-[13.5px] text-[#b4235a]">{error}</p> : null}
+          {notice ? <p role="status" className="rounded-[12px] bg-[#dcfce7] px-3 py-2 text-[13.5px] text-[#15803d]">{notice}</p> : null}
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" className="create-btn" disabled={!!busy || !brandId || !briefing.trim() || !formats.length} onClick={() => void create()}>
               {busy === 'create' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} Criar com IA
@@ -596,8 +646,9 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
                       {busy === 'revise' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} Pedir alteração
                     </button>
                     {job.status === 'review' ? (
-                      <button type="button" className="outline-btn" disabled={!!busy} onClick={() => void post({ action: 'approve', id: job.id }, 'approve')}>
-                        <CheckCircle2 size={16} /> Aprovar
+                      <button type="button" className="outline-btn" disabled={!!busy} onClick={() => void approve(job)}>
+                        {busy === 'approve' ? <LoaderCircle size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{' '}
+                        {job.sourceRef?.planning ? 'Aprovar e enviar ao OxyPlanning' : 'Aprovar'}
                       </button>
                     ) : null}
                   </div>

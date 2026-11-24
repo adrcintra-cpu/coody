@@ -340,6 +340,7 @@ export function publicJob(j: JobRow) {
     createdAt: j.createdAt,
     updatedAt: j.updatedAt,
     finishedAt: j.finishedAt,
+    sourceRef: parse<{ planning?: { postId: string; date: string; title: string; caption: string } } | null>(j.sourceRef, null),
   };
 }
 

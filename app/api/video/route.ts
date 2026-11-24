@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         .prepare(
           "INSERT INTO video_jobs (id,workspaceId,brandId,title,status,stage,progress,request,version,rootId,createdBy,createdAt,updatedAt,sourceRef) VALUES (?,?,?,?,'queued','Na fila',0,?,1,?,?,?,?,?)",
         )
-        .bind(id, w.id, brandId, req.briefing.slice(0, 80), JSON.stringify(req), id, user.email, now, now, typeof data.sourceRef === 'string' ? data.sourceRef.slice(0, 400) : null)
+        .bind(id, w.id, brandId, req.briefing.slice(0, 80), JSON.stringify(req), id, user.email, now, now, sourceRef(data.sourceRef))
         .run();
       await log(user.id, 'video.create', id, req.type);
       return Response.json({ ok: true, id });
@@ -164,4 +164,18 @@ async function log(userId: string, action: string, entityId: string, detail: str
   })
     .run()
     .catch(() => undefined);
+}
+
+/** Origem da produção (pauta do OxyPlanning): JSON pequeno e validado. */
+function sourceRef(raw: unknown) {
+  if (typeof raw !== 'string' || raw.length > 6000) return null;
+  try {
+    const p = (JSON.parse(raw) as { planning?: Record<string, unknown> }).planning;
+    if (!p || typeof p.postId !== 'string' || !/^[A-Za-z0-9-]{8,80}$/.test(p.postId)) return null;
+    const s = (v: unknown, n: number) => (typeof v === 'string' ? v.slice(0, n) : '');
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(s(p.date, 10)) ? s(p.date, 10) : '';
+    return JSON.stringify({ planning: { postId: p.postId, date, title: s(p.title, 200), caption: s(p.caption, 2200) } });
+  } catch {
+    return null;
+  }
 }

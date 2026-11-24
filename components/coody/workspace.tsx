@@ -502,7 +502,7 @@ export default function Workspace() {
           ) : view === 'Criar' ? (
             <Create state={visible} act={act} reload={reload} />
           ) : view === 'Video & Motion' ? (
-            <VideoMotion state={visible} reload={reload} />
+            <VideoMotion state={visible} act={act} reload={reload} />
           ) : view === 'Dashboard' ? (
             <Dashboard
               state={visible}

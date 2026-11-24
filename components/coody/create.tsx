@@ -17,6 +17,7 @@ import {
 import type { Action, Brand, State } from '@/lib/types';
 import { today } from '@/lib/types';
 import { HUB_URL } from '@/lib/oxyhub';
+import { PautaPicker, pautaBriefing, type Pauta } from './pauta-picker';
 
 /**
  * Criar: o jeito simples de fazer post e carrossel.
@@ -217,6 +218,8 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const [imagePrompt, setImagePrompt] = useState('');
   const [date, setDate] = useState(today());
   const [hasDraft, setHasDraft] = useState(false);
+  // Pauta do OxyPlanning escolhida: a arte volta para a mesma publicação.
+  const [pauta, setPauta] = useState<Pauta | null>(null);
 
   const [chat, setChat] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -282,11 +285,11 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     imagePrompt,
   });
 
-  const ask = async (text: string) => {
+  const ask = async (text: string, fmt: 'post' | 'carousel' = format, fresh = false) => {
     const msg = text.trim();
     if (!msg || thinking) return;
     if (!brand) return setError('Escolha a marca primeiro.');
-    const next: Msg[] = [...chat, { role: 'user', text: msg }];
+    const next: Msg[] = [...(fresh ? [] : chat), { role: 'user', text: msg }];
     setChat(next);
     setInput('');
     setThinking(true);
@@ -298,10 +301,10 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
         body: JSON.stringify({
           action: 'director',
           brandId,
-          format,
-          slides: format === 'post' ? 1 : count,
+          format: fmt,
+          slides: fmt === 'post' ? 1 : count,
           messages: next.map((m) => ({ role: m.role, text: m.text })),
-          draft: hasDraft ? draftNow() : null,
+          draft: !fresh && hasDraft ? draftNow() : null,
         }),
       });
       const j = (await r.json()) as { reply?: string; concepts?: Piece[]; draft?: Piece | null; error?: string };
@@ -438,12 +441,14 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
       const r = await fetch('/api/openai/studio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'planning', contentId: id }),
+        body: JSON.stringify({ action: 'planning', contentId: id, postId: pauta?.postId }),
       });
       const j = (await r.json().catch(() => ({}))) as { planning?: string | null; error?: string };
       const when = new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
       if (!r.ok)
         setDone(`Peça salva para ${when} e já está no OxyCalendar. Não foi para o OxyPlanning: ${j.error || 'falha no envio'}. Envie pela Produção.`);
+      else if (j.planning && pauta)
+        setDone(`Arte enviada para a pauta “${pauta.title || 'sem título'}” de ${j.planning} no OxyPlanning, para aprovação do cliente. Está no OxyCalendar.`);
       else if (j.planning)
         setDone(`Peça salva para ${when}: está no OxyCalendar e foi para aprovação de ${j.planning === 'ja_enviada' ? 'o cliente' : j.planning} no OxyPlanning.`);
       else setDone(`Peça salva para ${when} e já está no OxyCalendar, aguardando aprovação. A marca não está ligada a um cliente do OxyPlanning.`);
@@ -456,6 +461,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   };
 
   const reset = () => {
+    setPauta(null);
     setSlides([blank(palette[0])]);
     setFormat('post');
     setCaption('');
@@ -519,6 +525,24 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
           <h2 className="flex items-center gap-2 text-[15px] font-bold">
             <Sparkles size={18} className="text-[#7c3aed]" /> Diretor de Criação
           </h2>
+          <div className="mt-3">
+            <PautaPicker
+              brandId={brandId}
+              selected={pauta}
+              only="image"
+              onPick={(p) => {
+                setPauta(p);
+                if (!p) return;
+                const fmt = p.format === 'carousel' ? 'carousel' : 'post';
+                setFormat(fmt);
+                setTitle(p.title || p.theme || '');
+                if (/^\d{4}-\d{2}-\d{2}$/.test(p.date)) setDate(p.date);
+                if (p.caption) setCaption(p.caption);
+                setHasDraft(false);
+                void ask(pautaBriefing(p) + '\n\nCrie a peça a partir desta pauta, respeitando o texto da arte e o objetivo.', fmt, true);
+              }}
+            />
+          </div>
           <div className="mt-3 flex-1 space-y-3 overflow-y-auto pr-1">
             {!chat.length ? (
               <div className="rounded-[14px] bg-[rgb(15_21_64/.03)] p-3 text-[13.5px] leading-relaxed text-[#4a505c]">

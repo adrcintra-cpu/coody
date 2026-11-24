@@ -7,7 +7,7 @@ import { assetRecord, validateUpload } from '@/lib/asset-upload';
 import { genericRule, parseDNA, responseText } from '@/lib/art-direction';
 import { IMAGE_MODEL } from '@/lib/image-model';
 import { apiAlert } from '@/lib/workspaces';
-import { brandLinks, contentLink, createInPlanning } from '@/lib/oxyplanning';
+import { brandLinks, contentLink, createInPlanning, sendToPlanningPost } from '@/lib/oxyplanning';
 
 /**
  * Editor "Criar" do OxyStudio.
@@ -17,7 +17,8 @@ import { brandLinks, contentLink, createInPlanning } from '@/lib/oxyplanning';
  *   lâmina pronto; com rascunho, ajusta a peça conforme o pedido. Só devolve texto (JSON).
  * POST { action: 'image', brandId, prompt }
  *   Gera a imagem de fundo de uma lâmina (sem texto: o texto é do editor) e guarda na biblioteca.
- * POST { action: 'planning', contentId }
+ * POST { action: 'planning', contentId, postId? }
+ *   Com postId (pauta do OxyPlanning): envia a arte como nova versão dessa publicação.
  *   Depois de salvar a peça, cria a publicação no cliente do OxyPlanning ligado à marca e envia
  *   para aprovação. Marca sem cliente ligado: não faz nada (a aprovação fica no OxyStudio).
  */
@@ -106,6 +107,16 @@ export async function POST(request: Request) {
     if (data.action === 'planning') {
       const item = state.contents.find((c) => c.id === data.contentId);
       if (!item) throw new Error('Peça não encontrada.');
+      const postId = str(data.postId, 80);
+      if (postId) {
+        const version = await database()
+          .prepare('SELECT * FROM content_versions WHERE contentId=? ORDER BY number DESC LIMIT 1')
+          .bind(item.id)
+          .first<Parameters<typeof sendToPlanningPost>[0]['version']>();
+        if (!version) throw new Error('Versão não encontrada.');
+        const client = await sendToPlanningPost({ postId, item, version, email: user.email });
+        return Response.json({ ok: true, planning: client, pauta: true });
+      }
       const link = (await brandLinks()).find((l) => l.brandId === item.brandId);
       if (!link) return Response.json({ ok: true, planning: null });
       if (await contentLink(item.id)) return Response.json({ ok: true, planning: 'ja_enviada' });

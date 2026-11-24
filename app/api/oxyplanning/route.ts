@@ -116,6 +116,8 @@ export async function GET(request: Request) {
           title: p.version?.title || '',
           theme: p.version?.theme || '',
           objective: p.version?.objective || '',
+          artText: p.version?.art_text || '',
+          caption: p.version?.caption || '',
           campaign: p.campaign?.name || '',
           extra: p.is_extraordinary,
           hasArt: !needsArt(p),

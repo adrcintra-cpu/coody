@@ -399,3 +399,42 @@ export async function createInPlanning(opts: {
     .run();
   return post_id;
 }
+
+/**
+ * Arte (imagem, carrossel ou vídeo) feita no OxyStudio A PARTIR de uma pauta do OxyPlanning: liga a
+ * peça à publicação e envia como nova versão dessa mesma publicação, para aprovação do cliente.
+ * Se a publicação já estava ligada a outra peça do OxyStudio, a ligação passa para esta.
+ */
+export async function sendToPlanningPost(opts: {
+  postId: string;
+  item: { id: string; brandId: string; title: string; pillar: string; objective: string; format: string };
+  version: VersionRow;
+  email: string;
+}) {
+  const { postId, item, version, email } = opts;
+  await ensurePlanningTables();
+  const link = (await brandLinks()).find((l) => l.brandId === item.brandId);
+  if (!link) throw new Error('A marca não está ligada a um cliente do OxyPlanning.');
+  const { posts } = await ponte<{ posts: { id: string; client_id: string; status: string; current_version_id: string | null }[] }>({
+    action: 'pautas',
+    client_ids: [link.clientId],
+    from: '2000-01-01',
+  });
+  const post = posts.find((p) => p.id === postId);
+  if (!post) throw new Error('Pauta não encontrada no OxyPlanning deste cliente.');
+  if (post.status === 'approved' || post.status === 'published') throw new Error('Esta pauta já foi aprovada no OxyPlanning.');
+  const db = database();
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare('DELETE FROM planning_content_links WHERE contentId=? AND postId<>?').bind(item.id, postId),
+    db
+      .prepare(
+        'INSERT INTO planning_content_links (contentId, postId, clientId, planningStatus, createdAt, baseVersionId) VALUES (?,?,?,?,?,?) ON CONFLICT(postId) DO UPDATE SET contentId=excluded.contentId',
+      )
+      .bind(item.id, postId, link.clientId, post.status, now, post.current_version_id),
+  ]);
+  const row = await contentLink(item.id);
+  if (!row) throw new Error('Não foi possível ligar a peça à pauta.');
+  await sendToPlanning({ link: row, item, version, email });
+  return link.clientName;
+}
