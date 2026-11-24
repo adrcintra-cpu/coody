@@ -41,6 +41,8 @@ import type { State, Action, Asset } from '@/lib/types';
 import { ReferenceSheet } from './art-direction';
 import { parseReferenceMeta, referenceCategories, type ReferenceMeta } from '@/lib/art-direction';
 export const categories = assetCategories.map((c) => c.label);
+type Kept = { id?: string; pieces?: { id: string; title: string; status: string }[]; name: string; reason: string };
+
 export function LibraryView({
   state,
   act,
@@ -68,7 +70,7 @@ export function LibraryView({
   const [removing, setRemoving] = useState(false);
   const [removal, setRemoval] = useState<{
     removed: string[];
-    kept: { name: string; reason: string }[];
+    kept: Kept[];
     error?: string;
   } | null>(null);
   const togglePick = (id: string) =>
@@ -83,7 +85,7 @@ export function LibraryView({
       });
       const d = (await r.json()) as {
         removed?: string[];
-        kept?: { name: string; reason: string }[];
+        kept?: Kept[];
         error?: string;
       };
       if (!r.ok) throw new Error(d.error || 'Não foi possível excluir.');
@@ -242,10 +244,42 @@ export function LibraryView({
                 </p>
               )}
               {removal.kept.map((k) => (
-                <p key={k.name}>
-                  <strong>{k.name}</strong> não foi excluído: {k.reason}. Troque a
-                  arte dessa peça ou exclua a peça antes.
-                </p>
+                <div key={k.name} className="space-y-2">
+                  <p>
+                    <strong>{k.name}</strong> não foi excluído: {k.reason}. É a arte dessa peça.
+                  </p>
+                  {k.pieces?.length && k.id ? (
+                    <div className="flex flex-wrap gap-2">
+                      {k.pieces.map((p) => (
+                        <a key={p.id} className="outline-btn" href={`#Studio?id=${encodeURIComponent(p.id)}`}>
+                          Abrir a peça “{p.title.slice(0, 40)}”
+                        </a>
+                      ))}
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          className="outline-btn danger"
+                          disabled={removing}
+                          onClick={async () => {
+                            const names = k.pieces!.map((p) => '“' + p.title + '”').join(', ');
+                            if (!window.confirm(`Mover ${names} para a lixeira de conteúdos e excluir o arquivo “${k.name}” de vez? A peça poderá ser restaurada, mas sem esta arte.`)) return;
+                            setRemoving(true);
+                            try {
+                              for (const p of k.pieces!) await act('deleteContent', { id: p.id });
+                            } catch (e) {
+                              setRemoving(false);
+                              setRemoval({ removed: [], kept: [], error: (e as Error).message });
+                              return;
+                            }
+                            await removeFiles([k.id!]);
+                          }}
+                        >
+                          Excluir a peça e o arquivo
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </>
           )}

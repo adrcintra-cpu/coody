@@ -81,7 +81,7 @@ export async function DELETE(request: Request) {
     const db = database();
     const workspace = await activeWorkspace(request);
     const removed: string[] = [];
-    const kept: { name: string; reason: string }[] = [];
+    const kept: { id?: string; pieces?: { id: string; title: string; status: string }[]; name: string; reason: string }[] = [];
     const blobs: string[] = [];
     for (const id of ids) {
       const asset = await db
@@ -98,15 +98,17 @@ export async function DELETE(request: Request) {
       const used = (
         await db
           .prepare(
-            'SELECT DISTINCT c.title, c.deletedAt FROM content_versions v JOIN content_items c ON c.id=v.contentId WHERE v.feedUrl=? OR v.storyUrl=? LIMIT 3',
+            'SELECT DISTINCT c.id, c.title, c.status, c.deletedAt FROM content_versions v JOIN content_items c ON c.id=v.contentId WHERE v.feedUrl=? OR v.storyUrl=? LIMIT 3',
           )
           .bind(asset.url, asset.url)
-          .all<{ title: string; deletedAt: string | null }>()
+          .all<{ id: string; title: string; status: string; deletedAt: string | null }>()
       ).results;
       // Só peças ativas seguram o arquivo. Peça que está na lixeira não impede a exclusão
       // (a lixeira não tem "excluir de vez" e a peça continua restaurável, só sem essa arte).
       if (used.some((u) => !u.deletedAt)) {
         kept.push({
+          id: asset.id,
+          pieces: used.filter((u) => !u.deletedAt).map((u) => ({ id: u.id, title: u.title, status: u.status })),
           name: asset.name,
           reason:
             'usado na arte de ' +
