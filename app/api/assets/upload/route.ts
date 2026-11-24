@@ -21,6 +21,13 @@ const allowedTypes = [
   'video/quicktime',
   'video/webm',
   'application/pdf',
+  // Video & Motion: trilhas e áudios de entrevista
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/aac',
+  'audio/wav',
+  'audio/x-wav',
 ];
 export const MAX_DIRECT_MB = 500;
 const keyPattern = /^brands\/([A-Za-z0-9-]{1,80})\/([0-9a-f-]{36})$/;

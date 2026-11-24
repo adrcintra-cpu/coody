@@ -176,6 +176,7 @@ export type State = {
 };
 export type View =
   | 'Criar'
+  | 'Video & Motion'
   | 'Dashboard'
   | 'Pautas'
   | 'Planejamento'

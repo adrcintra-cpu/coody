@@ -27,6 +27,7 @@ import {
   PanelLeftOpen,
   Wand2,
   ArrowUpRight,
+  Clapperboard,
 } from 'lucide-react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -49,12 +50,14 @@ import { Studio } from './studio';
 import { Integrations, Settings } from './settings';
 import { ContentForm } from './forms';
 import { Create } from './create';
+import { VideoMotion } from './video-motion';
 import { today } from '@/lib/types';
 import { activeState } from '@/lib/brand-lifecycle';
 import type { View, State, Content, Action } from '@/lib/types';
-type NavName = 'Criar' | 'Dashboard' | 'Pautas' | 'Calendário' | 'Conteúdos' | 'Marcas' | 'Produção' | 'Biblioteca' | 'Integrações' | 'Configurações';
+type NavName = 'Criar' | 'Video & Motion' | 'Dashboard' | 'Pautas' | 'Calendário' | 'Conteúdos' | 'Marcas' | 'Produção' | 'Biblioteca' | 'Integrações' | 'Configurações';
 const ICON_OF: Record<NavName, typeof LayoutDashboard> = {
   Criar: Wand2,
+  'Video & Motion': Clapperboard,
   Dashboard: LayoutDashboard,
   Pautas: Inbox,
   Calendário: CalendarDays,
@@ -69,7 +72,7 @@ const ICON_OF: Record<NavName, typeof LayoutDashboard> = {
 // OxyStudio simplificado (24/11/2026): criar, ver no calendário (OxyCalendar) e cuidar das marcas.
 // As outras telas continuam no endereço (#Produção, #Biblioteca…) para links antigos e notificações.
 const GROUPS: { label: string; items: NavName[] }[] = [
-  { label: 'Estúdio', items: ['Criar', 'Calendário', 'Marcas'] },
+  { label: 'Estúdio', items: ['Criar', 'Video & Motion', 'Calendário', 'Marcas'] },
 ];
 export default function Workspace() {
   const [view, setView] = useState<View>('Criar');
@@ -498,6 +501,8 @@ export default function Workspace() {
             )
           ) : view === 'Criar' ? (
             <Create state={visible} act={act} reload={reload} />
+          ) : view === 'Video & Motion' ? (
+            <VideoMotion state={visible} reload={reload} />
           ) : view === 'Dashboard' ? (
             <Dashboard
               state={visible}
