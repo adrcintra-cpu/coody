@@ -696,7 +696,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
           <h2 className="text-[15px] font-bold">{total > 1 ? `Lâmina ${current + 1} de ${total}` : 'Arte'}</h2>
           <div>
             <span className={label}>Modelo</span>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid max-w-[640px] grid-cols-[repeat(auto-fill,minmax(68px,1fr))] gap-2">
               {LAYOUTS.map((l) => {
                 const on = s.layout === l.key;
                 return (
