@@ -18,6 +18,7 @@ import type { Action, Brand, State } from '@/lib/types';
 import { today } from '@/lib/types';
 import { HUB_URL } from '@/lib/oxyhub';
 import { PautaPicker, pautaBriefing, type Pauta } from './pauta-picker';
+import { LayoutThumb } from './layout-thumb';
 import { H, LAYOUTS, W, blankSlide, drawSlide, imageLuma, isLayout, type ArtSlide, type Layout } from './art-layouts';
 
 /**
@@ -351,7 +352,9 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     setBusy('subject');
     setError('');
     try {
-      patch({ subject: await makeSubject(prompt) });
+      const url = await makeSubject(prompt);
+      // Modelo sem objeto: passa para o Recorte, para o produto aparecer na arte
+      patch(LAYOUTS.find((l) => l.key === s.layout)?.subject ? { subject: url } : { subject: url, layout: 'recorte' });
       await reload().catch(() => undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível gerar o objeto.');
@@ -693,27 +696,77 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
           <h2 className="text-[15px] font-bold">{total > 1 ? `Lâmina ${current + 1} de ${total}` : 'Arte'}</h2>
           <div>
             <span className={label}>Modelo</span>
-            <div className="grid grid-cols-4 gap-1.5">
-              {LAYOUTS.map((l) => (
-                <button
-                  key={l.key}
-                  type="button"
-                  title={l.hint}
-                  aria-pressed={s.layout === l.key}
-                  onClick={() => patch({ layout: l.key })}
-                  className={
-                    'h-9 rounded-full px-2 text-[12.5px] font-semibold transition-colors ' +
-                    (s.layout === l.key ? 'bg-[#4700ff] text-white' : 'bg-[rgb(15_21_64/.05)] text-[#4a505c] hover:bg-[rgb(15_21_64/.09)]')
-                  }
-                >
-                  {l.label}
-                </button>
-              ))}
+            <div className="grid grid-cols-4 gap-2">
+              {LAYOUTS.map((l) => {
+                const on = s.layout === l.key;
+                return (
+                  <button key={l.key} type="button" title={l.hint} aria-pressed={on} onClick={() => patch({ layout: l.key })} className="group flex flex-col items-center gap-1">
+                    <span
+                      className={
+                        'block aspect-[4/5] w-full overflow-hidden rounded-[10px] transition ' +
+                        (on ? 'ring-2 ring-[#4700ff] ring-offset-2' : 'shadow-[0_0_0_1px_rgb(15_21_64/.1)] group-hover:shadow-[0_0_0_1px_rgb(15_21_64/.25)]')
+                      }
+                    >
+                      <LayoutThumb layout={l.key} on={on} />
+                    </span>
+                    <span className={'w-full truncate text-center text-[11.5px] ' + (on ? 'font-bold text-[#4700ff]' : 'font-medium text-[#4a505c]')}>{l.label}</span>
+                  </button>
+                );
+              })}
             </div>
             <p className="mt-1.5 text-[12px] text-[#737985]">
               {LAYOUTS.find((l) => l.key === s.layout)?.hint}.{' '}
               {LAYOUTS.find((l) => l.key === s.layout)?.photo === 'sim' && !s.image ? 'Escolha uma foto da biblioteca abaixo.' : ''}
             </p>
+          </div>
+          <div className="rounded-[16px] bg-[rgb(71_0_255/.04)] p-3 shadow-[0_0_0_1px_rgb(71_0_255/.12)]">
+            <div className="space-y-2">
+              <span className={label}>Produto</span>
+              {products.length ? (
+                <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Produtos da biblioteca">
+                  {products.map((a) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={a.id}
+                      src={a.url}
+                      alt={a.name}
+                      loading="lazy"
+                      decoding="async"
+                      title={product?.id === a.id ? 'Produto escolhido (clique para tirar)' : 'Usar este produto'}
+                      onClick={() => setProduct((p) => (p?.id === a.id ? null : { id: a.id, url: a.url, name: a.name }))}
+                      className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (product?.id === a.id ? 'ring-2 ring-[#4700ff] ring-offset-1' : 'opacity-85 hover:opacity-100')}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[12px] text-[#737985]">Nenhuma foto de produto na biblioteca desta marca. Envie em Biblioteca → Fotos de produto.</p>
+              )}
+              {product ? <p className="text-[12.5px] font-semibold text-[#4700ff]">Produto escolhido: {product.name.slice(0, 60)}. A IA recorta o produto real, sem inventar peças.</p> : null}
+              {!LAYOUTS.find((l) => l.key === s.layout)?.subject ? (
+                <p className="text-[12px] text-[#737985]">Ao criar o objeto ou recortar o produto, a lâmina passa para o modelo Recorte (dá para trocar depois por Vidro, Gigante ou Pôster).</p>
+              ) : null}
+              <span className={label}>{product ? 'Observação para o recorte (opcional)' : 'Objeto 3D (recorte da IA)'}</span>
+              <textarea rows={2} value={subjectPrompt} onChange={(e) => setSubjectPrompt(e.target.value)} placeholder="Ex.: um cérebro de cerâmica branca; uma folha com gota d’água; um megafone de vidro" className={field + ' resize-none'} />
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="create-btn" disabled={!!busy} onClick={() => void generateSubject()}>
+                  {busy === 'subject' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy === 'subject' ? (product ? 'Recortando o produto…' : 'Criando o objeto…') : product ? 'Recortar o produto com IA' : 'Criar objeto com IA'}
+                </button>
+                {s.subject ? (
+                  <button type="button" className="outline-btn" onClick={() => patch({ subject: '' })} aria-label="Tirar objeto">
+                    <Trash2 size={16} />
+                  </button>
+                ) : null}
+              </div>
+              {subjects.length ? (
+                <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Objetos já criados">
+                  {subjects.map((a) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={a.id} src={a.url} alt={a.name} title={a.name} loading="lazy" decoding="async" onClick={() => patch(LAYOUTS.find((l) => l.key === s.layout)?.subject ? { subject: a.url } : { subject: a.url, layout: 'recorte' })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:12px_12px] object-contain ' + (s.subject === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
+                  ))}
+                </div>
+              ) : null}
+              <p className="text-[12px] text-[#737985]">A IA cria só o objeto, com fundo transparente; o layout, a tipografia e as cores da marca são montados aqui, com o texto sempre certo.</p>
+            </div>
           </div>
           <label className="block">
             <span className={label}>Sobretítulo</span>
@@ -747,50 +800,6 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
               <input type="color" aria-label="Outra cor" value={s.bg} onChange={(e) => patch({ bg: e.target.value, image: '' })} className="size-8 cursor-pointer rounded-full border-0 bg-transparent p-0" />
             </div>
           </div>
-          {LAYOUTS.find((l) => l.key === s.layout)?.subject ? (
-            <div className="space-y-2">
-              <span className={label}>Produto da biblioteca (opcional)</span>
-              {products.length ? (
-                <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Produtos da biblioteca">
-                  {products.map((a) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      key={a.id}
-                      src={a.url}
-                      alt={a.name}
-                      loading="lazy"
-                      decoding="async"
-                      title={product?.id === a.id ? 'Produto escolhido (clique para tirar)' : 'Usar este produto'}
-                      onClick={() => setProduct((p) => (p?.id === a.id ? null : { id: a.id, url: a.url, name: a.name }))}
-                      className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (product?.id === a.id ? 'ring-2 ring-[#4700ff] ring-offset-1' : 'opacity-85 hover:opacity-100')}
-                    />
-                  ))}
-                </div>
-              ) : null}
-              {product ? <p className="text-[12.5px] font-semibold text-[#4700ff]">Produto escolhido: {product.name.slice(0, 60)}. A IA recorta o produto real, sem inventar peças.</p> : null}
-              <span className={label}>{product ? 'Observação para o recorte (opcional)' : 'Objeto 3D (recorte da IA)'}</span>
-              <textarea rows={2} value={subjectPrompt} onChange={(e) => setSubjectPrompt(e.target.value)} placeholder="Ex.: um cérebro de cerâmica branca; uma folha com gota d’água; um megafone de vidro" className={field + ' resize-none'} />
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="create-btn" disabled={!!busy} onClick={() => void generateSubject()}>
-                  {busy === 'subject' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy === 'subject' ? (product ? 'Recortando o produto…' : 'Criando o objeto…') : product ? 'Recortar o produto com IA' : 'Criar objeto com IA'}
-                </button>
-                {s.subject ? (
-                  <button type="button" className="outline-btn" onClick={() => patch({ subject: '' })} aria-label="Tirar objeto">
-                    <Trash2 size={16} />
-                  </button>
-                ) : null}
-              </div>
-              {subjects.length ? (
-                <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Objetos já criados">
-                  {subjects.map((a) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={a.id} src={a.url} alt={a.name} title={a.name} loading="lazy" decoding="async" onClick={() => patch({ subject: a.url })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:12px_12px] object-contain ' + (s.subject === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
-                  ))}
-                </div>
-              ) : null}
-              <p className="text-[12px] text-[#737985]">A IA cria só o objeto, com fundo transparente; o layout, a tipografia e as cores da marca são montados aqui, com o texto sempre certo.</p>
-            </div>
-          ) : null}
           {LAYOUTS.find((l) => l.key === s.layout)?.photo !== 'não' ? (
           <div className="space-y-2">
             <span className={label}>{s.layout === 'recorte' ? 'Foto dentro da forma (opcional)' : 'Imagem de fundo'}</span>
