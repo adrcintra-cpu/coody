@@ -513,7 +513,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
         </p>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(280px,340px)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 xl:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(280px,340px)]">
         {/* Diretor de Criação */}
         <section className="glass flex min-h-[420px] flex-col rounded-[22px] p-4 xl:h-[calc(100svh-240px)]">
           <h2 className="flex items-center gap-2 text-[15px] font-bold">
