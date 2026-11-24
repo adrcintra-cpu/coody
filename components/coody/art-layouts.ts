@@ -497,20 +497,23 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     ctx.font = n.font;
     const nw = ctx.measureText(big).width;
     const baseY = Math.min(H - 170, y + 60 + n.size * 0.78);
-    ctx.fillStyle = isLight(s.bg) ? shade(s.bg, -0.18) : alpha('#ffffff', 0.9);
+    // O número na cor do texto (contraste garantido); o objeto apoiado na base dele, sem escondê-lo
+    ctx.fillStyle = alpha(ink, isLight(s.bg) ? 0.88 : 0.92);
     ctx.fillText(big, (W - nw) / 2, baseY);
-    if (env.subject) drawSubject(ctx, env.subject, W / 2, baseY - n.size * 0.32, W * 0.82, n.size * 0.95, 0.45);
-    else if (env.preview) subjectSlot(ctx, W / 2, baseY - n.size * 0.35, 360, ink, f);
+    if (env.subject) drawSubject(ctx, env.subject, W / 2 + nw * 0.18, baseY - n.size * 0.2, Math.min(W * 0.62, nw * 1.1), n.size * 0.62, 0.45);
+    else if (env.preview) subjectSlot(ctx, W / 2 + nw * 0.18, baseY - n.size * 0.22, 300, ink, f);
     if (s.text) {
-      const b = fit(ctx, s.text, 500, f, 380, 5, 30, 24);
-      drawLines(ctx, b, W - M - 380, baseY - n.size * 0.42, 1.6, alpha(ink, 0.92), r2.hi);
+      const b = fit(ctx, s.text.replace(/\n/g, ' · '), 500, f, W - M * 2, 2, 30, 24);
+      centered(ctx, b, Math.min(H - 150, baseY + 40), 1.4, alpha(ink, 0.85), r2.hi, false);
     }
     footer(ctx, env, ink, H - 60, false);
   } else if (layout === 'poster') {
     // Fundo suave em luz difusa, objeto no alto, fio de ligação e título centralizado
-    ctx.fillStyle = shade(s.bg, isLight(s.bg) ? 0 : 0.55);
+    const pbg = isLight(s.bg) && saturation(s.bg) < 0.3 ? s.bg : '#eef0f5';
+    ctx.fillStyle = pbg;
     ctx.fillRect(0, 0, W, H);
-    const blobs = [env.palette[0], env.palette[2] || env.palette[1] || '#2563eb', env.palette[1] || '#7c3aed'];
+    // Luz difusa nas cores da marca (a cor escolhida primeiro)
+    const blobs = [s.bg, env.palette[1] || '#2563eb', env.palette[2] || env.palette[0] || '#7c3aed'];
     [
       [W * 0.1, H * 0.45, 420],
       [W * 0.95, H * 0.5, 460],
@@ -522,8 +525,8 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       ctx.fillStyle = gr;
       ctx.fillRect(0, 0, W, H);
     });
-    const ink = s.tone === 'dark' ? '#0f1540' : s.tone === 'light' ? '#ffffff' : '#0f1540';
-    const r2 = roles(env.palette, '#eef0f6');
+    const ink = s.tone === 'light' ? '#ffffff' : '#0f1540';
+    const r2 = roles(env.palette, pbg);
     let box = { x: W / 2 - 200, y: 160, w: 400, h: 420 };
     if (env.subject) box = drawSubject(ctx, env.subject, W / 2, 380, W * 0.62, 520, 0.22);
     else if (env.preview) subjectSlot(ctx, W / 2, 380, 380, ink, f);
