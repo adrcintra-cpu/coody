@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
 export const metadata: Metadata = {
-  title: 'OxyStudio — Workspace criativo',
+  title: 'OxyStudio · Oxyhub',
   description:
     'Planejamento editorial, inteligência de marca, produção criativa e aprovação.',
   // App icon: browser tab, home screen (iOS/Android) and installed app.

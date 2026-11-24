@@ -162,6 +162,10 @@ export default function Workspace() {
     },
     [month],
   );
+  // Nome da aba no padrão Oxyhub: "Página · OxyStudio · Oxyhub"
+  useEffect(() => {
+    document.title = `${view === 'Studio' ? 'Peça' : view} · OxyStudio · Oxyhub`;
+  }, [view]);
   const navigate = useCallback(
     (v: View, details: Record<string, string> = {}) => {
       if (view === 'Studio' && studioDirty) {
