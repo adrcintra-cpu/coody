@@ -31,7 +31,7 @@ import { H, LAYOUTS, W, blankSlide, drawSlide, isLayout, type ArtSlide, type Lay
 
 type Slide = ArtSlide;
 type PieceSlide = { layout: Layout; eyebrow: string; title: string; text: string };
-type Piece = { name: string; idea: string; slides: PieceSlide[]; caption: string; hashtags: string[]; imagePrompt: string };
+type Piece = { name: string; idea: string; slides: PieceSlide[]; caption: string; hashtags: string[]; imagePrompt: string; subjectPrompt: string };
 type Msg = { role: 'user' | 'director'; text: string; concepts?: Piece[] };
 
 /** Cores da marca a partir do texto livre do cadastro (#hex); sem cores, a paleta Oxy. */
@@ -63,11 +63,11 @@ function loadImage(src: string) {
 type EnvBase = { family: string; palette: string[]; logo: string; signature: string };
 
 /** Desenha a lâmina num canvas (o mesmo desenho da prévia e do PNG). */
-async function paint(canvas: HTMLCanvasElement, s: Slide, base: EnvBase, index: number, total: number) {
-  const [logo, image] = await Promise.all([loadImage(base.logo), loadImage(s.image)]);
+async function paint(canvas: HTMLCanvasElement, s: Slide, base: EnvBase, index: number, total: number, preview = false) {
+  const [logo, image, subject] = await Promise.all([loadImage(base.logo), loadImage(s.image), loadImage(s.subject)]);
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  drawSlide(ctx, s, { family: base.family, palette: base.palette, logo, image, index, total, signature: base.signature });
+  drawSlide(ctx, s, { family: base.family, palette: base.palette, logo, image, subject, preview, index, total, signature: base.signature });
 }
 
 /** Prévia ao vivo: canvas em tamanho real (1080×1350), reduzido por CSS. */
@@ -78,7 +78,7 @@ function CanvasArt({ s, base, index, total, width }: { s: Slide; base: EnvBase; 
     const off = document.createElement('canvas');
     off.width = W;
     off.height = H;
-    void paint(off, s, base, index, total).then(() => {
+    void paint(off, s, base, index, total, true).then(() => {
       const c = ref.current;
       if (!alive || !c) return;
       c.getContext('2d')?.drawImage(off, 0, 0);
@@ -123,8 +123,12 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     () => state.assets.find((a) => a.brandId === brandId && a.category === 'logo' && /^image\//.test(a.mime))?.url || '',
     [state.assets, brandId],
   );
+  const subjects = useMemo(
+    () => state.assets.filter((a) => a.brandId === brandId && a.mime === 'image/png' && /^Criar · objeto/.test(a.name)).slice(0, 30),
+    [state.assets, brandId],
+  );
   const images = useMemo(
-    () => state.assets.filter((a) => a.brandId === brandId && /^image\/(png|jpe?g|webp)/.test(a.mime) && a.category !== 'logo').slice(0, 60),
+    () => state.assets.filter((a) => a.brandId === brandId && /^image\/(png|jpe?g|webp)/.test(a.mime) && a.category !== 'logo' && !/^Criar · objeto/.test(a.name)).slice(0, 60),
     [state.assets, brandId],
   );
 
@@ -136,6 +140,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const [hashtags, setHashtags] = useState('');
   const [title, setTitle] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
+  const [subjectPrompt, setSubjectPrompt] = useState('');
   const [date, setDate] = useState(today());
   const [hasDraft, setHasDraft] = useState(false);
   // Pauta do OxyPlanning escolhida: a arte volta para a mesma publicação.
@@ -144,7 +149,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const [chat, setChat] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [busy, setBusy] = useState<'' | 'image' | 'save' | 'download' | 'upload'>('');
+  const [busy, setBusy] = useState<'' | 'image' | 'subject' | 'save' | 'download' | 'upload'>('');
   const [error, setError] = useState('');
   const [done, setDone] = useState('');
   const chatEnd = useRef<HTMLDivElement>(null);
@@ -198,7 +203,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const resize = (n: number) =>
     setSlides((all) => {
       const next = all.slice(0, n);
-      while (next.length < n) next.push({ ...blank(all[all.length - 1]?.bg || palette[0], all[all.length - 1]?.layout), image: all[all.length - 1]?.image || '', dim: all[all.length - 1]?.dim ?? 30 });
+      while (next.length < n) next.push({ ...blank(all[all.length - 1]?.bg || palette[0], all[all.length - 1]?.layout), image: all[all.length - 1]?.image || '', subject: all[all.length - 1]?.subject || '', dim: all[all.length - 1]?.dim ?? 30 });
       return next;
     });
   useEffect(() => {
@@ -222,6 +227,8 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     setHashtags(p.hashtags.join(' '));
     setTitle((t) => t || p.name);
     setImagePrompt(p.imagePrompt);
+    setSubjectPrompt(p.subjectPrompt || '');
+    void autoArt(p);
     setHasDraft(true);
     setCurrent(0);
   };
@@ -232,6 +239,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     caption,
     hashtags: hashtags.split(/\s+/).filter(Boolean),
     imagePrompt,
+    subjectPrompt,
   });
 
   const ask = async (text: string, fmt: 'post' | 'carousel' = format, fresh = false) => {
@@ -265,6 +273,69 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
       setError(e instanceof Error ? e.message : 'O Diretor de Criação não respondeu.');
     } finally {
       setThinking(false);
+    }
+  };
+
+  /** Gera com a IA um objeto recortado (PNG com fundo transparente) para os modelos de composição. */
+  const makeSubject = async (prompt: string) => {
+    const r = await fetch('/api/openai/studio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'image', kind: 'subject', brandId, prompt }),
+    });
+    const j = (await r.json()) as { url?: string; error?: string };
+    if (!r.ok || !j.url) throw new Error(j.error || 'Não foi possível gerar o objeto.');
+    return j.url;
+  };
+  const makeScene = async (prompt: string) => {
+    const r = await fetch('/api/openai/studio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'image', brandId, prompt }),
+    });
+    const j = (await r.json()) as { url?: string; error?: string };
+    if (!r.ok || !j.url) throw new Error(j.error || 'Não foi possível gerar a imagem.');
+    return j.url;
+  };
+  /** Ao escolher um conceito, a IA já produz o objeto e/ou a foto que os modelos escolhidos pedem. */
+  const autoArt = async (p: Piece) => {
+    // Só gera o que falta (ajustes do rascunho não refazem imagens que já existem)
+    const needSubject = p.subjectPrompt && p.slides.some((x, i) => LAYOUTS.find((l) => l.key === x.layout)?.subject && !slides[i]?.subject);
+    const needPhoto = p.imagePrompt && p.slides.some((x, i) => LAYOUTS.find((l) => l.key === x.layout)?.photo === 'sim' && !slides[i]?.image);
+    if (!needSubject && !needPhoto) return;
+    setBusy('image');
+    setError('');
+    try {
+      const [subject, photo] = await Promise.all([
+        needSubject ? makeSubject(p.subjectPrompt) : Promise.resolve(''),
+        needPhoto ? makeScene(p.imagePrompt) : Promise.resolve(''),
+      ]);
+      setSlides((all) =>
+        all.map((x) => ({
+          ...x,
+          ...(subject && LAYOUTS.find((l) => l.key === x.layout)?.subject && !x.subject ? { subject } : {}),
+          ...(photo && LAYOUTS.find((l) => l.key === x.layout)?.photo === 'sim' && !x.image ? { image: photo } : {}),
+        })),
+      );
+      await reload().catch(() => undefined);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'A IA não conseguiu produzir as imagens.');
+    } finally {
+      setBusy('');
+    }
+  };
+  const generateSubject = async () => {
+    const prompt = (subjectPrompt || s.title || title).trim();
+    if (!prompt) return setError('Descreva o objeto que a IA deve criar.');
+    setBusy('subject');
+    setError('');
+    try {
+      patch({ subject: await makeSubject(prompt) });
+      await reload().catch(() => undefined);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Não foi possível gerar o objeto.');
+    } finally {
+      setBusy('');
     }
   };
 
@@ -654,6 +725,31 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
               <input type="color" aria-label="Outra cor" value={s.bg} onChange={(e) => patch({ bg: e.target.value, image: '' })} className="size-8 cursor-pointer rounded-full border-0 bg-transparent p-0" />
             </div>
           </div>
+          {LAYOUTS.find((l) => l.key === s.layout)?.subject ? (
+            <div className="space-y-2">
+              <span className={label}>Objeto 3D (recorte da IA)</span>
+              <textarea rows={2} value={subjectPrompt} onChange={(e) => setSubjectPrompt(e.target.value)} placeholder="Ex.: um cérebro de cerâmica branca; uma folha com gota d’água; um megafone de vidro" className={field + ' resize-none'} />
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="create-btn" disabled={!!busy} onClick={() => void generateSubject()}>
+                  {busy === 'subject' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy === 'subject' ? 'Criando o objeto…' : 'Criar objeto com IA'}
+                </button>
+                {s.subject ? (
+                  <button type="button" className="outline-btn" onClick={() => patch({ subject: '' })} aria-label="Tirar objeto">
+                    <Trash2 size={16} />
+                  </button>
+                ) : null}
+              </div>
+              {subjects.length ? (
+                <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Objetos já criados">
+                  {subjects.map((a) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={a.id} src={a.url} alt={a.name} title={a.name} onClick={() => patch({ subject: a.url })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:12px_12px] object-contain ' + (s.subject === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
+                  ))}
+                </div>
+              ) : null}
+              <p className="text-[12px] text-[#737985]">A IA cria só o objeto, com fundo transparente; o layout, a tipografia e as cores da marca são montados aqui, com o texto sempre certo.</p>
+            </div>
+          ) : null}
           <div className="space-y-2">
             <span className={label}>Imagem de fundo</span>
             <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="Descreva a imagem (sem texto): ex. mesa de café da manhã com luz natural" className={field + ' resize-none'} />

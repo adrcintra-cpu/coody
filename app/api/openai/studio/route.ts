@@ -31,7 +31,7 @@ const slideSchema = {
   additionalProperties: false,
   required: ['layout', 'eyebrow', 'title', 'text'],
   properties: {
-    layout: { type: 'string', enum: ['manchete', 'editorial', 'moldura', 'faixa', 'foto', 'numero', 'lista', 'citacao'] },
+    layout: { type: 'string', enum: ['recorte', 'vidro', 'gigante', 'poster', 'manchete', 'editorial', 'moldura', 'faixa', 'foto', 'numero', 'lista', 'citacao'] },
     eyebrow: { type: 'string' },
     title: { type: 'string' },
     text: { type: 'string' },
@@ -40,7 +40,7 @@ const slideSchema = {
 const pieceSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['name', 'idea', 'slides', 'caption', 'hashtags', 'imagePrompt'],
+  required: ['name', 'idea', 'slides', 'caption', 'hashtags', 'imagePrompt', 'subjectPrompt'],
   properties: {
     name: { type: 'string' },
     idea: { type: 'string' },
@@ -48,6 +48,7 @@ const pieceSchema = {
     caption: { type: 'string' },
     hashtags: { type: 'array', items: { type: 'string' } },
     imagePrompt: { type: 'string' },
+    subjectPrompt: { type: 'string' },
   },
 };
 const directorSchema = {
@@ -62,7 +63,7 @@ const directorSchema = {
 };
 
 type Slide = { layout: string; eyebrow: string; title: string; text: string };
-type Piece = { name: string; idea: string; slides: Slide[]; caption: string; hashtags: string[]; imagePrompt: string };
+type Piece = { name: string; idea: string; slides: Slide[]; caption: string; hashtags: string[]; imagePrompt: string; subjectPrompt: string };
 
 const str = (v: unknown, n: number) => (typeof v === 'string' ? v.trim().slice(0, n) : '');
 /** Exatamente 5 hashtags válidas (regra do OxyStudio). */
@@ -76,7 +77,7 @@ function tags(list: unknown): string[] {
 }
 function cleanPiece(p: Piece | null, slides: number): Piece | null {
   if (!p) return null;
-  const LAYOUTS = ['manchete', 'editorial', 'moldura', 'faixa', 'foto', 'numero', 'lista', 'citacao'];
+  const LAYOUTS = ['recorte', 'vidro', 'gigante', 'poster', 'manchete', 'editorial', 'moldura', 'faixa', 'foto', 'numero', 'lista', 'citacao'];
   const list = (Array.isArray(p.slides) ? p.slides : []).slice(0, 10).map((s) => ({
     layout: LAYOUTS.includes(s.layout) ? s.layout : 'manchete',
     eyebrow: str(s.eyebrow, 40),
@@ -91,6 +92,7 @@ function cleanPiece(p: Piece | null, slides: number): Piece | null {
     caption: str(p.caption, 2200),
     hashtags: tags(p.hashtags),
     imagePrompt: str(p.imagePrompt, 800),
+    subjectPrompt: str(p.subjectPrompt, 600),
   };
 }
 
@@ -144,6 +146,39 @@ export async function POST(request: Request) {
     if (!brand) throw new Error('Escolha uma marca.');
     if (!apiKey()) throw new Error('Configure a chave OpenAI para usar o Diretor de Criação.');
     const dna = parseDNA(brand.artDNA);
+
+    if (data.action === 'image' && data.kind === 'subject') {
+      // Objeto isolado com fundo transparente: o layout e o texto são montados no editor.
+      const prompt = str(data.prompt, 800);
+      if (!prompt) throw new Error('Descreva o objeto.');
+      const result = await openaiRequest(apiKey(), 'images/generations', {
+        model: IMAGE_MODEL,
+        n: 1,
+        quality: 'high',
+        output_format: 'png',
+        background: 'transparent',
+        size: '1024x1024',
+        prompt:
+          'Um único objeto isolado, inteiro e centralizado, com FUNDO TRANSPARENTE (sem chão, sem cenário, sem sombra no chão). ' +
+          'Estilo: fotografia de produto de estúdio / render 3D hiper-realista de design premium, materiais táteis (cerâmica, vidro fosco, metal escovado, papel, folhas reais), iluminação suave de softbox, sombras internas sutis, acabamento limpo. ' +
+          'Sem texto, letras, números, logotipos ou marca d’água. Sem pessoas. ' +
+          'Cores coerentes com a marca ' + brand.name + ' (' + (brand.colors || 'livre') + ') quando fizer sentido. Objeto: ' + prompt,
+      });
+      const encoded = (result.data as { b64_json?: string }[] | undefined)?.[0]?.b64_json;
+      if (!encoded || encoded.length > 28 * 1024 * 1024) throw new OpenAIError('A OpenAI devolveu uma imagem vazia ou muito grande.');
+      const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+      const file = new File([bytes], 'objeto-ia.png', { type: 'image/png' });
+      await validateUpload(file);
+      const asset = assetRecord(file, brand.id, {
+        name: ('Criar · objeto IA · ' + prompt).slice(0, 200),
+        category: 'visual_reference',
+        description: prompt,
+        aiNotes: 'Objeto recortado (fundo transparente) gerado com OpenAI no editor Criar. Revisão humana necessária.',
+      });
+      await bucket().put('brands/' + brand.id + '/' + asset.id, bytes, { httpMetadata: { contentType: 'image/png' } });
+      await insert('brand_assets', asset).run();
+      return Response.json({ url: asset.url, assetId: asset.id });
+    }
 
     if (data.action === 'image') {
       const prompt = str(data.prompt, 1200);
@@ -205,6 +240,7 @@ export async function POST(request: Request) {
           ? 'Já existe um rascunho (campo "rascunhoAtual"). Faça EXATAMENTE o ajuste pedido na última mensagem e devolva a peça inteira atualizada em "draft". Em "concepts" devolva uma lista vazia. Em "reply" diga em uma ou duas frases o que mudou.'
           : 'Ainda não há rascunho. Se o pedido estiver claro, proponha de 2 a 3 conceitos diferentes em "concepts" (cada um com nome curto, a ideia em uma frase e todas as lâminas prontas) e "draft" null. Se faltar algo essencial (o que comunicar), faça UMA pergunta curta em "reply" e devolva "concepts" vazio e "draft" null.',
         `Cada peça tem exatamente ${slides} lâmina(s). Título da lâmina: até 8 palavras, forte e claro. Texto da lâmina: até 25 palavras (pode ficar vazio na capa). ` +
+          'Prefira os modelos de COMPOSIÇÃO, que são os mais elaborados: "recorte" (um objeto 3D saindo de uma forma na cor da marca, título em cima), "vidro" (cartão de vidro com selo, título e tópicos, o objeto passando por cima do cartão), "gigante" (o título COMEÇA com um número ou palavra curta que fica enorme, com o objeto na frente, ex.: "3 dias para a Black Friday") e "poster" (objeto em destaque sobre fundo suave, título centralizado). Nesses modelos a IA de imagem cria UM objeto isolado ("subjectPrompt"): descreva em português um objeto concreto e simbólico do tema, como uma peça de design de produto (material, cor, acabamento, ângulo), por exemplo "um megafone de cerâmica verde-limão fosca, levemente de lado", "uma folha verde com gota d’água", "um cartão de crédito de vidro fosco". Um único objeto, sem pessoas, sem texto, sem fundo. ' +
           'Escolha o MODELO de cada lâmina como um diretor de arte, variando ao longo do carrossel: "manchete" (só tipografia, para capas e frases fortes), "editorial" (foto em cima e texto em bloco de cor), "moldura" (foto emoldurada e título embaixo), "faixa" (foto inteira e faixa de cor com o texto), "foto" (foto inteira com degradê), "numero" (título COMEÇA com o número em destaque, ex.: "20% de desconto em todos os planos"; use só com números reais do briefing ou da marca), "lista" (título + até 4 itens curtos no texto, um por linha) e "citacao" (uma frase da própria marca em destaque; no texto, quem assina, ex.: o nome da marca; nunca invente depoimento de cliente). ' +
           '"eyebrow" é o sobretítulo curto (até 4 palavras, ex.: "Black Friday", "Dica 02", "Novidade"). No título, marque UMA palavra-chave entre *asteriscos* para o destaque de cor (ex.: "Seu site *vende* enquanto você dorme"). ' +
           'Escreva como redator de agência, não como IA: nada de "Descubra", "Transforme sua", "Eleve", "Desbloqueie", "no mundo de hoje", emojis no título ou pontos de exclamação em excesso; seja específico e concreto. ' +
