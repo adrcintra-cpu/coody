@@ -167,7 +167,10 @@ function drawLines(
   hi: string,
   opts: { align?: 'left' | 'center'; width?: number; underline?: boolean } = {},
 ) {
-  const { lines, size } = t;
+  const { size } = t;
+  // Tudo em destaque não é destaque: o título inteiro volta para a cor do texto
+  const all = t.lines.every((l) => l.every((w) => w.hi));
+  const lines = all ? t.lines.map((l) => l.map((w) => ({ ...w, hi: false }))) : t.lines;
   ctx.font = t.font; // a fonte medida no fit (outra medição pode ter trocado ctx.font)
   ctx.textBaseline = 'alphabetic';
   for (const line of lines) {
@@ -464,7 +467,8 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       y += 92;
     }
     const inner = cw - 128;
-    const t = fit(ctx, s.title, 700, f, inner * 0.78, 3, 108, 64);
+    const tall = !!env.subject && env.subject.width / env.subject.height < 1;
+    const t = fit(ctx, s.title, 700, f, inner * (tall ? 0.6 : 0.95), 3, 108, 60);
     y = drawLines(ctx, t, cx + 64, y, 1.02, ink, r2.hi, { underline: r2.underline });
     ctx.fillStyle = alpha(ink, 0.2);
     ctx.fillRect(cx + 64, y + 30, inner, 2);
@@ -472,7 +476,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     const items = s.text.split(/\n|;|•/).map((x) => x.trim()).filter(Boolean).slice(0, 4);
     if (items.length > 1) {
       for (const it of items) {
-        const b = fit(ctx, it, 500, f, inner * 0.62 - 40, 2, 36, 28);
+        const b = fit(ctx, it, 500, f, inner * (tall ? 0.6 : 0.9) - 40, 2, 36, 28);
         ctx.fillStyle = r2.hi;
         ctx.beginPath();
         ctx.arc(cx + 74, y + b.size * 0.55, 7, 0, Math.PI * 2);
@@ -480,11 +484,22 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
         y = drawLines(ctx, b, cx + 104, y, 1.28, alpha(ink, 0.92), r2.hi) + 18;
       }
     } else if (s.text) {
-      const b = fit(ctx, s.text, 400, f, inner * 0.62, 4, 36, 28);
+      const b = fit(ctx, s.text, 400, f, inner * (tall ? 0.6 : 0.9), 4, 36, 28);
       drawLines(ctx, b, cx + 64, y, 1.4, alpha(ink, 0.88), r2.hi);
     }
-    if (env.subject) drawSubject(ctx, env.subject, W * 0.73, H * 0.5, W * 0.62, H * 0.7, 0.4);
-    else if (env.preview) subjectSlot(ctx, W * 0.74, H * 0.5, 380, ink, f);
+    if (env.subject) {
+      const sub = env.subject;
+      const wide = sub.width / sub.height >= 1;
+      if (wide) {
+        // Produto largo (máquina, veículo): embaixo do texto, saindo pela direita do cartão
+        const top = Math.max(y + 30, cy + ch * 0.42);
+        const bottom = H - 130;
+        drawSubject(ctx, sub, W * 0.6, (top + bottom) / 2, W * 0.92, bottom - top, 0.4);
+      } else {
+        // Produto alto: coluna da direita, sem cobrir o título
+        drawSubject(ctx, sub, W * 0.8, H * 0.52, W * 0.44, H * 0.66, 0.4);
+      }
+    } else if (env.preview) subjectSlot(ctx, W * 0.74, H * 0.62, 340, ink, f);
     footer(ctx, env, ink, H - 70, false);
   } else if (layout === 'gigante') {
     // Número/palavra enorme e o objeto na frente dele
