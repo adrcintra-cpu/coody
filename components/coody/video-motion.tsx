@@ -304,7 +304,7 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
             <div className="mt-3">
               {origin === 'library' ? (
                 media.length ? (
-                  <div className="grid max-h-[260px] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
+                  <div className="grid max-h-[300px] grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6 2xl:grid-cols-8">
                     {media.map((a) => (
                       <AssetTile key={a.id} a={a} on={assetIds.includes(a.id)} onClick={() => toggleAsset(a.id)} />
                     ))}
@@ -469,7 +469,7 @@ export function VideoMotion({ state, reload }: { state: State; reload: () => voi
               ))}
             </div>
           ) : !roots.length ? (
-            <p className="text-[13.5px] text-[#737985]">Nenhuma produção desta marca ainda. Preencha o pedido ao lado e clique em “Criar com IA”.</p>
+            <p className="text-[13.5px] text-[#737985]">Nenhuma produção desta marca ainda. Preencha o pedido e clique em “Criar com IA”.</p>
           ) : (
             <ul className="max-h-[220px] space-y-1.5 overflow-y-auto pr-1">
               {roots.map((j) => (

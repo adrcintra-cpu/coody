@@ -2968,7 +2968,7 @@ h3 {
 /* Oxyhub · aberto dentro do Hub: a barra do Hub já mostra logo, sistemas e pessoa. */
 .oxyhub-embed .embed-hide { display: none !important; }
 @media (min-width: 1024px) {
-  .oxyhub-embed .oxy-topbar { height: 56px; background: transparent; box-shadow: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .oxyhub-embed .oxy-topbar { height: 56px; }
   .oxyhub-embed .oxy-side { top: 68px; height: calc(100svh - 80px); }
   /* Menu do OxyStudio no menu do Hub (como na Vercel); o workspace sobe para a barra */
   .oxyhub-nav-hub [data-oxyhub-nav] { display: none !important; }
