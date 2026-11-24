@@ -337,14 +337,14 @@ export default function Workspace() {
         const items = g.items.filter((name) => name !== 'Integrações' || !state || can(role, 'manage'));
         if (!items.length) return null;
         return (
-          <div key={g.label} className="oxy-nav-group">
+          <div key={g.label} className="oxy-nav-group" data-oxyhub-section={g.label}>
             {!mini && <span className="oxy-nav-label">{g.label}</span>}
             {items.map((name) => {
               const Icon = ICON_OF[name];
               const active = view === name || (view === 'Studio' && name === 'Criar');
               if (name === 'Calendário')
                 return (
-                  <a key={name} className="oxy-nav-link" href={`${HUB_URL}/calendario`} title={mini ? 'Calendário (OxyCalendar)' : 'Abre o OxyCalendar'}>
+                  <a key={name} className="oxy-nav-link" data-oxyhub-item="Calendário" href={`${HUB_URL}/calendario`} title={mini ? 'Calendário (OxyCalendar)' : 'Abre o OxyCalendar'}>
                     <Icon size={18} />
                     {!mini && <span>{name}</span>}
                     {!mini && <ArrowUpRight size={14} className="text-[#737985]" aria-hidden />}
@@ -354,13 +354,14 @@ export default function Workspace() {
                 <button
                   key={name}
                   className="oxy-nav-link"
+                  data-oxyhub-item={name}
                   aria-current={active ? 'page' : undefined}
                   title={mini ? name : undefined}
                   onClick={() => { navigate(name); onPick?.(); }}
                 >
                   <Icon size={18} />
                   {!mini && <span>{name}</span>}
-                  {!mini && name === 'Produção' && badge > 0 && <span className="nav-badge">{badge}</span>}
+                  {!mini && name === 'Produção' && badge > 0 && <span className="nav-badge" data-oxyhub-badge>{badge}</span>}
                 </button>
               );
             })}
@@ -381,6 +382,7 @@ export default function Workspace() {
         <button className="oxy-brand embed-hide" onClick={() => navigate('Criar')} aria-label="Ir para Criar, no OxyStudio">
           <span className="oxy-product">OxyStudio</span>
         </button>
+        {state && <div className="embed-only"><WorkspaceMenu state={state} reload={reload} /></div>}
         <div className="oxy-spacer" />
         <Input
           type="month"
@@ -418,7 +420,7 @@ export default function Workspace() {
         )}
       </header>
       <div className="oxy-body">
-        <nav aria-label="Menu principal" className={'glass oxy-side' + (collapsed ? ' collapsed' : '')}>
+        <nav data-oxyhub-nav aria-label="Menu principal" className={'glass oxy-side' + (collapsed ? ' collapsed' : '')}>
           {sideNav(collapsed)}
           <button className="oxy-nav-link oxy-toggle" onClick={toggleCollapsed} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}>
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}

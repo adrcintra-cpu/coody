@@ -2970,4 +2970,9 @@ h3 {
 @media (min-width: 1024px) {
   .oxyhub-embed .oxy-topbar { height: 56px; background: transparent; box-shadow: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .oxyhub-embed .oxy-side { top: 68px; height: calc(100svh - 80px); }
+  /* Menu do OxyStudio no menu do Hub (como na Vercel); o workspace sobe para a barra */
+  .oxyhub-nav-hub [data-oxyhub-nav] { display: none !important; }
+  .oxyhub-nav-hub .oxy-body { padding-left: 24px; }
+  .oxyhub-nav-hub .embed-only { display: block; min-width: 240px; }
 }
+.embed-only { display: none; }
