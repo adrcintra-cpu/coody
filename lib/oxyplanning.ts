@@ -118,21 +118,9 @@ function filesOf(item: { format: string }, v: VersionRow) {
   return urls;
 }
 
-/**
- * Envia a peça aprovada internamente para o cliente no OxyPlanning: sobe os arquivos para a pasta
- * do cliente e cria a nova versão em nome de quem aprovou. Lança erro (e o status não muda) se falhar.
- */
-export async function sendToPlanning(opts: {
-  link: ContentLink;
-  item: { id: string; brandId: string; title: string; pillar: string; objective: string; format: string };
-  version: VersionRow;
-  email: string;
-}) {
-  const { link, item, version, email } = opts;
+/** Sobe os arquivos da biblioteca do OxyStudio para a pasta do cliente no OxyPlanning. */
+async function uploadToPlanning(clientId: string, urls: string[]) {
   const db = database();
-  const urls = filesOf(item, version);
-  if (!urls.length) throw new Error('Anexe a arte antes de enviar ao cliente.');
-
   const files: { body: ArrayBuffer; mime: string; name: string; size: number }[] = [];
   for (const url of urls) {
     const m = /^\/api\/assets\/([^?#/]+)/.exec(url);
@@ -152,7 +140,7 @@ export async function sendToPlanning(opts: {
 
   const { uploads } = await ponte<{ uploads: { storage_path: string; signed_url: string }[] }>({
     action: 'upload',
-    client_id: link.clientId,
+    client_id: clientId,
     files: files.map((f) => ({ name: f.name, mime: f.mime })),
   });
   await Promise.all(
@@ -166,6 +154,26 @@ export async function sendToPlanning(opts: {
       if (!r.ok) throw new Error(`Falha ao enviar o arquivo ${files[i].name} ao OxyPlanning (${r.status}).`);
     }),
   );
+
+  return { uploads, files };
+}
+
+/**
+ * Envia a peça aprovada internamente para o cliente no OxyPlanning: sobe os arquivos para a pasta
+ * do cliente e cria a nova versão em nome de quem aprovou. Lança erro (e o status não muda) se falhar.
+ */
+export async function sendToPlanning(opts: {
+  link: ContentLink;
+  item: { id: string; brandId: string; title: string; pillar: string; objective: string; format: string };
+  version: VersionRow;
+  email: string;
+}) {
+  const { link, item, version, email } = opts;
+  const db = database();
+  const urls = filesOf(item, version);
+  if (!urls.length) throw new Error('Anexe a arte antes de enviar ao cliente.');
+
+  const { uploads, files } = await uploadToPlanning(link.clientId, urls);
 
   let hashtags: string[] = [];
   try {
@@ -342,4 +350,52 @@ export async function planningStyleReferences(brandId: string, limit = 4) {
     console.error('oxyplanning references', e);
   }
   return empty;
+}
+
+/**
+ * Peça criada no editor "Criar" (sem publicação de origem no OxyPlanning): cria o post no
+ * cliente ligado à marca, já com a arte e enviado para aprovação, e guarda a ligação para a
+ * sincronização de decisões e comentários funcionar como nas pautas vindas de lá.
+ */
+export async function createInPlanning(opts: {
+  brandLink: BrandLink;
+  item: { id: string; title: string; pillar: string; objective: string; format: string; date: string };
+  version: VersionRow;
+  email: string;
+}) {
+  const { brandLink, item, version, email } = opts;
+  await ensurePlanningTables();
+  const urls = filesOf(item, version);
+  if (!urls.length) throw new Error('Anexe a arte antes de enviar ao cliente.');
+  const { uploads, files } = await uploadToPlanning(brandLink.clientId, urls);
+  let hashtags: string[] = [];
+  try {
+    hashtags = JSON.parse(version.hashtags || '[]');
+  } catch {
+    hashtags = (version.hashtags || '').split(/[\s,]+/).filter(Boolean);
+  }
+  const { post_id, version_id } = await ponte<{ post_id: string; version_id: string | null }>({
+    action: 'criar',
+    client_id: brandLink.clientId,
+    email,
+    date: item.date,
+    format: item.format === 'Carrossel' ? 'carousel' : 'static',
+    content: {
+      title: item.title,
+      theme: item.pillar,
+      objective: item.objective,
+      art_text: [version.headline, version.copy].filter(Boolean).join('\n\n'),
+      caption: version.caption,
+      hashtags,
+    },
+    media: uploads.map((u, i) => ({ storage_path: u.storage_path, file_name: files[i].name, mime_type: files[i].mime, size_bytes: files[i].size })),
+  });
+  const now = new Date().toISOString();
+  await database()
+    .prepare(
+      "INSERT INTO planning_content_links (contentId, postId, clientId, sentVersionId, sentContentVersionId, sentAt, sentBy, planningStatus, lastCommentAt, syncedAt, createdAt) VALUES (?,?,?,?,?,?,?,'awaiting',?,?,?)",
+    )
+    .bind(item.id, post_id, brandLink.clientId, version_id, version.id, now, email, now, now, now)
+    .run();
+  return post_id;
 }

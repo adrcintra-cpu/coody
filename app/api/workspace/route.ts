@@ -592,10 +592,13 @@ export async function POST(request: Request) {
           id: id(),
           contentId,
           number: (last?.number || 0) + 1,
-          headline: last?.headline || str(data.title, 300) || 'Peça enviada',
-          copy: last?.copy || '',
+          // O editor "Criar" manda o texto da arte e as hashtags junto com as lâminas.
+          headline: str(data.headline, 300) || last?.headline || str(data.title, 300) || 'Peça enviada',
+          copy: str(data.copy) || last?.copy || '',
           caption: str(data.caption) || last?.caption || '',
-          hashtags: last?.hashtags || [],
+          hashtags: Array.isArray(data.hashtags)
+            ? (() => { const tags = (data.hashtags as unknown[]).filter((t): t is string => typeof t === 'string').slice(0, 30); validateHashtags(tags); return tags; })()
+            : last?.hashtags || [],
           feedUrl: firstImage,
           storyUrl: firstImage,
           change: str(data.change) || (action === 'createExternal' ? 'Peça enviada para aprovação' : 'Nova versão enviada'),

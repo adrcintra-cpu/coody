@@ -175,6 +175,7 @@ export type State = {
   deletedBrands?: DeletedBrand[];
 };
 export type View =
+  | 'Criar'
   | 'Dashboard'
   | 'Pautas'
   | 'Planejamento'

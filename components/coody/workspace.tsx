@@ -19,13 +19,14 @@ import {
   Library,
   Plug,
   Settings as SettingsIcon,
-  Plus,
   X,
   LoaderCircle,
   LogOut,
   Menu as MenuIcon,
   PanelLeftClose,
   PanelLeftOpen,
+  Wand2,
+  ArrowUpRight,
 } from 'lucide-react';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
@@ -47,11 +48,13 @@ import { Contents } from './contents';
 import { Studio } from './studio';
 import { Integrations, Settings } from './settings';
 import { ContentForm } from './forms';
+import { Create } from './create';
 import { today } from '@/lib/types';
 import { activeState } from '@/lib/brand-lifecycle';
 import type { View, State, Content, Action } from '@/lib/types';
-type NavName = 'Dashboard' | 'Pautas' | 'Calendário' | 'Conteúdos' | 'Marcas' | 'Produção' | 'Biblioteca' | 'Integrações' | 'Configurações';
+type NavName = 'Criar' | 'Dashboard' | 'Pautas' | 'Calendário' | 'Conteúdos' | 'Marcas' | 'Produção' | 'Biblioteca' | 'Integrações' | 'Configurações';
 const ICON_OF: Record<NavName, typeof LayoutDashboard> = {
+  Criar: Wand2,
   Dashboard: LayoutDashboard,
   Pautas: Inbox,
   Calendário: CalendarDays,
@@ -63,15 +66,13 @@ const ICON_OF: Record<NavName, typeof LayoutDashboard> = {
   Configurações: SettingsIcon,
 };
 /** Menu lateral no padrão Oxyhub: seções em maiúsculas. */
+// OxyStudio simplificado (24/11/2026): criar, ver no calendário (OxyCalendar) e cuidar das marcas.
+// As outras telas continuam no endereço (#Produção, #Biblioteca…) para links antigos e notificações.
 const GROUPS: { label: string; items: NavName[] }[] = [
-  { label: 'Visão geral', items: ['Dashboard'] },
-  { label: 'Planejamento', items: ['Pautas', 'Calendário'] },
-  { label: 'Criação', items: ['Conteúdos', 'Produção', 'Biblioteca'] },
-  { label: 'Marcas', items: ['Marcas'] },
-  { label: 'Sistema', items: ['Integrações', 'Configurações'] },
+  { label: 'Estúdio', items: ['Criar', 'Calendário', 'Marcas'] },
 ];
 export default function Workspace() {
-  const [view, setView] = useState<View>('Dashboard');
+  const [view, setView] = useState<View>('Criar');
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
@@ -182,8 +183,8 @@ export default function Workspace() {
         else if (name === 'Aprovações') setView('Produção');
         else if (name === 'Planejamento') setView('Pautas');
         else if (name) {
-          setView('Dashboard');
-          setMessage('Página não encontrada. Você voltou ao Dashboard.');
+          setView('Criar');
+          setMessage('Página não encontrada. Você voltou para Criar.');
         }
         setSelected(params.get('id') || '');
         setLibraryBrand(params.get('brand') || '');
@@ -191,7 +192,7 @@ export default function Workspace() {
         if (restoredMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(restoredMonth))
           setMonth(restoredMonth);
       } catch {
-        setView('Dashboard');
+        setView('Criar');
       }
     };
     restore();
@@ -326,11 +327,6 @@ export default function Workspace() {
       {!mini && (
         <div className="oxy-side-top">
           <WorkspaceMenu state={state} reload={reload} />
-          {(!state || can(role, 'edit')) && (
-            <button className="create-btn" disabled={!state} onClick={() => { onPick?.(); create(month + '-15'); }}>
-              <Plus size={18} /> Criar conteúdo
-            </button>
-          )}
         </div>
       )}
       {GROUPS.map((g) => {
@@ -341,7 +337,15 @@ export default function Workspace() {
             {!mini && <span className="oxy-nav-label">{g.label}</span>}
             {items.map((name) => {
               const Icon = ICON_OF[name];
-              const active = view === name || (view === 'Studio' && name === 'Conteúdos');
+              const active = view === name || (view === 'Studio' && name === 'Criar');
+              if (name === 'Calendário')
+                return (
+                  <a key={name} className="oxy-nav-link" href={`${HUB_URL}/calendario`} title={mini ? 'Calendário (OxyCalendar)' : 'Abre o OxyCalendar'}>
+                    <Icon size={18} />
+                    {!mini && <span>{name}</span>}
+                    {!mini && <ArrowUpRight size={14} className="text-[#737985]" aria-hidden />}
+                  </a>
+                );
               return (
                 <button
                   key={name}
@@ -370,7 +374,7 @@ export default function Workspace() {
         <a className="oxy-brand" href={HUB_URL} aria-label="Oxyhub · tela inicial" title="Tela inicial do Oxyhub">
           <Image unoptimized width={107} height={33} src="/oxyhub-logo.svg" alt="Oxyhub" className="oxy-logo" priority />
         </a>
-        <button className="oxy-brand" onClick={() => navigate('Dashboard')} aria-label="Ir para o Dashboard do OxyStudio">
+        <button className="oxy-brand" onClick={() => navigate('Criar')} aria-label="Ir para Criar, no OxyStudio">
           <span className="oxy-product">OxyStudio</span>
         </button>
         <div className="oxy-spacer" />
@@ -486,6 +490,8 @@ export default function Workspace() {
               </button>
             </section>
             )
+          ) : view === 'Criar' ? (
+            <Create state={visible} act={act} reload={reload} />
           ) : view === 'Dashboard' ? (
             <Dashboard
               state={visible}
