@@ -364,11 +364,13 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
 
   if (layout === 'recorte') {
     // Fundo claro, título no alto, forma (marcador) na cor da marca e o objeto escapando dela
-    const bg = isLight(s.bg) ? s.bg : paper;
+    // Cor viva escolhida vai para a forma; o fundo fica claro e neutro (como nas referências)
+    const vivid = saturation(s.bg) > 0.3 || !isLight(s.bg);
+    const bg = vivid ? paper : s.bg;
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
     const r2 = roles(env.palette, bg);
-    const ink = toneFor(bg);
+    const ink = s.tone === 'light' ? '#ffffff' : '#0f1540';
     let y = 96;
     if (s.eyebrow) {
       ctx.font = `700 26px ${f}`;
@@ -388,7 +390,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     const sy = Math.max(y + 70, 470);
     const sw = W - sx * 2;
     const sh = H - sy - 150;
-    const fill = [env.palette[0], ...env.palette].find((c) => !isLight(c) || saturation(c) > 0.4) || dark;
+    const fill = vivid ? s.bg : [env.palette[0], ...env.palette].find((c) => !isLight(c) || saturation(c) > 0.4) || dark;
     ctx.save();
     ctx.shadowColor = 'rgba(8,10,30,.18)';
     ctx.shadowBlur = 50;
@@ -404,7 +406,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       cover(ctx, img, sx, sy, sw, sh);
       ctx.restore();
     }
-    if (env.subject) drawSubject(ctx, env.subject, W / 2, sy + sh * 0.46, sw * 1.45, sh * 1.05, 0.3);
+    if (env.subject) drawSubject(ctx, env.subject, W / 2, sy + sh * 0.44, sw * 1.65, sh * 1.12, 0.3);
     else if (env.preview) subjectSlot(ctx, W / 2, sy + sh * 0.45, sw * 0.8, '#ffffff', f);
     footer(ctx, env, ink, H - 56, false);
   } else if (layout === 'vidro') {
