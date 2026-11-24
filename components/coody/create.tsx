@@ -137,6 +137,15 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     () => state.assets.filter((a) => a.brandId === brandId && a.mime === 'image/png' && /^Criar · objeto/.test(a.name)).slice(0, 30),
     [state.assets, brandId],
   );
+  // Produtos: fotos de produto primeiro; peças prontas e imagens de IA ficam de fora
+  const products = useMemo(
+    () =>
+      state.assets
+        .filter((a) => a.brandId === brandId && /^image\/(png|jpe?g|webp)/.test(a.mime) && a.category !== 'logo' && !/· IA$|^Criar ·|· IA ·/.test(a.name) && a.category !== 'delivery')
+        .sort((a, b) => Number(b.category === 'product_photo') - Number(a.category === 'product_photo'))
+        .slice(0, 24),
+    [state.assets, brandId],
+  );
   const images = useMemo(
     () => state.assets.filter((a) => a.brandId === brandId && /^image\/(png|jpe?g|webp)/.test(a.mime) && a.category !== 'logo' && !/^Criar · objeto/.test(a.name)).slice(0, 36),
     [state.assets, brandId],
@@ -741,9 +750,9 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
           {LAYOUTS.find((l) => l.key === s.layout)?.subject ? (
             <div className="space-y-2">
               <span className={label}>Produto da biblioteca (opcional)</span>
-              {images.length ? (
+              {products.length ? (
                 <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Produtos da biblioteca">
-                  {images.map((a) => (
+                  {products.map((a) => (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={a.id}

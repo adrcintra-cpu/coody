@@ -511,7 +511,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       ctx.textAlign = 'left';
       y += 50;
     }
-    const n = fit(ctx, big, 900, f, W - M * 2, 1, 760, 200);
+    const n = fit(ctx, big, 900, f, W - M * 2, 1, 760, 90);
     ctx.font = n.font;
     const nw = ctx.measureText(big).width;
     const baseY = Math.min(H - 170, y + 60 + n.size * 0.78);
@@ -546,7 +546,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     const ink = s.tone === 'light' ? '#ffffff' : '#0f1540';
     const r2 = roles(env.palette, pbg);
     let box = { x: W / 2 - 200, y: 160, w: 400, h: 420 };
-    if (env.subject) box = drawSubject(ctx, env.subject, W / 2, 380, W * 0.62, 520, 0.22);
+    if (env.subject) box = drawSubject(ctx, env.subject, W / 2, 400, W * 0.78, 580, 0.22);
     else if (env.preview) subjectSlot(ctx, W / 2, 380, 380, ink, f);
     const lineTop = box.y + box.h + 20;
     const t = fit(ctx, s.title, 500, f, W - M * 2, 3, 104, 64);
