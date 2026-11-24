@@ -20,6 +20,10 @@ export type ArtSlide = {
   image: string;
   /** Objeto recortado (PNG com fundo transparente) gerado pela IA ou da biblioteca. */
   subject: string;
+  /** Logo: '' = automático (versão clara em fundo escuro, escura em fundo claro) ou o endereço de uma versão. */
+  logo: string;
+  /** Altura do logo em px na arte 1080×1350. */
+  logoSize: number;
   dim: number;
   align: Align;
   tone: TextTone;
@@ -48,9 +52,12 @@ const M = 88; // margem
 export type ArtEnv = {
   family: string;
   palette: string[];
-  logo: HTMLImageElement | null;
+  /** Versões do logo da marca, com a luminância média de cada uma (0 escuro … 255 claro). */
+  logos: { img: HTMLImageElement; luma: number; url: string }[];
   image: HTMLImageElement | null;
   subject: HTMLImageElement | null;
+  logoUrl?: string;
+  logoSize?: number;
   /** Prévia na tela (mostra onde o objeto vai); no PNG exportado é false. */
   preview?: boolean;
   index: number;
@@ -212,11 +219,13 @@ function footer(ctx: CanvasRenderingContext2D, env: ArtEnv, color: string, y = H
     ctx.fillStyle = alpha(color, 0.22);
     ctx.fillRect(M, y - 54, W - M * 2, 2);
   }
-  if (env.logo && env.logo.width && env.logo.height) {
-    const r = Math.min(240 / env.logo.width, 44 / env.logo.height);
-    const w = env.logo.width * r;
-    const h = env.logo.height * r;
-    ctx.drawImage(env.logo, M, y - h + 4, w, h);
+  const logo = pickLogo(env, color);
+  if (logo) {
+    const size = env.logoSize || 64;
+    const r = Math.min((size * 4.2) / logo.width, size / logo.height);
+    const w = logo.width * r;
+    const h = logo.height * r;
+    ctx.drawImage(logo, M, y - h + 6, w, h);
   } else if (env.signature) {
     ctx.font = `700 26px ${env.family}`;
     ctx.fillStyle = color;
@@ -228,6 +237,14 @@ function footer(ctx: CanvasRenderingContext2D, env: ArtEnv, color: string, y = H
   const n = env.total > 1 ? `${String(env.index + 1).padStart(2, '0')} / ${String(env.total).padStart(2, '0')}` : '';
   ctx.fillText(env.total > 1 && env.index === 0 ? `${n}   arraste →` : n, W - M, y);
   ctx.textAlign = 'left';
+}
+/** A versão do logo certa para o fundo: texto claro = fundo escuro = logo mais claro (negativo/branco). */
+function pickLogo(env: ArtEnv, ink: string) {
+  if (!env.logos.length) return null;
+  if (env.logoUrl) return env.logos.find((l) => l.url === env.logoUrl)?.img ?? env.logos[0].img;
+  const darkBg = luma(ink.startsWith('#') ? ink : '#ffffff') > 150;
+  const sorted = [...env.logos].sort((a, b) => a.luma - b.luma);
+  return (darkBg ? sorted[sorted.length - 1] : sorted[0]).img;
 }
 function cover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x: number, y: number, w: number, h: number, focusY = 0.45) {
   const r = Math.max(w / img.width, h / img.height);
@@ -351,6 +368,7 @@ function centered(ctx: CanvasRenderingContext2D, t: Fitted, y: number, lh: numbe
 /* ---------------- modelos ---------------- */
 
 export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEnv) {
+  env = { ...env, logoUrl: s.logo, logoSize: s.logoSize || 72 };
   const f = env.family;
   ctx.save();
   ctx.clearRect(0, 0, W, H);
@@ -727,4 +745,27 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
 }
 
 /** Lâmina em branco no modelo indicado. */
-export const blankSlide = (bg: string, layout: Layout = 'manchete'): ArtSlide => ({ layout, eyebrow: '', title: '', text: '', bg, image: '', subject: '', dim: 30, align: 'bottom', tone: 'auto' });
+export const blankSlide = (bg: string, layout: Layout = 'manchete'): ArtSlide => ({ layout, eyebrow: '', title: '', text: '', bg, image: '', subject: '', logo: '', logoSize: 72, dim: 30, align: 'bottom', tone: 'auto' });
+
+/** Luminância média dos pixels visíveis de uma imagem (para saber se o logo é claro ou escuro). */
+export function imageLuma(img: HTMLImageElement) {
+  const c = document.createElement('canvas');
+  c.width = 48;
+  c.height = Math.max(1, Math.round((48 * img.height) / Math.max(1, img.width)));
+  const g = c.getContext('2d');
+  if (!g) return 128;
+  g.drawImage(img, 0, 0, c.width, c.height);
+  try {
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let sum = 0;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 128) continue;
+      sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      n++;
+    }
+    return n ? sum / n : 128;
+  } catch {
+    return 128;
+  }
+}

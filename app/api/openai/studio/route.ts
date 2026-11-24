@@ -5,7 +5,7 @@ import { activeState } from '@/lib/brand-lifecycle';
 import { OpenAIError, openaiRequest } from '@/lib/openai-client';
 import { assetRecord, validateUpload } from '@/lib/asset-upload';
 import { genericRule, parseDNA, responseText } from '@/lib/art-direction';
-import { IMAGE_MODEL } from '@/lib/image-model';
+import { EDIT_MODEL, IMAGE_MODEL } from '@/lib/image-model';
 import { apiAlert } from '@/lib/workspaces';
 import { brandLinks, contentLink, createInPlanning, sendToPlanningPost } from '@/lib/oxyplanning';
 
@@ -96,6 +96,20 @@ function cleanPiece(p: Piece | null, slides: number): Piece | null {
   };
 }
 
+
+/** Foto de produto da biblioteca da marca, para a IA usar como referência fiel. */
+async function productFile(brandId: string, assetId: unknown) {
+  if (typeof assetId !== 'string' || !/^[0-9a-f-]{36}$/.test(assetId)) return null;
+  const row = await database()
+    .prepare("SELECT id, name, mime FROM brand_assets WHERE id=? AND brandId=? AND mime IN ('image/png','image/jpeg','image/webp')")
+    .bind(assetId, brandId)
+    .first<{ id: string; name: string; mime: string }>();
+  if (!row) throw new Error('Produto não encontrado na biblioteca desta marca.');
+  const object = await bucket().get('brands/' + brandId + '/' + row.id);
+  if (!object) throw new Error('A foto do produto não está disponível.');
+  return new File([await object.arrayBuffer()], row.name.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'produto', { type: row.mime });
+}
+
 const guard = (request: Request) =>
   request.headers.get('origin') && request.headers.get('origin') !== new URL(request.url).origin
     ? Response.json({ error: 'Origem inválida.' }, { status: 403 })
@@ -150,8 +164,28 @@ export async function POST(request: Request) {
     if (data.action === 'image' && data.kind === 'subject') {
       // Objeto isolado com fundo transparente: o layout e o texto são montados no editor.
       const prompt = str(data.prompt, 800);
-      if (!prompt) throw new Error('Descreva o objeto.');
-      const result = await openaiRequest(apiKey(), 'images/generations', {
+      const product = await productFile(brand.id, data.productAssetId);
+      if (!prompt && !product) throw new Error('Descreva o objeto.');
+      const result = product
+        ? await (async () => {
+            // Recorte fiel do produto real (mesma forma, cores e peças), só com luz de estúdio
+            const form = new FormData();
+            form.append('model', EDIT_MODEL);
+            form.append('n', '1');
+            form.append('size', '1024x1024');
+            form.append('quality', 'high');
+            form.append('output_format', 'png');
+            form.append('background', 'transparent');
+            form.append(
+              'prompt',
+              'Isole ESTE produto exatamente como ele é na foto: mesma forma, proporções, cores, peças, rodas, adesivos e acabamento. Não invente nem remova partes. ' +
+                'Fundo TRANSPARENTE, sem chão e sem sombra no chão. Produto inteiro, centralizado, com luz de estúdio suave e nitidez de fotografia de catálogo. Sem texto novo. ' +
+                (prompt ? 'Observação: ' + prompt : ''),
+            );
+            form.append('image[]', product);
+            return openaiRequest(apiKey(), 'images/edits', form);
+          })()
+        : await openaiRequest(apiKey(), 'images/generations', {
         model: IMAGE_MODEL,
         n: 1,
         quality: 'high',
@@ -163,17 +197,51 @@ export async function POST(request: Request) {
           'Estilo: fotografia de produto de estúdio / render 3D hiper-realista de design premium, materiais táteis (cerâmica, vidro fosco, metal escovado, papel, folhas reais), iluminação suave de softbox, sombras internas sutis, acabamento limpo. ' +
           'Sem texto, letras, números, logotipos ou marca d’água. Sem pessoas. ' +
           'Cores coerentes com a marca ' + brand.name + ' (' + (brand.colors || 'livre') + ') quando fizer sentido. Objeto: ' + prompt,
-      });
+          });
       const encoded = (result.data as { b64_json?: string }[] | undefined)?.[0]?.b64_json;
       if (!encoded || encoded.length > 28 * 1024 * 1024) throw new OpenAIError('A OpenAI devolveu uma imagem vazia ou muito grande.');
       const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
       const file = new File([bytes], 'objeto-ia.png', { type: 'image/png' });
       await validateUpload(file);
       const asset = assetRecord(file, brand.id, {
-        name: ('Criar · objeto IA · ' + prompt).slice(0, 200),
+        name: ('Criar · objeto IA · ' + (product ? 'produto ' + product.name + ' ' : '') + prompt).slice(0, 200),
         category: 'visual_reference',
         description: prompt,
         aiNotes: 'Objeto recortado (fundo transparente) gerado com OpenAI no editor Criar. Revisão humana necessária.',
+      });
+      await bucket().put('brands/' + brand.id + '/' + asset.id, bytes, { httpMetadata: { contentType: 'image/png' } });
+      await insert('brand_assets', asset).run();
+      return Response.json({ url: asset.url, assetId: asset.id });
+    }
+
+    if (data.action === 'image' && data.productAssetId) {
+      // Cena fotográfica real com o PRODUTO da biblioteca (fiel ao original)
+      const prompt = str(data.prompt, 1200);
+      const product = await productFile(brand.id, data.productAssetId);
+      const form = new FormData();
+      form.append('model', EDIT_MODEL);
+      form.append('n', '1');
+      form.append('size', '1024x1280');
+      form.append('quality', 'high');
+      form.append('output_format', 'png');
+      form.append(
+        'prompt',
+        'Fotografia publicitária REAL para Instagram 4:5 com ESTE produto, mantido exatamente como é (forma, cores, peças e proporções; não invente partes). ' +
+          'Aspecto de foto de verdade: câmera profissional, luz natural, cores fiéis, profundidade de campo natural; sem aspecto 3D, sem neon, sem texto, sem logotipo novo. ' +
+          'Deixe uma área calma para o texto (em cima ou embaixo). Marca: ' + brand.name + ' (' + brand.segment + '). Cena: ' + (prompt || 'o produto em uso no seu ambiente real'),
+      );
+      form.append('image[]', product!);
+      const result = await openaiRequest(apiKey(), 'images/edits', form);
+      const encoded = (result.data as { b64_json?: string }[] | undefined)?.[0]?.b64_json;
+      if (!encoded || encoded.length > 28 * 1024 * 1024) throw new OpenAIError('A OpenAI devolveu uma imagem vazia ou muito grande.');
+      const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+      const file = new File([bytes], 'cena-produto-ia.png', { type: 'image/png' });
+      await validateUpload(file);
+      const asset = assetRecord(file, brand.id, {
+        name: ('Criar · cena com produto · ' + (prompt || product!.name)).slice(0, 200),
+        category: 'visual_reference',
+        description: prompt,
+        aiNotes: 'Cena gerada com OpenAI a partir da foto do produto. Revisão humana necessária.',
       });
       await bucket().put('brands/' + brand.id + '/' + asset.id, bytes, { httpMetadata: { contentType: 'image/png' } });
       await insert('brand_assets', asset).run();

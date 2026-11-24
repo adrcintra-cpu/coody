@@ -18,7 +18,7 @@ import type { Action, Brand, State } from '@/lib/types';
 import { today } from '@/lib/types';
 import { HUB_URL } from '@/lib/oxyhub';
 import { PautaPicker, pautaBriefing, type Pauta } from './pauta-picker';
-import { H, LAYOUTS, W, blankSlide, drawSlide, isLayout, type ArtSlide, type Layout } from './art-layouts';
+import { H, LAYOUTS, W, blankSlide, drawSlide, imageLuma, isLayout, type ArtSlide, type Layout } from './art-layouts';
 
 /**
  * Criar: o jeito simples de fazer post e carrossel.
@@ -60,14 +60,21 @@ function loadImage(src: string) {
   return p;
 }
 
-type EnvBase = { family: string; palette: string[]; logo: string; signature: string };
+const lumaCache = new Map<string, number>();
+const logoLuma = (url: string, img: HTMLImageElement) => {
+  if (!lumaCache.has(url)) lumaCache.set(url, imageLuma(img));
+  return lumaCache.get(url)!;
+};
+
+type EnvBase = { family: string; palette: string[]; logos: string[]; signature: string };
 
 /** Desenha a lâmina num canvas (o mesmo desenho da prévia e do PNG). */
 async function paint(canvas: HTMLCanvasElement, s: Slide, base: EnvBase, index: number, total: number, preview = false) {
-  const [logo, image, subject] = await Promise.all([loadImage(base.logo), loadImage(s.image), loadImage(s.subject)]);
+  const [logoImgs, image, subject] = await Promise.all([Promise.all(base.logos.map(loadImage)), loadImage(s.image), loadImage(s.subject)]);
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
-  drawSlide(ctx, s, { family: base.family, palette: base.palette, logo, image, subject, preview, index, total, signature: base.signature });
+  const logos = logoImgs.flatMap((img, i) => (img ? [{ img, url: base.logos[i], luma: logoLuma(base.logos[i], img) }] : []));
+  drawSlide(ctx, s, { family: base.family, palette: base.palette, logos, image, subject, preview, index, total, signature: base.signature });
 }
 
 /** Prévia ao vivo: canvas em tamanho real (1080×1350), reduzido por CSS. */
@@ -119,10 +126,13 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   });
   const brand = brands.find((b) => b.id === brandId);
   const palette = useMemo(() => brandColors(brand), [brand]);
-  const logo = useMemo(
-    () => state.assets.find((a) => a.brandId === brandId && a.category === 'logo' && /^image\//.test(a.mime))?.url || '',
+  // Todas as versões do logo da marca (positivo, negativo, branco…): a arte escolhe a certa para o fundo
+  const logoAssets = useMemo(
+    () => state.assets.filter((a) => a.brandId === brandId && a.category === 'logo' && /^image\//.test(a.mime)).slice(0, 8),
     [state.assets, brandId],
   );
+  const logos = useMemo(() => logoAssets.map((a) => a.url), [logoAssets]);
+  const logo = logos[0] || '';
   const subjects = useMemo(
     () => state.assets.filter((a) => a.brandId === brandId && a.mime === 'image/png' && /^Criar · objeto/.test(a.name)).slice(0, 30),
     [state.assets, brandId],
@@ -141,6 +151,8 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const [title, setTitle] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
   const [subjectPrompt, setSubjectPrompt] = useState('');
+  // Produto da biblioteca escolhido: a IA recorta o produto real e cria cenas com ele (fiel ao original)
+  const [product, setProduct] = useState<{ id: string; url: string; name: string } | null>(null);
   const [date, setDate] = useState(today());
   const [hasDraft, setHasDraft] = useState(false);
   // Pauta do OxyPlanning escolhida: a arte volta para a mesma publicação.
@@ -191,9 +203,9 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const base = useMemo<EnvBase>(() => {
     const page = typeof document === 'undefined' ? 'Saira, sans-serif' : getComputedStyle(document.body).fontFamily || 'Saira, sans-serif';
     const family = brandFont && /^[\p{L}\p{N} ]+$/u.test(brandFont) ? `"${brandFont}", ${page}` : page;
-    return { family, palette, logo, signature: brand?.name || '' };
+    return { family, palette, logos, signature: brand?.name || '' };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brandFont, palette, logo, brand?.name, fontTick]);
+  }, [brandFont, palette, logos, brand?.name, fontTick]);
 
   const total = slides.length;
   const s = slides[Math.min(current, total - 1)];
@@ -281,7 +293,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     const r = await fetch('/api/openai/studio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'image', kind: 'subject', brandId, prompt }),
+      body: JSON.stringify({ action: 'image', kind: 'subject', brandId, prompt, productAssetId: product?.id }),
     });
     const j = (await r.json()) as { url?: string; error?: string };
     if (!r.ok || !j.url) throw new Error(j.error || 'Não foi possível gerar o objeto.');
@@ -291,7 +303,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     const r = await fetch('/api/openai/studio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'image', brandId, prompt }),
+      body: JSON.stringify({ action: 'image', brandId, prompt, productAssetId: product?.id }),
     });
     const j = (await r.json()) as { url?: string; error?: string };
     if (!r.ok || !j.url) throw new Error(j.error || 'Não foi possível gerar a imagem.');
@@ -300,14 +312,14 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   /** Ao escolher um conceito, a IA já produz o objeto e/ou a foto que os modelos escolhidos pedem. */
   const autoArt = async (p: Piece) => {
     // Só gera o que falta (ajustes do rascunho não refazem imagens que já existem)
-    const needSubject = p.subjectPrompt && p.slides.some((x, i) => LAYOUTS.find((l) => l.key === x.layout)?.subject && !slides[i]?.subject);
+    const needSubject = (p.subjectPrompt || product) && p.slides.some((x, i) => LAYOUTS.find((l) => l.key === x.layout)?.subject && !slides[i]?.subject);
     const needPhoto = p.imagePrompt && p.slides.some((x, i) => LAYOUTS.find((l) => l.key === x.layout)?.photo === 'sim' && !slides[i]?.image);
     if (!needSubject && !needPhoto) return;
     setBusy('image');
     setError('');
     try {
       const [subject, photo] = await Promise.all([
-        needSubject ? makeSubject(p.subjectPrompt) : Promise.resolve(''),
+        needSubject ? makeSubject(product ? '' : p.subjectPrompt) : Promise.resolve(''),
         needPhoto ? makeScene(p.imagePrompt) : Promise.resolve(''),
       ]);
       setSlides((all) =>
@@ -325,8 +337,8 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     }
   };
   const generateSubject = async () => {
-    const prompt = (subjectPrompt || s.title || title).trim();
-    if (!prompt) return setError('Descreva o objeto que a IA deve criar.');
+    const prompt = product ? subjectPrompt.trim() : (subjectPrompt || s.title || title).trim();
+    if (!prompt && !product) return setError('Descreva o objeto que a IA deve criar, ou escolha um produto.');
     setBusy('subject');
     setError('');
     try {
@@ -348,7 +360,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
       const r = await fetch('/api/openai/studio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'image', brandId, prompt }),
+        body: JSON.stringify({ action: 'image', brandId, prompt, productAssetId: product?.id }),
       });
       const j = (await r.json()) as { url?: string; error?: string };
       if (!r.ok || !j.url) throw new Error(j.error || 'Não foi possível gerar a imagem.');
@@ -476,6 +488,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   };
 
   const reset = () => {
+    setProduct(null);
     setPauta(null);
     setSlides([blank(palette[0])]);
     setFormat('post');
@@ -727,11 +740,28 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
           </div>
           {LAYOUTS.find((l) => l.key === s.layout)?.subject ? (
             <div className="space-y-2">
-              <span className={label}>Objeto 3D (recorte da IA)</span>
+              <span className={label}>Produto da biblioteca (opcional)</span>
+              {images.length ? (
+                <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Produtos da biblioteca">
+                  {images.map((a) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={a.id}
+                      src={a.url}
+                      alt={a.name}
+                      title={product?.id === a.id ? 'Produto escolhido (clique para tirar)' : 'Usar este produto'}
+                      onClick={() => setProduct((p) => (p?.id === a.id ? null : { id: a.id, url: a.url, name: a.name }))}
+                      className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (product?.id === a.id ? 'ring-2 ring-[#4700ff] ring-offset-1' : 'opacity-85 hover:opacity-100')}
+                    />
+                  ))}
+                </div>
+              ) : null}
+              {product ? <p className="text-[12.5px] font-semibold text-[#4700ff]">Produto escolhido: {product.name.slice(0, 60)}. A IA recorta o produto real, sem inventar peças.</p> : null}
+              <span className={label}>{product ? 'Observação para o recorte (opcional)' : 'Objeto 3D (recorte da IA)'}</span>
               <textarea rows={2} value={subjectPrompt} onChange={(e) => setSubjectPrompt(e.target.value)} placeholder="Ex.: um cérebro de cerâmica branca; uma folha com gota d’água; um megafone de vidro" className={field + ' resize-none'} />
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="create-btn" disabled={!!busy} onClick={() => void generateSubject()}>
-                  {busy === 'subject' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy === 'subject' ? 'Criando o objeto…' : 'Criar objeto com IA'}
+                  {busy === 'subject' ? <LoaderCircle size={16} className="animate-spin" /> : <Sparkles size={16} />} {busy === 'subject' ? (product ? 'Recortando o produto…' : 'Criando o objeto…') : product ? 'Recortar o produto com IA' : 'Criar objeto com IA'}
                 </button>
                 {s.subject ? (
                   <button type="button" className="outline-btn" onClick={() => patch({ subject: '' })} aria-label="Tirar objeto">
@@ -755,7 +785,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
             <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="Descreva a imagem (sem texto): ex. mesa de café da manhã com luz natural" className={field + ' resize-none'} />
             <div className="flex flex-wrap gap-2">
               <button type="button" className="create-btn" disabled={!!busy} onClick={() => void generateImage()}>
-                {busy === 'image' ? <LoaderCircle size={16} className="animate-spin" /> : <ImagePlus size={16} />} {busy === 'image' ? 'Gerando…' : 'Gerar com IA'}
+                {busy === 'image' ? <LoaderCircle size={16} className="animate-spin" /> : <ImagePlus size={16} />} {busy === 'image' ? 'Gerando…' : product ? 'Gerar cena com o produto' : 'Gerar com IA'}
               </button>
               <button type="button" className="outline-btn" disabled={!!busy} onClick={() => fileInput.current?.click()}>
                 {busy === 'upload' ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />} Enviar
@@ -786,6 +816,49 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
                 Usar este fundo em todas as lâminas
               </button>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <span className={label}>Logo</span>
+            {logoAssets.length ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => patch({ logo: '' })} className={pill(!s.logo)}>
+                  Automático
+                </button>
+                {logoAssets.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    title={a.name}
+                    onClick={() => patch({ logo: a.url })}
+                    className={'grid h-10 w-20 place-items-center rounded-[10px] bg-[repeating-conic-gradient(#d9dbe3_0_25%,#f4f5f8_0_50%)] bg-[length:10px_10px] p-1 ' + (s.logo === a.url ? 'ring-2 ring-[#4700ff]' : 'shadow-[0_0_0_1px_rgb(15_21_64/.1)]')}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={a.url} alt="" className="max-h-full max-w-full object-contain" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12.5px] text-[#737985]">Envie o logo (e as versões negativa e branca) em Marcas → arquivos, na categoria Logotipo.</p>
+            )}
+            <div className="flex rounded-full bg-[rgb(15_21_64/.05)] p-1">
+              {(
+                [
+                  [56, 'Pequeno'],
+                  [72, 'Médio'],
+                  [96, 'Grande'],
+                ] as const
+              ).map(([v, l]) => (
+                <button key={v} type="button" className={pill((s.logoSize || 72) === v) + ' flex-1 justify-center'} onClick={() => patch({ logoSize: v })}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            {total > 1 ? (
+              <button type="button" className="text-[13px] font-semibold text-[#4700ff] hover:underline" onClick={() => setSlides((all) => all.map((x) => ({ ...x, logo: s.logo, logoSize: s.logoSize })))}>
+                Usar este logo em todas as lâminas
+              </button>
+            ) : null}
+            <p className="text-[12px] text-[#737985]">No automático, a arte usa a versão clara (negativa/branca) em fundo escuro e a escura em fundo claro.</p>
           </div>
           <div>
             <span className={label}>Cor do texto</span>
