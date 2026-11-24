@@ -62,8 +62,12 @@ export type VideoRequest = {
   revision: string;
 };
 
+/** Ícones 3D de vidro que o motor sabe montar (peças 3D, não desenho plano). */
+export const GLASS_ICONS = ['clock', 'gear', 'network', 'chart', 'bolt', 'rocket', 'chat', 'check', 'target', 'cloud', 'shield', 'sparkles', 'none'] as const;
+export type GlassIcon = (typeof GLASS_ICONS)[number];
 export type Scene = {
-  kind: 'clip' | 'image' | 'title' | 'logo' | 'end';
+  kind: 'clip' | 'image' | 'title' | 'glass3d' | 'logo' | 'end';
+  icon: GlassIcon;
   sourceId: string | null;
   start: number;
   duration: number;
@@ -206,9 +210,10 @@ export const planSchema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['kind', 'sourceId', 'start', 'duration', 'headline', 'text', 'layout', 'transition', 'motion', 'background', 'muted'],
+        required: ['kind', 'icon', 'sourceId', 'start', 'duration', 'headline', 'text', 'layout', 'transition', 'motion', 'background', 'muted'],
         properties: {
-          kind: { type: 'string', enum: ['clip', 'image', 'title', 'logo', 'end'] },
+          kind: { type: 'string', enum: ['clip', 'image', 'title', 'glass3d', 'logo', 'end'] },
+          icon: { type: 'string', enum: [...GLASS_ICONS] },
           sourceId: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           start: { type: 'number' },
           duration: { type: 'number' },
@@ -236,7 +241,7 @@ export function cleanPlan(raw: unknown, sources: SourceInfo[], maxSeconds: numbe
   let total = 0;
   for (const r of Array.isArray(p.scenes) ? p.scenes.slice(0, 60) : []) {
     const s = (r ?? {}) as Record<string, unknown>;
-    const kind = (['clip', 'image', 'title', 'logo', 'end'] as const).find((k) => k === s.kind);
+    const kind = (['clip', 'image', 'title', 'glass3d', 'logo', 'end'] as const).find((k) => k === s.kind);
     if (!kind) continue;
     const src = typeof s.sourceId === 'string' ? byId.get(s.sourceId) : undefined;
     let start = num(s.start, 0, 36000, 0);
@@ -253,6 +258,7 @@ export function cleanPlan(raw: unknown, sources: SourceInfo[], maxSeconds: numbe
     total += duration;
     scenes.push({
       kind,
+      icon: GLASS_ICONS.find((v) => v === s.icon) ?? (kind === 'glass3d' ? 'sparkles' : 'none'),
       sourceId: kind === 'clip' || kind === 'image' ? src!.id : null,
       start: kind === 'clip' ? Math.round(start * 100) / 100 : 0,
       duration: Math.round(duration * 100) / 100,
