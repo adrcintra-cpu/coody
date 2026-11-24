@@ -126,22 +126,24 @@ function fit(ctx: CanvasRenderingContext2D, text: string, weight: number, family
   for (let size = max; size >= min; size -= 4) {
     ctx.font = `${weight} ${size}px ${family}`;
     const lines = layoutText(ctx, text, width);
-    if (lines.length <= maxLines) return { size, lines };
+    if (lines.length <= maxLines) return { size, lines, font: ctx.font };
   }
   ctx.font = `${weight} ${min}px ${family}`;
-  return { size: min, lines: layoutText(ctx, text, width) };
+  return { size: min, lines: layoutText(ctx, text, width), font: ctx.font };
 }
+type Fitted = { size: number; lines: Token[][]; font: string };
 function drawLines(
   ctx: CanvasRenderingContext2D,
-  lines: Token[][],
+  t: Fitted,
   x: number,
   y: number,
-  size: number,
   lh: number,
   color: string,
   hi: string,
   opts: { align?: 'left' | 'center'; width?: number; underline?: boolean } = {},
 ) {
+  const { lines, size } = t;
+  ctx.font = t.font; // a fonte medida no fit (outra medição pode ter trocado ctx.font)
   ctx.textBaseline = 'alphabetic';
   for (const line of lines) {
     const full = line.map((t) => t.word).join(' ');
@@ -300,10 +302,10 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     let y = eyebrow(ctx, s.eyebrow, M, split + 64, hi, f);
     if (!s.eyebrow) y = split + 72;
     const t = fit(ctx, s.title, 800, f, W - M * 2, 3, 84, 52);
-    y = drawLines(ctx, t.lines, M, y, t.size, 1.04, ink, hi);
+    y = drawLines(ctx, t, M, y, 1.04, ink, hi);
     if (s.text) {
       const b = fit(ctx, s.text, 400, f, W - M * 2, 3, 34, 28);
-      drawLines(ctx, b.lines, M, y + 18, b.size, 1.38, alpha(ink, 0.82), hi);
+      drawLines(ctx, b, M, y + 18, 1.38, alpha(ink, 0.82), hi);
     }
     footer(ctx, env, ink, H - 64, false);
   } else if (layout === 'moldura') {
@@ -323,10 +325,10 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     ctx.restore();
     y += fh + 56;
     const t = fit(ctx, s.title, 800, f, W - M * 2, 2, 76, 50);
-    y = drawLines(ctx, t.lines, M, y, t.size, 1.04, ink, hi);
+    y = drawLines(ctx, t, M, y, 1.04, ink, hi);
     if (s.text) {
       const b = fit(ctx, s.text, 400, f, W - M * 2, 2, 32, 26);
-      drawLines(ctx, b.lines, M, y + 14, b.size, 1.36, alpha(ink, 0.78), hi);
+      drawLines(ctx, b, M, y + 14, 1.36, alpha(ink, 0.78), hi);
     }
     footer(ctx, env, ink, H - 60, false);
   } else if (layout === 'faixa' || layout === 'foto') {
@@ -346,8 +348,8 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       const blockH = 64 * (s.eyebrow ? 1 : 0) + t.lines.length * t.size * 1.04 + (b ? 22 + b.lines.length * b.size * 1.38 : 0);
       let y = top ? 140 : s.align === 'center' ? (H - blockH) / 2 : H - 150 - blockH;
       y = eyebrow(ctx, s.eyebrow, M, y, '#ffffff', f);
-      y = drawLines(ctx, t.lines, M, y, t.size, 1.04, ink, accent === '#ffffff' ? '#ffffff' : accent, { underline: true });
-      if (b) drawLines(ctx, b.lines, M, y + 22, b.size, 1.38, alpha(ink, 0.88), accent);
+      y = drawLines(ctx, t, M, y, 1.04, ink, accent === '#ffffff' ? '#ffffff' : accent, { underline: true });
+      if (b) drawLines(ctx, b, M, y + 22, 1.38, alpha(ink, 0.88), accent);
       footer(ctx, env, ink, top ? H - 64 : 96, false);
     } else {
       if (s.dim) {
@@ -363,10 +365,10 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       let y = eyebrow(ctx, s.eyebrow, M, by + 58, hi, f);
       if (!s.eyebrow) y = by + 70;
       const t = fit(ctx, s.title, 800, f, W - 120 - M * 2, 3, 80, 52);
-      y = drawLines(ctx, t.lines, M, y, t.size, 1.04, ink, hi);
+      y = drawLines(ctx, t, M, y, 1.04, ink, hi);
       if (s.text) {
         const b = fit(ctx, s.text, 400, f, W - 120 - M * 2, 2, 32, 26);
-        drawLines(ctx, b.lines, M, y + 14, b.size, 1.36, alpha(ink, 0.82), hi);
+        drawLines(ctx, b, M, y + 14, 1.36, alpha(ink, 0.82), hi);
       }
       footer(ctx, env, '#ffffff', s.align === 'top' ? H - 60 : 96, false);
     }
@@ -399,11 +401,11 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       y += n.size * 0.98 + 24;
       if (rest) {
         const t = fit(ctx, rest, 700, f, W - M * 2, 3, 64, 44);
-        y = drawLines(ctx, t.lines, M, y, t.size, 1.08, ink, hi);
+        y = drawLines(ctx, t, M, y, 1.08, ink, hi);
       }
       if (s.text) {
         const b = fit(ctx, s.text, 400, f, W - M * 2, 4, 34, 28);
-        drawLines(ctx, b.lines, M, y + 24, b.size, 1.4, alpha(ink, 0.8), hi);
+        drawLines(ctx, b, M, y + 24, 1.4, alpha(ink, 0.8), hi);
       }
     } else if (layout === 'citacao') {
       ctx.font = `800 300px Georgia, serif`;
@@ -411,16 +413,16 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       ctx.fillText('“', M - 14, y + 230);
       y += 230;
       const t = fit(ctx, s.title, 300, f, W - M * 2, 6, 72, 46);
-      y = drawLines(ctx, t.lines, M, y, t.size, 1.18, ink, hi);
+      y = drawLines(ctx, t, M, y, 1.18, ink, hi);
       if (s.text) {
         ctx.fillStyle = hi;
         ctx.fillRect(M, y + 34, 44, 3);
         const b = fit(ctx, s.text, 600, f, W - M * 2 - 64, 2, 30, 24);
-        drawLines(ctx, b.lines, M + 64, y + 22, b.size, 1.3, alpha(ink, 0.85), hi);
+        drawLines(ctx, b, M + 64, y + 22, 1.3, alpha(ink, 0.85), hi);
       }
     } else if (layout === 'lista') {
       const t = fit(ctx, s.title, 800, f, W - M * 2, 3, 80, 52);
-      y = drawLines(ctx, t.lines, M, y, t.size, 1.04, ink, hi) + 40;
+      y = drawLines(ctx, t, M, y, 1.04, ink, hi) + 40;
       const items = s.text
         .split(/\n|;|•/)
         .map((x) => x.trim())
@@ -434,7 +436,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
         ctx.fillStyle = hi;
         ctx.fillText(String(i + 1).padStart(2, '0'), M, y + 62);
         const b = fit(ctx, it, 600, f, W - M * 2 - 110, 2, 38, 28);
-        drawLines(ctx, b.lines, M + 110, y + 30, b.size, 1.25, ink, hi);
+        drawLines(ctx, b, M + 110, y + 30, 1.25, ink, hi);
         y += rowH;
       });
     } else {
@@ -443,11 +445,11 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       const b = s.text ? fit(ctx, s.text, 400, f, W - M * 2 - 40, 3, 36, 28) : null;
       const blockH = t.lines.length * t.size * 1.0 + (b ? 40 + b.lines.length * b.size * 1.4 : 0);
       const top = s.align === 'top' ? y + 20 : s.align === 'center' ? (H - blockH) / 2 : H - 190 - blockH;
-      let yy = drawLines(ctx, t.lines, M - 4, Math.max(y, top), t.size, 1.0, ink, hi);
+      let yy = drawLines(ctx, t, M - 4, Math.max(y, top), 1.0, ink, hi);
       if (b) {
         ctx.fillStyle = hi;
         ctx.fillRect(M, yy + 28, 6, b.lines.length * b.size * 1.4 - 8);
-        yy = drawLines(ctx, b.lines, M + 34, yy + 24, b.size, 1.4, alpha(ink, 0.85), hi);
+        yy = drawLines(ctx, b, M + 34, yy + 24, 1.4, alpha(ink, 0.85), hi);
       }
     }
     footer(ctx, env, ink);
