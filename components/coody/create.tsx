@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,6 +18,7 @@ import type { Action, Brand, State } from '@/lib/types';
 import { today } from '@/lib/types';
 import { HUB_URL } from '@/lib/oxyhub';
 import { PautaPicker, pautaBriefing, type Pauta } from './pauta-picker';
+import { H, LAYOUTS, W, blankSlide, drawSlide, isLayout, type ArtSlide, type Layout } from './art-layouts';
 
 /**
  * Criar: o jeito simples de fazer post e carrossel.
@@ -28,15 +29,10 @@ import { PautaPicker, pautaBriefing, type Pauta } from './pauta-picker';
  *    OxyPlanning já para aprovação.
  */
 
-type Align = 'top' | 'center' | 'bottom';
-type TextTone = 'auto' | 'light' | 'dark';
-type Slide = { title: string; text: string; bg: string; image: string; dim: number; align: Align; tone: TextTone };
-type Piece = { name: string; idea: string; slides: { title: string; text: string }[]; caption: string; hashtags: string[]; imagePrompt: string };
+type Slide = ArtSlide;
+type PieceSlide = { layout: Layout; eyebrow: string; title: string; text: string };
+type Piece = { name: string; idea: string; slides: PieceSlide[]; caption: string; hashtags: string[]; imagePrompt: string };
 type Msg = { role: 'user' | 'director'; text: string; concepts?: Piece[] };
-
-const W = 1080;
-const H = 1350;
-const PAD = 96;
 
 /** Cores da marca a partir do texto livre do cadastro (#hex); sem cores, a paleta Oxy. */
 function brandColors(b?: Brand) {
@@ -44,144 +40,68 @@ function brandColors(b?: Brand) {
   const list = [...new Set(found.map((c) => c.toLowerCase()))];
   return list.length ? [...list, '#ffffff', '#0f1540'].slice(0, 8) : ['#4700ff', '#0f1540', '#2563eb', '#7c3aed', '#22d3ee', '#ffffff'];
 }
-function isLight(hex: string) {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
-  const n = parseInt(full, 16);
-  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150;
-}
-function textColor(s: Slide) {
-  if (s.tone === 'light') return '#ffffff';
-  if (s.tone === 'dark') return '#0f1540';
-  if (s.image) return '#ffffff';
-  return isLight(s.bg) ? '#0f1540' : '#ffffff';
-}
-const blank = (bg: string): Slide => ({ title: '', text: '', bg, image: '', dim: 35, align: 'bottom', tone: 'auto' });
+const blank = (bg: string, layout: Layout = 'manchete'): Slide => blankSlide(bg, layout);
 
-/* ---------------- prévia (HTML) ---------------- */
+/* ---------------- imagens (cache) ---------------- */
 
-function SlideArt({ s, logo, index, total }: { s: Slide; logo: string; index: number; total: number }) {
-  const color = textColor(s);
-  const justify = s.align === 'top' ? 'flex-start' : s.align === 'center' ? 'center' : 'flex-end';
-  return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', background: s.bg, fontFamily: 'inherit' }}>
-      {s.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={s.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-      ) : null}
-      {s.image ? <div style={{ position: 'absolute', inset: 0, background: `rgba(0,0,0,${s.dim / 100})` }} /> : null}
-      <div style={{ position: 'absolute', inset: PAD, display: 'flex', flexDirection: 'column', justifyContent: justify, gap: 28, color }}>
-        {s.title ? <div style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.02em', whiteSpace: 'pre-wrap' }}>{s.title}</div> : null}
-        {s.text ? <div style={{ fontSize: 40, fontWeight: 400, lineHeight: 1.35, whiteSpace: 'pre-wrap', opacity: 0.92 }}>{s.text}</div> : null}
-      </div>
-      {logo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={logo} alt="" style={{ position: 'absolute', left: PAD, ...(s.align === 'bottom' ? { top: 64 } : { bottom: 64 }), height: 64, width: 'auto', objectFit: 'contain' }} />
-      ) : null}
-      {total > 1 ? (
-        <div style={{ position: 'absolute', right: PAD, ...(s.align === 'bottom' ? { top: 72 } : { bottom: 72 }), fontSize: 30, fontWeight: 600, color, opacity: 0.8 }}>
-          {index + 1}/{total}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-/** A arte em tamanho real, reduzida para caber na largura disponível. */
-function Scaled({ children, width }: { children: React.ReactNode; width: number }) {
-  const scale = width / W;
-  return (
-    <div style={{ width, height: H * scale, position: 'relative', overflow: 'hidden', borderRadius: 18, boxShadow: '0 18px 40px -22px rgb(15 21 64 / .45)' }}>
-      <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', position: 'absolute', top: 0, left: 0 }}>{children}</div>
-    </div>
-  );
-}
-
-/* ---------------- exportação (canvas) ---------------- */
-
+const imageCache = new Map<string, Promise<HTMLImageElement | null>>();
 function loadImage(src: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Não foi possível carregar uma imagem da peça.'));
-    img.src = src;
-  });
-}
-function wrap(ctx: CanvasRenderingContext2D, text: string, max: number) {
-  const lines: string[] = [];
-  for (const para of text.split('\n')) {
-    let line = '';
-    for (const word of para.split(/\s+/).filter(Boolean)) {
-      const next = line ? line + ' ' + word : word;
-      if (ctx.measureText(next).width > max && line) {
-        lines.push(line);
-        line = word;
-      } else line = next;
-    }
-    lines.push(line);
+  if (!src) return Promise.resolve(null);
+  let p = imageCache.get(src);
+  if (!p) {
+    p = new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+    imageCache.set(src, p);
   }
-  return lines;
+  return p;
 }
-async function renderPng(s: Slide, logo: string, index: number, total: number, family: string) {
+
+type EnvBase = { family: string; palette: string[]; logo: string; signature: string };
+
+/** Desenha a lâmina num canvas (o mesmo desenho da prévia e do PNG). */
+async function paint(canvas: HTMLCanvasElement, s: Slide, base: EnvBase, index: number, total: number) {
+  const [logo, image] = await Promise.all([loadImage(base.logo), loadImage(s.image)]);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  drawSlide(ctx, s, { family: base.family, palette: base.palette, logo, image, index, total, signature: base.signature });
+}
+
+/** Prévia ao vivo: canvas em tamanho real (1080×1350), reduzido por CSS. */
+function CanvasArt({ s, base, index, total, width }: { s: Slide; base: EnvBase; index: number; total: number; width: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let alive = true;
+    const off = document.createElement('canvas');
+    off.width = W;
+    off.height = H;
+    void paint(off, s, base, index, total).then(() => {
+      const c = ref.current;
+      if (!alive || !c) return;
+      c.getContext('2d')?.drawImage(off, 0, 0);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [s, base, index, total]);
+  return (
+    <canvas
+      ref={ref}
+      width={W}
+      height={H}
+      style={{ width, height: (H / W) * width, display: 'block', borderRadius: width > 100 ? 18 : 8, boxShadow: width > 100 ? '0 18px 40px -22px rgb(15 21 64 / .45)' : undefined }}
+    />
+  );
+}
+
+async function renderPng(s: Slide, base: EnvBase, index: number, total: number) {
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = s.bg;
-  ctx.fillRect(0, 0, W, H);
-  if (s.image) {
-    const img = await loadImage(s.image);
-    const r = Math.max(W / img.width, H / img.height);
-    const w = img.width * r,
-      h = img.height * r;
-    ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h);
-    ctx.fillStyle = `rgba(0,0,0,${s.dim / 100})`;
-    ctx.fillRect(0, 0, W, H);
-  }
-  const color = textColor(s);
-  const maxW = W - PAD * 2;
-  ctx.textBaseline = 'top';
-  ctx.font = `700 84px ${family}`;
-  const titleLines = s.title ? wrap(ctx, s.title, maxW) : [];
-  ctx.font = `400 40px ${family}`;
-  const textLines = s.text ? wrap(ctx, s.text, maxW) : [];
-  const titleH = titleLines.length * 84 * 1.05;
-  const textH = textLines.length * 40 * 1.35;
-  const block = titleH + textH + (titleLines.length && textLines.length ? 28 : 0);
-  let y = s.align === 'top' ? PAD : s.align === 'center' ? (H - block) / 2 : H - PAD - block;
-  ctx.fillStyle = color;
-  ctx.font = `700 84px ${family}`;
-  for (const l of titleLines) {
-    ctx.fillText(l, PAD, y);
-    y += 84 * 1.05;
-  }
-  if (titleLines.length && textLines.length) y += 28;
-  ctx.font = `400 40px ${family}`;
-  ctx.globalAlpha = 0.92;
-  for (const l of textLines) {
-    ctx.fillText(l, PAD, y);
-    y += 40 * 1.35;
-  }
-  ctx.globalAlpha = 1;
-  const corner = s.align === 'bottom' ? 'top' : 'bottom';
-  if (logo) {
-    const img = await loadImage(logo).catch(() => null);
-    if (img) {
-      const h = 64,
-        w = (img.width / img.height) * h;
-      ctx.drawImage(img, PAD, corner === 'top' ? 64 : H - 64 - h, w, h);
-    }
-  }
-  if (total > 1) {
-    ctx.font = `600 30px ${family}`;
-    ctx.globalAlpha = 0.8;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = corner === 'top' ? 'top' : 'bottom';
-    ctx.fillText(`${index + 1}/${total}`, W - PAD, corner === 'top' ? 72 : H - 72);
-    ctx.globalAlpha = 1;
-    ctx.textAlign = 'left';
-  }
+  await paint(canvas, s, base, index, total);
   return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Não foi possível gerar o PNG.'))), 'image/png'));
 }
 
@@ -248,6 +168,28 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     }
   }, [brandId]);
 
+  // Fonte: a da marca (Google Fonts) quando o cadastro informa; senão a Saira do Oxyhub.
+  const brandFont = (brand?.fonts || '').split(/[,;\n]/)[0].replace(/["']/g, '').trim().slice(0, 60);
+  const [fontTick, setFontTick] = useState(0);
+  useEffect(() => {
+    if (!brandFont || !/^[\p{L}\p{N} ]+$/u.test(brandFont)) return;
+    const id = 'brand-font-' + brandFont.replace(/\W+/g, '-');
+    if (!document.getElementById(id)) {
+      const link = document.createElement('link');
+      link.id = id;
+      link.rel = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(brandFont)}:wght@300;400;600;700;800&display=swap`;
+      document.head.appendChild(link);
+    }
+    void Promise.all([document.fonts.load(`800 80px "${brandFont}"`), document.fonts.load(`400 40px "${brandFont}"`)]).then(() => setFontTick((t) => t + 1));
+  }, [brandFont]);
+  const base = useMemo<EnvBase>(() => {
+    const page = typeof document === 'undefined' ? 'Saira, sans-serif' : getComputedStyle(document.body).fontFamily || 'Saira, sans-serif';
+    const family = brandFont && /^[\p{L}\p{N} ]+$/u.test(brandFont) ? `"${brandFont}", ${page}` : page;
+    return { family, palette, logo, signature: brand?.name || '' };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandFont, palette, logo, brand?.name, fontTick]);
+
   const total = slides.length;
   const s = slides[Math.min(current, total - 1)];
   const patch = (p: Partial<Slide>) => setSlides((all) => all.map((x, i) => (i === current ? { ...x, ...p } : x)));
@@ -256,7 +198,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const resize = (n: number) =>
     setSlides((all) => {
       const next = all.slice(0, n);
-      while (next.length < n) next.push({ ...blank(all[all.length - 1]?.bg || palette[0]), image: all[all.length - 1]?.image || '', dim: all[all.length - 1]?.dim ?? 35 });
+      while (next.length < n) next.push({ ...blank(all[all.length - 1]?.bg || palette[0], all[all.length - 1]?.layout), image: all[all.length - 1]?.image || '', dim: all[all.length - 1]?.dim ?? 30 });
       return next;
     });
   useEffect(() => {
@@ -267,7 +209,14 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
 
   const applyPiece = (p: Piece) => {
     setSlides((all) =>
-      p.slides.map((t, i) => ({ ...(all[i] || blank(all[0]?.bg || palette[0])), title: t.title, text: t.text, ...(i > 0 && !all[i] ? { image: all[0]?.image || '' } : {}) })),
+      p.slides.map((t, i) => ({
+        ...(all[i] || blank(all[0]?.bg || palette[0])),
+        title: t.title,
+        text: t.text,
+        eyebrow: t.eyebrow,
+        layout: isLayout(t.layout) ? t.layout : 'manchete',
+        ...(i > 0 && !all[i] ? { image: all[0]?.image || '' } : {}),
+      })),
     );
     setCaption(p.caption);
     setHashtags(p.hashtags.join(' '));
@@ -279,7 +228,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
   const draftNow = (): Piece => ({
     name: title,
     idea: '',
-    slides: slides.map((x) => ({ title: x.title, text: x.text })),
+    slides: slides.map((x) => ({ layout: x.layout, eyebrow: x.eyebrow, title: x.title, text: x.text })),
     caption,
     hashtags: hashtags.split(/\s+/).filter(Boolean),
     imagePrompt,
@@ -362,15 +311,10 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     }
   };
 
-  const family = useCallback(() => {
-    const f = getComputedStyle(document.querySelector('.create-art') || document.body).fontFamily || 'Saira, sans-serif';
-    return f;
-  }, []);
   const pngs = async () => {
-    const f = family();
-    await Promise.all([document.fonts.load(`700 84px ${f}`), document.fonts.load(`400 40px ${f}`)]).catch(() => undefined);
+    await Promise.all([document.fonts.load(`800 84px ${base.family}`), document.fonts.load(`400 40px ${base.family}`)]).catch(() => undefined);
     const out: Blob[] = [];
-    for (let i = 0; i < slides.length; i++) out.push(await renderPng(slides[i], logo, i, slides.length, f));
+    for (let i = 0; i < slides.length; i++) out.push(await renderPng(slides[i], base, i, slides.length));
     return out;
   };
 
@@ -430,8 +374,8 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
         date,
         format: files.length > 1 ? 'Carrossel' : 'Feed',
         brief: chat.filter((m) => m.role === 'user').map((m) => m.text).join('\n').slice(0, 2000),
-        headline: slides[0].title,
-        copy: slides.map((x, i) => (files.length > 1 ? `${i + 1}. ` : '') + [x.title, x.text].filter(Boolean).join(' — ')).join('\n'),
+        headline: slides[0].title.replace(/\*/g, ''),
+        copy: slides.map((x, i) => (files.length > 1 ? `${i + 1}. ` : '') + [x.title.replace(/\*/g, ''), x.text].filter(Boolean).join(' — ')).join('\n'),
         caption,
         hashtags: tagsList,
         media: ids,
@@ -565,7 +509,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
                       <div key={k} className="rounded-[14px] bg-white p-3 shadow-[0_0_0_.5px_rgb(15_21_64/.08)]">
                         <p className="text-[14px] font-bold">{c.name}</p>
                         <p className="mt-0.5 text-[13px] text-[#737985]">{c.idea}</p>
-                        <p className="mt-1.5 text-[13px] text-[#4a505c]">“{c.slides[0]?.title}”{c.slides.length > 1 ? ` + ${c.slides.length - 1} lâminas` : ''}</p>
+                        <p className="mt-1.5 text-[13px] text-[#4a505c]">“{c.slides[0]?.title.replace(/\*/g, '')}”{c.slides.length > 1 ? ` + ${c.slides.length - 1} lâminas` : ''}</p>
                         <button type="button" className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-[#4700ff] px-3 text-[13px] font-semibold text-white" onClick={() => applyPiece(c)}>
                           <Wand2 size={14} /> Usar este
                         </button>
@@ -629,9 +573,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
             ) : null}
           </div>
           <div ref={box} className="create-art flex w-full justify-center">
-            <Scaled width={previewW}>
-              <SlideArt s={s} logo={logo} index={current} total={total} />
-            </Scaled>
+            <CanvasArt s={s} base={base} index={current} total={total} width={previewW} />
           </div>
           {total > 1 ? (
             <div className="flex w-full max-w-[560px] items-center gap-2">
@@ -641,9 +583,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
               <div className="flex flex-1 gap-2 overflow-x-auto py-1">
                 {slides.map((x, i) => (
                   <button key={i} type="button" aria-label={`Lâmina ${i + 1}`} aria-current={i === current} onClick={() => setCurrent(i)} className={'shrink-0 rounded-[8px] ' + (i === current ? 'ring-2 ring-[#4700ff] ring-offset-2' : 'opacity-80 hover:opacity-100')}>
-                    <Scaled width={56}>
-                      <SlideArt s={x} logo={logo} index={i} total={total} />
-                    </Scaled>
+                    <CanvasArt s={x} base={base} index={i} total={total} width={56} />
                   </button>
                 ))}
               </div>
@@ -658,18 +598,47 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
         {/* Ajustes */}
         <section className="glass space-y-4 rounded-[22px] p-4">
           <h2 className="text-[15px] font-bold">{total > 1 ? `Lâmina ${current + 1} de ${total}` : 'Arte'}</h2>
+          <div>
+            <span className={label}>Modelo</span>
+            <div className="grid grid-cols-4 gap-1.5">
+              {LAYOUTS.map((l) => (
+                <button
+                  key={l.key}
+                  type="button"
+                  title={l.hint}
+                  aria-pressed={s.layout === l.key}
+                  onClick={() => patch({ layout: l.key })}
+                  className={
+                    'h-9 rounded-full px-2 text-[12.5px] font-semibold transition-colors ' +
+                    (s.layout === l.key ? 'bg-[#4700ff] text-white' : 'bg-[rgb(15_21_64/.05)] text-[#4a505c] hover:bg-[rgb(15_21_64/.09)]')
+                  }
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[12px] text-[#737985]">
+              {LAYOUTS.find((l) => l.key === s.layout)?.hint}.{' '}
+              {LAYOUTS.find((l) => l.key === s.layout)?.photo === 'sim' && !s.image ? 'Escolha uma foto da biblioteca abaixo.' : ''}
+            </p>
+          </div>
+          <label className="block">
+            <span className={label}>Sobretítulo</span>
+            <input value={s.eyebrow} onChange={(e) => patch({ eyebrow: e.target.value })} className={field} maxLength={40} placeholder="Ex.: Black Friday · Dica 01 · Novidade" />
+          </label>
           <label className="block">
             <span className={label}>Título</span>
             <textarea rows={2} value={s.title} onChange={(e) => patch({ title: e.target.value })} className={field + ' resize-none'} maxLength={140} />
+            <span className="mt-1 block text-[12px] text-[#737985]">Coloque *asteriscos* numa palavra para destacá-la na cor da marca.</span>
           </label>
           <label className="block">
-            <span className={label}>Texto</span>
+            <span className={label}>{s.layout === 'lista' ? 'Itens (um por linha)' : s.layout === 'citacao' ? 'Assinatura' : 'Texto'}</span>
             <textarea rows={3} value={s.text} onChange={(e) => patch({ text: e.target.value })} className={field + ' resize-none'} maxLength={400} />
           </label>
           <div>
             <span className={label}>Posição do texto</span>
             <div className="flex rounded-full bg-[rgb(15_21_64/.05)] p-1">
-              {(['top', 'center', 'bottom'] as Align[]).map((a) => (
+              {(['top', 'center', 'bottom'] as Slide['align'][]).map((a) => (
                 <button key={a} type="button" className={pill(s.align === a) + ' flex-1 justify-center'} onClick={() => patch({ align: a })}>
                   {a === 'top' ? 'Em cima' : a === 'center' ? 'Centro' : 'Embaixo'}
                 </button>
@@ -725,7 +694,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
           <div>
             <span className={label}>Cor do texto</span>
             <div className="flex rounded-full bg-[rgb(15_21_64/.05)] p-1">
-              {(['auto', 'light', 'dark'] as TextTone[]).map((t) => (
+              {(['auto', 'light', 'dark'] as Slide['tone'][]).map((t) => (
                 <button key={t} type="button" className={pill(s.tone === t) + ' flex-1 justify-center'} onClick={() => patch({ tone: t })}>
                   {t === 'auto' ? 'Automática' : t === 'light' ? 'Clara' : 'Escura'}
                 </button>
