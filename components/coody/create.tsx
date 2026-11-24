@@ -138,7 +138,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
     [state.assets, brandId],
   );
   const images = useMemo(
-    () => state.assets.filter((a) => a.brandId === brandId && /^image\/(png|jpe?g|webp)/.test(a.mime) && a.category !== 'logo' && !/^Criar · objeto/.test(a.name)).slice(0, 60),
+    () => state.assets.filter((a) => a.brandId === brandId && /^image\/(png|jpe?g|webp)/.test(a.mime) && a.category !== 'logo' && !/^Criar · objeto/.test(a.name)).slice(0, 36),
     [state.assets, brandId],
   );
 
@@ -749,6 +749,8 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
                       key={a.id}
                       src={a.url}
                       alt={a.name}
+                      loading="lazy"
+                      decoding="async"
                       title={product?.id === a.id ? 'Produto escolhido (clique para tirar)' : 'Usar este produto'}
                       onClick={() => setProduct((p) => (p?.id === a.id ? null : { id: a.id, url: a.url, name: a.name }))}
                       className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (product?.id === a.id ? 'ring-2 ring-[#4700ff] ring-offset-1' : 'opacity-85 hover:opacity-100')}
@@ -773,15 +775,16 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
                 <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Objetos já criados">
                   {subjects.map((a) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img key={a.id} src={a.url} alt={a.name} title={a.name} onClick={() => patch({ subject: a.url })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:12px_12px] object-contain ' + (s.subject === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
+                    <img key={a.id} src={a.url} alt={a.name} title={a.name} loading="lazy" decoding="async" onClick={() => patch({ subject: a.url })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:12px_12px] object-contain ' + (s.subject === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
                   ))}
                 </div>
               ) : null}
               <p className="text-[12px] text-[#737985]">A IA cria só o objeto, com fundo transparente; o layout, a tipografia e as cores da marca são montados aqui, com o texto sempre certo.</p>
             </div>
           ) : null}
+          {LAYOUTS.find((l) => l.key === s.layout)?.photo !== 'não' ? (
           <div className="space-y-2">
-            <span className={label}>Imagem de fundo</span>
+            <span className={label}>{s.layout === 'recorte' ? 'Foto dentro da forma (opcional)' : 'Imagem de fundo'}</span>
             <textarea rows={2} value={imagePrompt} onChange={(e) => setImagePrompt(e.target.value)} placeholder="Descreva a imagem (sem texto): ex. mesa de café da manhã com luz natural" className={field + ' resize-none'} />
             <div className="flex flex-wrap gap-2">
               <button type="button" className="create-btn" disabled={!!busy} onClick={() => void generateImage()}>
@@ -801,7 +804,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
               <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Imagens da biblioteca">
                 {images.map((a) => (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img key={a.id} src={a.url} alt={a.name} title={a.name} onClick={() => patch({ image: a.url })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (s.image === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
+                  <img key={a.id} src={a.url} alt={a.name} title={a.name} loading="lazy" decoding="async" onClick={() => patch({ image: a.url })} className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (s.image === a.url ? 'ring-2 ring-[#4700ff]' : '')} />
                 ))}
               </div>
             ) : null}
@@ -817,6 +820,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
               </button>
             ) : null}
           </div>
+          ) : null}
           <div className="space-y-2">
             <span className={label}>Logo</span>
             {logoAssets.length ? (
