@@ -2964,3 +2964,10 @@ h3 {
 /* Nome do produto em texto (OxyStudio) enquanto o logo oficial não existe.
    O logo antigo (oxycreate-logo.svg) trazia o nome OxyCreate e saiu de uso. */
 .product-wordmark { margin: 0; font-family: 'Saira', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: #0f1540; }
+
+/* Oxyhub · aberto dentro do Hub: a barra do Hub já mostra logo, sistemas e pessoa. */
+.oxyhub-embed .embed-hide { display: none !important; }
+@media (min-width: 1024px) {
+  .oxyhub-embed .oxy-topbar { height: 56px; background: transparent; box-shadow: none; border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .oxyhub-embed .oxy-side { top: 68px; height: calc(100svh - 80px); }
+}

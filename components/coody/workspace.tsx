@@ -375,10 +375,10 @@ export default function Workspace() {
         <button className="glass-btn oxy-menu-btn" aria-label="Abrir menu" onClick={() => setMenuOpen(true)}>
           <MenuIcon size={20} />
         </button>
-        <a className="oxy-brand" href={HUB_URL} aria-label="Oxyhub · tela inicial" title="Tela inicial do Oxyhub">
+        <a className="oxy-brand embed-hide" href={HUB_URL} aria-label="Oxyhub · tela inicial" title="Tela inicial do Oxyhub">
           <Image unoptimized width={107} height={33} src="/oxyhub-logo.svg" alt="Oxyhub" className="oxy-logo" priority />
         </a>
-        <button className="oxy-brand" onClick={() => navigate('Criar')} aria-label="Ir para Criar, no OxyStudio">
+        <button className="oxy-brand embed-hide" onClick={() => navigate('Criar')} aria-label="Ir para Criar, no OxyStudio">
           <span className="oxy-product">OxyStudio</span>
         </button>
         <div className="oxy-spacer" />
@@ -395,20 +395,20 @@ export default function Workspace() {
             window.history.replaceState(null, '', (path || '#Dashboard') + '?' + params.toString());
           }}
         />
-        {state && role !== 'APROVADOR' && <OxyhubSwitcher />}
+        {state && role !== 'APROVADOR' && <span className="embed-hide"><OxyhubSwitcher /></span>}
         {state && <Notifications />}
         {state?.user && (
           <>
-            <button className="oxy-user" onClick={() => navigate('Configurações')} title={role ? roleLabels[role] : undefined}>
+            <button className="oxy-user embed-hide" onClick={() => navigate('Configurações')} title={role ? roleLabels[role] : undefined}>
               {state.user.name?.split(' ')[0] || 'Minha conta'}
             </button>
             <button
-              className="glass-btn oxy-out"
+              className="glass-btn oxy-out embed-hide"
               aria-label="Sair"
               title="Sair"
               onClick={async () => {
                 const response = await fetch('/api/session', { method: 'DELETE' });
-                if (response.ok) window.location.assign(HUB_SIGN_OUT);
+                if (response.ok) (window.top ?? window).location.href = HUB_SIGN_OUT;
                 else setError('Não foi possível sair. Tente novamente.');
               }}
             >

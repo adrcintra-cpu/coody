@@ -30,6 +30,7 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body>
         {children}
+        <Script src="/oxyhub-embed.js" strategy="afterInteractive" />
         <Script src="/liquid-lens.js" strategy="afterInteractive" data-selector=".glass, .attention, .panel, .brand-assist, .kanban-column, .brand-card, .asset-card, .integration-card, .art-workspace, .metrics, .week-meter, .calendar-scroll, .library-folders > button, .profile-upload, .coody-dialog, .notification-popover, [data-slot='dialog-content'], [data-slot='popover-content'], [data-slot='dropdown-menu-content'], [data-slot='select-content'], [data-slot='alert-dialog-content'], [data-slot='sheet-content'], .outline-btn, [data-slot='button'][data-variant='outline'], [data-slot='button'][data-variant='secondary'], [data-slot='select-trigger'], .create-btn, [data-slot='button'][data-variant='default'], .profile-upload-button" />
       </body>
     </html>
