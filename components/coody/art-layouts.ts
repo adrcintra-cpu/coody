@@ -79,11 +79,20 @@ function roles(palette: string[], bg: string) {
   const dark = [...colors, '#0f1540'].sort((a, b) => luma(a) - luma(b))[0];
   const paper = '#f6f4ef';
   // Destaque: a cor mais viva da paleta que contraste com o fundo
+  const ink = isLight(bg) ? '#0f1540' : '#ffffff';
+  const far = (a: string, b: string) => {
+    const [r1, g1, b1] = rgb(a);
+    const [r2, g2, b2] = rgb(b);
+    return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2) > 120;
+  };
+  // Destaque: a cor mais viva da paleta que contraste com o fundo E seja diferente do texto
   const accent =
     [...colors]
-      .filter((c) => Math.abs(luma(c) - luma(bg)) > 60 && saturation(c) > 0.35)
-      .sort((a, b) => saturation(b) - saturation(a))[0] || (isLight(bg) ? colors.find((c) => !isLight(c) && saturation(c) > 0.3) || dark : '#ffffff');
-  return { dark, paper, accent };
+      .filter((c) => Math.abs(luma(c) - luma(bg)) > 60 && saturation(c) > 0.35 && far(c, ink) && far(c, bg))
+      .sort((a, b) => saturation(b) - saturation(a))[0] || null;
+  // Sem cor de destaque que funcione: marca-texto (faixa atrás da palavra) numa cor da paleta
+  const marker = colors.find((c) => far(c, bg)) || ink;
+  return { dark, paper, hi: accent || marker, underline: !accent };
 }
 
 /* ---------------- texto ---------------- */
@@ -282,7 +291,10 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
   const f = env.family;
   ctx.save();
   ctx.clearRect(0, 0, W, H);
-  const { dark, paper, accent } = roles(env.palette, s.bg);
+  const base = roles(env.palette, s.bg);
+  const { dark, paper } = base;
+  const accent = base.hi;
+  const ul = { underline: base.underline };
   const toneFor = (bg: string) => (s.tone === 'light' ? '#ffffff' : s.tone === 'dark' ? '#0f1540' : isLight(bg) ? '#0f1540' : '#ffffff');
   const img = env.image;
   const layout = s.layout;
@@ -298,11 +310,13 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     ctx.fillStyle = s.bg;
     ctx.fillRect(0, split, W, H - split);
     const ink = toneFor(s.bg);
-    const hi = roles(env.palette, s.bg).accent;
+    const r2 = roles(env.palette, s.bg);
+    const hi = r2.hi;
+    const ul2 = { underline: r2.underline };
     let y = eyebrow(ctx, s.eyebrow, M, split + 64, hi, f);
     if (!s.eyebrow) y = split + 72;
     const t = fit(ctx, s.title, 800, f, W - M * 2, 3, 84, 52);
-    y = drawLines(ctx, t, M, y, 1.04, ink, hi);
+    y = drawLines(ctx, t, M, y, 1.04, ink, hi, ul2);
     if (s.text) {
       const b = fit(ctx, s.text, 400, f, W - M * 2, 3, 34, 28);
       drawLines(ctx, b, M, y + 18, 1.38, alpha(ink, 0.82), hi);
@@ -313,7 +327,9 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
     const ink = toneFor(bg);
-    const hi = roles(env.palette, bg).accent;
+    const r2 = roles(env.palette, bg);
+    const hi = r2.hi;
+    const ul2 = { underline: r2.underline };
     let y = eyebrow(ctx, s.eyebrow, M, 92, hi, f);
     if (!s.eyebrow) y = 100;
     const fh = 640;
@@ -325,7 +341,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
     ctx.restore();
     y += fh + 56;
     const t = fit(ctx, s.title, 800, f, W - M * 2, 2, 76, 50);
-    y = drawLines(ctx, t, M, y, 1.04, ink, hi);
+    y = drawLines(ctx, t, M, y, 1.04, ink, hi, ul2);
     if (s.text) {
       const b = fit(ctx, s.text, 400, f, W - M * 2, 2, 32, 26);
       drawLines(ctx, b, M, y + 14, 1.36, alpha(ink, 0.78), hi);
@@ -348,7 +364,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       const blockH = 64 * (s.eyebrow ? 1 : 0) + t.lines.length * t.size * 1.04 + (b ? 22 + b.lines.length * b.size * 1.38 : 0);
       let y = top ? 140 : s.align === 'center' ? (H - blockH) / 2 : H - 150 - blockH;
       y = eyebrow(ctx, s.eyebrow, M, y, '#ffffff', f);
-      y = drawLines(ctx, t, M, y, 1.04, ink, accent === '#ffffff' ? '#ffffff' : accent, { underline: true });
+      y = drawLines(ctx, t, M, y, 1.04, ink, base.underline ? '#ffffff' : accent, { underline: true });
       if (b) drawLines(ctx, b, M, y + 22, 1.38, alpha(ink, 0.88), accent);
       footer(ctx, env, ink, top ? H - 64 : 96, false);
     } else {
@@ -361,11 +377,13 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       ctx.fillStyle = s.bg;
       ctx.fillRect(0, by, W - 120, bandH);
       const ink = toneFor(s.bg);
-      const hi = roles(env.palette, s.bg).accent;
+      const r2 = roles(env.palette, s.bg);
+    const hi = r2.hi;
+    const ul2 = { underline: r2.underline };
       let y = eyebrow(ctx, s.eyebrow, M, by + 58, hi, f);
       if (!s.eyebrow) y = by + 70;
       const t = fit(ctx, s.title, 800, f, W - 120 - M * 2, 3, 80, 52);
-      y = drawLines(ctx, t, M, y, 1.04, ink, hi);
+      y = drawLines(ctx, t, M, y, 1.04, ink, hi, ul2);
       if (s.text) {
         const b = fit(ctx, s.text, 400, f, W - 120 - M * 2, 2, 32, 26);
         drawLines(ctx, b, M, y + 14, 1.36, alpha(ink, 0.82), hi);
@@ -401,7 +419,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       y += n.size * 0.98 + 24;
       if (rest) {
         const t = fit(ctx, rest, 700, f, W - M * 2, 3, 64, 44);
-        y = drawLines(ctx, t, M, y, 1.08, ink, hi);
+        y = drawLines(ctx, t, M, y, 1.08, ink, hi, ul);
       }
       if (s.text) {
         const b = fit(ctx, s.text, 400, f, W - M * 2, 4, 34, 28);
@@ -413,7 +431,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       ctx.fillText('“', M - 14, y + 230);
       y += 230;
       const t = fit(ctx, s.title, 300, f, W - M * 2, 6, 72, 46);
-      y = drawLines(ctx, t, M, y, 1.18, ink, hi);
+      y = drawLines(ctx, t, M, y, 1.18, ink, hi, ul);
       if (s.text) {
         ctx.fillStyle = hi;
         ctx.fillRect(M, y + 34, 44, 3);
@@ -422,7 +440,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       }
     } else if (layout === 'lista') {
       const t = fit(ctx, s.title, 800, f, W - M * 2, 3, 80, 52);
-      y = drawLines(ctx, t, M, y, 1.04, ink, hi) + 40;
+      y = drawLines(ctx, t, M, y, 1.04, ink, hi, ul) + 40;
       const items = s.text
         .split(/\n|;|•/)
         .map((x) => x.trim())
@@ -445,7 +463,7 @@ export function drawSlide(ctx: CanvasRenderingContext2D, s: ArtSlide, env: ArtEn
       const b = s.text ? fit(ctx, s.text, 400, f, W - M * 2 - 40, 3, 36, 28) : null;
       const blockH = t.lines.length * t.size * 1.0 + (b ? 40 + b.lines.length * b.size * 1.4 : 0);
       const top = s.align === 'top' ? y + 20 : s.align === 'center' ? (H - blockH) / 2 : H - 190 - blockH;
-      let yy = drawLines(ctx, t, M - 4, Math.max(y, top), 1.0, ink, hi);
+      let yy = drawLines(ctx, t, M - 4, Math.max(y, top), 1.0, ink, hi, ul);
       if (b) {
         ctx.fillStyle = hi;
         ctx.fillRect(M, yy + 28, 6, b.lines.length * b.size * 1.4 - 8);
