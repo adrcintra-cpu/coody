@@ -93,7 +93,7 @@ export function TrelloIntegration({ state }: { state: State }) {
       expiration: '30days',
       scope: 'read,write',
       response_type: 'token',
-      name: 'OxyCreate',
+      name: 'OxyStudio',
       key,
     });
   const select = (
@@ -215,7 +215,7 @@ export function TrelloIntegration({ state }: { state: State }) {
               </button>
               <p className="notice">
                 Disponíveis apenas pautas que aguardam aprovação. O envio é
-                manual. Movimentos e comentários no Trello não alteram o OxyCreate
+                manual. Movimentos e comentários no Trello não alteram o OxyStudio
                 automaticamente.
               </p>
               <h3>Envios</h3>
@@ -241,7 +241,7 @@ export function TrelloIntegration({ state }: { state: State }) {
             disabled={busy}
             onClick={() => action({ action: 'disconnect' })}
           >
-            Desconectar do OxyCreate
+            Desconectar do OxyStudio
           </button>
         </>
       ) : (
@@ -271,7 +271,7 @@ export function TrelloIntegration({ state }: { state: State }) {
           {/^[a-zA-Z0-9]{20,128}$/.test(key) && (
             <p>
               <a href={authUrl} target="_blank" rel="noreferrer">
-                Autorizar OxyCreate no Trello e obter token
+                Autorizar OxyStudio no Trello e obter token
               </a>
             </p>
           )}

@@ -544,7 +544,7 @@ export async function POST(request: Request) {
               .bind(status, status, plan.id),
       );
     } else if (action === 'createExternal' || action === 'mediaVersion') {
-      // A post, carousel, video or file made outside the OxyCreate, sent for
+      // A post, carousel, video or file made outside the OxyStudio, sent for
       // approval. createExternal makes the piece already in approval;
       // mediaVersion adds a new version with new files (after a request).
       const target =

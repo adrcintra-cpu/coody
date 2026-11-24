@@ -141,7 +141,7 @@ export function OxyPlanningInbox({
             <h2>
               <Link2 size={17} /> Marcas ligadas ao OxyPlanning
             </h2>
-            <p className="muted">Cada marca do OxyCreate corresponde a um cliente do OxyPlanning. Só as marcas ligadas recebem pautas.</p>
+            <p className="muted">Cada marca do OxyStudio corresponde a um cliente do OxyPlanning. Só as marcas ligadas recebem pautas.</p>
             <div className="planning-links-grid">
               {brands.map((b) => {
                 const link = ok!.links.find((l) => l.brandId === b.id);
@@ -224,7 +224,7 @@ export function OxyPlanningInbox({
                             if (out?.contentId) openId(out.contentId);
                           }}
                         >
-                          {busy === p.postId ? <LoaderCircle className="animate-spin" size={16} /> : <CalendarCheck2 size={16} />} Produzir no OxyCreate
+                          {busy === p.postId ? <LoaderCircle className="animate-spin" size={16} /> : <CalendarCheck2 size={16} />} Produzir no OxyStudio
                         </button>
                       )}
                     </article>
@@ -240,8 +240,8 @@ export function OxyPlanningInbox({
 }
 
 /**
- * Calendário do OxyCreate = calendário do OxyPlanning: mostra as publicações planejadas lá
- * (marcas ligadas), com o andamento da produção aqui quando a pauta está no OxyCreate.
+ * Calendário do OxyStudio = calendário do OxyPlanning: mostra as publicações planejadas lá
+ * (marcas ligadas), com o andamento da produção aqui quando a pauta está no OxyStudio.
  */
 export function PlanningCalendar({
   state,

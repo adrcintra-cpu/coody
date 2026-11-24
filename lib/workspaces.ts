@@ -6,7 +6,7 @@ import { memberWorkspaces } from './members';
 export async function allowedWorkspaceIds(request?: Request): Promise<string[] | null> {
   if (!request) return null;
   const user = await authorize(request);
-  if (user instanceof Response) throw new Error('Entre com sua conta para acessar o OxyCreate.');
+  if (user instanceof Response) throw new Error('Entre com sua conta para acessar o OxyStudio.');
   return user.member ? memberWorkspaces(user.id) : null;
 }
 export const defaultWorkspace = 'main';

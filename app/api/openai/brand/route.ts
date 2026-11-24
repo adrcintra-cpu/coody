@@ -37,7 +37,7 @@ async function readSite(raw: string): Promise<{ text: string; note: string }> {
         redirect: 'manual',
         signal: AbortSignal.timeout(8000),
         headers: {
-          'User-Agent': 'OxyCreate/1.0 (cadastro de marca)',
+          'User-Agent': 'OxyStudio/1.0 (cadastro de marca)',
           Accept: 'text/html,application/xhtml+xml',
         },
       });

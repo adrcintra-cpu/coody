@@ -273,7 +273,7 @@ export default function Workspace() {
           name: 'start_content_creation',
           title: 'Abrir criação de conteúdo',
           description:
-            'Abre o formulário de nova pauta no OxyCreate. Não salva nem gera conteúdo.',
+            'Abre o formulário de nova pauta no OxyStudio. Não salva nem gera conteúdo.',
           inputSchema: {
             type: 'object',
             properties: {},
@@ -370,8 +370,8 @@ export default function Workspace() {
         <a className="oxy-brand" href={HUB_URL} aria-label="Oxyhub · tela inicial" title="Tela inicial do Oxyhub">
           <Image unoptimized width={107} height={33} src="/oxyhub-logo.svg" alt="Oxyhub" className="oxy-logo" priority />
         </a>
-        <button className="oxy-brand" onClick={() => navigate('Dashboard')} aria-label="Ir para o Dashboard do OxyCreate">
-          <span className="oxy-product">OxyCreate</span>
+        <button className="oxy-brand" onClick={() => navigate('Dashboard')} aria-label="Ir para o Dashboard do OxyStudio">
+          <span className="oxy-product">OxyStudio</span>
         </button>
         <div className="oxy-spacer" />
         <Input

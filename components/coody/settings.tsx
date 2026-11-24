@@ -14,7 +14,7 @@ export function Integrations({ state }: { state: State }) {
         <div>
           <p className="eyebrow">SERVIÇOS EXTERNOS</p>
           <h1>Integrações</h1>
-          <p>Status dos recursos conectados ao OxyCreate.</p>
+          <p>Status dos recursos conectados ao OxyStudio.</p>
         </div>
       </div>
       <div className="integration-grid">

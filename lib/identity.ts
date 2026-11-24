@@ -18,7 +18,7 @@ export function identify(
     .toLowerCase();
   if (!id || !email)
     return Response.json(
-      { error: 'Entre com sua conta para acessar o OxyCreate.' },
+      { error: 'Entre com sua conta para acessar o OxyStudio.' },
       { status: 401 },
     );
   if (!ownerEmail || email !== ownerEmail.trim().toLowerCase())

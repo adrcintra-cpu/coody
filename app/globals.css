@@ -2223,7 +2223,7 @@ h1, h2, h3, .studio-title, .brand-card h2, .integration-card h2, .coody-dialog [
 .integration-badge.missing, .integration-badge.checking { color: var(--muted-foreground, #737985); background: rgba(127, 127, 127, .12); }
 
 /* =====================================================================================
-   Oxyhub Liquid Glass — linha visual dos sistemas Oxycom (OxyCreate)
+   Oxyhub Liquid Glass — linha visual dos sistemas Oxycom (OxyStudio)
    Fundo claro quadriculado com luzes, vidro por papel, roxo #4700ff como única cor de ação,
    Saira com títulos finos e tudo que é clicável em pílula.
    ===================================================================================== */
@@ -2737,7 +2737,7 @@ h3 {
   }
 }
 
-/* Nome do produto em texto (até existir o logo oficial do OxyCreate) */
+/* Nome do produto em texto (até existir o logo oficial do OxyStudio) */
 .product-wordmark {
   display: inline-block;
   font-family: 'Saira', sans-serif;
@@ -2748,7 +2748,7 @@ h3 {
   color: #262b36;
 }
 
-/* Logo oficial do OxyCreate: 33px de altura no menu (padrão da barra), proporção preservada */
+/* Logo oficial do OxyStudio: 33px de altura no menu (padrão da barra), proporção preservada */
 .official-logo {
   height: 33px !important;
   width: auto !important;
@@ -2950,7 +2950,7 @@ h3 {
   .oxy-pagehead { margin-bottom: 20px; }
   .oxy-pagehead-actions { width: 100%; }
 }
-/* OxyCreate: as páginas usam .page-heading; mesmas medidas da testeira padrão */
+/* OxyStudio: as páginas usam .page-heading; mesmas medidas da testeira padrão */
 .page-heading { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; margin-bottom: 28px; }
 .page-heading > div:first-child { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1 1 420px; }
 .page-heading h1 { font-size: clamp(34px, 2.4vw + 18px, 46px) !important; margin: 0 !important; overflow-wrap: anywhere; }
@@ -2960,3 +2960,7 @@ h3 {
   .page-heading { margin-bottom: 20px; }
   .page-heading > :not(:first-child) { width: 100%; }
 }
+
+/* Nome do produto em texto (OxyStudio) enquanto o logo oficial não existe.
+   O logo antigo (oxycreate-logo.svg) trazia o nome OxyCreate e saiu de uso. */
+.product-wordmark { margin: 0; font-family: 'Saira', sans-serif; font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: #0f1540; }

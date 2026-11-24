@@ -196,7 +196,7 @@ export function Members({ currentWorkspaceId }: { currentWorkspaceId?: string })
                 className="text-btn danger"
                 disabled={busy}
                 onClick={() => {
-                  if (window.confirm(`Remover ${m.name} do OxyCreate? O acesso termina na hora.`))
+                  if (window.confirm(`Remover ${m.name} do OxyStudio? O acesso termina na hora.`))
                     void post({ action: 'remove', id: m.id });
                 }}
               >

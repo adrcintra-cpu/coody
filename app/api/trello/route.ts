@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       return Response.json({
         ok: true,
         message:
-          'Conta desconectada do OxyCreate. Os cards foram preservados. Você pode revogar o token nas configurações do Trello.',
+          'Conta desconectada do OxyStudio. Os cards foram preservados. Você pode revogar o token nas configurações do Trello.',
       });
     }
     if (data.action === 'configure') {

@@ -14,10 +14,10 @@ import {
 } from '@/lib/oxyplanning';
 
 /**
- * Pautas do OxyPlanning dentro do OxyCreate (/api/oxyplanning).
+ * Pautas do OxyPlanning dentro do OxyStudio (/api/oxyplanning).
  * GET  → clientes do OxyPlanning, vínculos marca↔cliente e pautas a partir de hoje (já sincroniza o status)
  * POST { action: "link", brandId, clientId, clientName } / { action: "unlink", brandId }   (administradores)
- * POST { action: "produce", postId }  → cria a pauta "Planejado" no OxyCreate, ligada à publicação
+ * POST { action: "produce", postId }  → cria a pauta "Planejado" no OxyStudio, ligada à publicação
  * POST { action: "release", contentId } → desfaz a ligação de uma pauta ainda não enviada
  */
 
@@ -37,7 +37,7 @@ type Post = {
   version: { title: string; theme: string | null; objective: string | null; art_text: string | null; caption?: string | null; submitted_at: string | null } | null;
 };
 
-/** Pode ser produzida no OxyCreate: rascunho, ou enviada ao cliente só com texto (sem arquivo) e ainda não aprovada. */
+/** Pode ser produzida no OxyStudio: rascunho, ou enviada ao cliente só com texto (sem arquivo) e ainda não aprovada. */
 const needsArt = (p: Post) => p.status === 'draft' || ((p.status === 'awaiting' || p.status === 'changes_requested') && p.media_count === 0);
 
 /** Primeira versão do conteúdo (o Studio precisa dela): título, texto da arte e legenda que vieram do OxyPlanning. */

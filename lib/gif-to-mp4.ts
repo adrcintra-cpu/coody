@@ -44,7 +44,7 @@ async function decodeWithImageDecoder(data: ArrayBuffer, fallbackMs: number): Pr
 }
 
 export async function gifToMp4(gifUrl: string, opts: { frameMs: number; minSeconds?: number; width?: number; height?: number }) {
-  if (!mp4Supported()) throw new Error('Este navegador não grava MP4. Abra o OxyCreate no Chrome, Edge ou Safari para converter o motion.');
+  if (!mp4Supported()) throw new Error('Este navegador não grava MP4. Abra o OxyStudio no Chrome, Edge ou Safari para converter o motion.');
   const width = opts.width || 1080;
   const height = opts.height || 1350;
   const minMs = (opts.minSeconds || 6) * 1000;

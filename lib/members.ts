@@ -3,7 +3,7 @@ import { database } from './repository';
 import type { Role } from './permissions';
 
 /**
- * People invited to the OxyCreate (besides the owner): their role, the
+ * People invited to the OxyStudio (besides the owner): their role, the
  * workspaces released to them and one-time invite links. Tables are created
  * on first use (no manual migration).
  */

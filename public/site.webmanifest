@@ -1,6 +1,6 @@
 {
-  "name": "OxyCreate — Workspace criativo",
-  "short_name": "OxyCreate",
+  "name": "OxyStudio — Workspace criativo",
+  "short_name": "OxyStudio",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#16121b",

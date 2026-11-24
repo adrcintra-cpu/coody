@@ -2,13 +2,13 @@ import { env } from 'cloudflare:workers';
 import { bucket, database } from './repository';
 
 /**
- * Integração OxyPlanning ↔ OxyCreate, pela ponte do Oxyhub (/api/ponte/planning).
+ * Integração OxyPlanning ↔ OxyStudio, pela ponte do Oxyhub (/api/ponte/planning).
  * O OxyPlanning não muda: daqui só lemos as publicações dele e, quando uma peça passa
  * na revisão interna, enviamos a arte como nova versão — pela mesma função que a equipe usa lá.
  *
  * Tabelas próprias (criadas sob demanda, não alteram as existentes):
- *   planning_brand_links   marca do OxyCreate ↔ cliente do OxyPlanning
- *   planning_content_links pauta do OxyCreate ↔ publicação do OxyPlanning, com o estado do envio
+ *   planning_brand_links   marca do OxyStudio ↔ cliente do OxyPlanning
+ *   planning_content_links pauta do OxyStudio ↔ publicação do OxyPlanning, com o estado do envio
  *
  * Variáveis: COODY_HUB_SECRET (o mesmo do Oxyhub) e NEXT_PUBLIC_HUB_URL (padrão hub.oxyhub.com.br).
  */
@@ -81,7 +81,7 @@ export async function contentLink(contentId: string) {
   return database().prepare('SELECT * FROM planning_content_links WHERE contentId=?').bind(contentId).first<ContentLink>();
 }
 
-/** Formato do OxyPlanning → formato do OxyCreate. */
+/** Formato do OxyPlanning → formato do OxyStudio. */
 export function createFormat(format: string) {
   return (
     { static: 'Feed + Story', carousel: 'Carrossel', video: 'Vídeo', reel: 'Vídeo', story: 'Story' } as Record<string, string>
@@ -102,7 +102,7 @@ type VersionRow = {
 
 const MIME_OK = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/quicktime', 'application/pdf'];
 
-/** Arquivos da versão (feed, story, slides, vídeo), servidos pelo próprio OxyCreate. */
+/** Arquivos da versão (feed, story, slides, vídeo), servidos pelo próprio OxyStudio. */
 function filesOf(item: { format: string }, v: VersionRow) {
   let media: { url: string; mime?: string; name?: string }[] = [];
   try {
@@ -136,7 +136,7 @@ export async function sendToPlanning(opts: {
   const files: { body: ArrayBuffer; mime: string; name: string; size: number }[] = [];
   for (const url of urls) {
     const m = /^\/api\/assets\/([^?#/]+)/.exec(url);
-    if (!m) throw new Error('Um dos arquivos não está na biblioteca do OxyCreate. Envie-o pela biblioteca e tente de novo.');
+    if (!m) throw new Error('Um dos arquivos não está na biblioteca do OxyStudio. Envie-o pela biblioteca e tente de novo.');
     const asset = await db
       .prepare('SELECT id, brandId, mime, name FROM brand_assets WHERE id=?')
       .bind(m[1])
@@ -186,7 +186,7 @@ export async function sendToPlanning(opts: {
       hashtags,
     },
     media: uploads.map((u, i) => ({ storage_path: u.storage_path, file_name: files[i].name, mime_type: files[i].mime, size_bytes: files[i].size })),
-    change_note: `Enviada pelo OxyCreate (versão ${version.number}) após revisão interna`,
+    change_note: `Enviada pelo OxyStudio (versão ${version.number}) após revisão interna`,
   });
   const now = new Date().toISOString();
   await db
@@ -205,7 +205,7 @@ type PlanningStatus = {
 };
 
 /**
- * Traz para o OxyCreate o que aconteceu no OxyPlanning: decisão do cliente, comentários
+ * Traz para o OxyStudio o que aconteceu no OxyPlanning: decisão do cliente, comentários
  * e artes enviadas direto por lá. Só muda pautas ligadas; nunca escreve no OxyPlanning.
  */
 export async function syncFromPlanning() {
@@ -253,7 +253,7 @@ export async function syncFromPlanning() {
       if (link.baseVersionId && post.current_version_id && ['awaiting', 'changes_requested', 'approved', 'published'].includes(post.status) && post.current_version_id !== link.sentVersionId && post.current_version_id !== link.baseVersionId) {
         const target = post.status === 'published' ? 'PUBLICADO' : post.status === 'approved' ? 'APROVADO' : 'APROVAÇÃO';
         if (!['APROVADO', 'PUBLICADO'].includes(item.status) || target === 'PUBLICADO')
-          set(target, 'Arte enviada direto no OxyPlanning. Esta pauta saiu da fila de produção do OxyCreate.');
+          set(target, 'Arte enviada direto no OxyPlanning. Esta pauta saiu da fila de produção do OxyStudio.');
       }
     } else {
       // Comentários do cliente desde o último sincronismo

@@ -1,5 +1,4 @@
 'use client';
-import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -109,7 +108,7 @@ export function ClientBoard({ token }: { token: string }) {
   return (
     <main className="client-page">
       <header className="client-header">
-        <Image unoptimized width={1920} height={425} src="/oxycreate-logo.svg" alt="OxyCreate" className="client-logo" />
+        <p className="product-wordmark" aria-label="OxyStudio">OxyStudio</p>
         <div>
           <p className="eyebrow">{board.brand.segment || 'PRODUÇÃO'}</p>
           <h1>{board.brand.name}</h1>
