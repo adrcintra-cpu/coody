@@ -734,7 +734,7 @@ export function Create({ state, act, reload }: { state: State; act: Action; relo
                       decoding="async"
                       title={product?.id === a.id ? 'Produto escolhido (clique para tirar)' : 'Usar este produto'}
                       onClick={() => setProduct((p) => (p?.id === a.id ? null : { id: a.id, url: a.url, name: a.name }))}
-                      className={'size-12 shrink-0 cursor-pointer rounded-[8px] object-cover ' + (product?.id === a.id ? 'ring-2 ring-[#4700ff] ring-offset-1' : 'opacity-85 hover:opacity-100')}
+                      className={'size-16 shrink-0 cursor-pointer rounded-[10px] bg-white object-contain p-1 shadow-[0_0_0_1px_rgb(15_21_64/.08)] ' + (product?.id === a.id ? 'ring-2 ring-[#4700ff] ring-offset-1' : 'opacity-85 hover:opacity-100')}
                     />
                   ))}
                 </div>
